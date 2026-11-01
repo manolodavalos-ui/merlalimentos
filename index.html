@@ -444,6 +444,29 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .scan-box video{width:100%;height:100%;object-fit:cover}
 .scan-line{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#ff3b30;box-shadow:0 0 8px #ff3b30}
 
+.cat-grid{padding-top:12px}
+.cat-hint{text-align:center;color:var(--muted);font-size:.82rem;padding:0 16px 28px}
+.cat-modal{position:fixed;inset:0;z-index:85;background:rgba(10,16,14,.72);display:flex;align-items:center;justify-content:center;padding:16px;animation:catIn .18s ease-out}
+@keyframes catIn{from{opacity:0}to{opacity:1}}
+.cat-card{position:relative;width:min(440px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.4);animation:catZoom .2s ease-out}
+@keyframes catZoom{from{transform:scale(.92)}to{transform:none}}
+.cat-x{position:absolute;top:8px;right:8px;z-index:2;background:rgba(255,255,255,.92);border-radius:50%}
+.cat-x svg{stroke:var(--text)}
+.cat-foto{width:100%;aspect-ratio:1/1;background-color:#fff;background-position:center;background-size:contain;background-repeat:no-repeat;border-bottom:1px solid var(--line)}
+.cat-foto.sin{display:grid;place-items:center;background:#e3e7e5;font-size:1.3rem;font-weight:700;text-align:center;padding:24px}
+.cat-info{padding:16px 20px 24px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px}
+.cat-marca{font-size:.78rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.cat-info h3{font-size:1.3rem;line-height:1.25}
+.cat-pres{color:var(--muted)}
+.cat-precio{font-size:2rem;font-weight:800;margin-top:6px}
+.cat-precio small{font-size:.95rem;font-weight:600;color:var(--muted)}
+.cat-may{background:#fff7e0;color:#6b4e00;border-radius:10px;padding:6px 12px;font-size:.88rem;margin-top:4px}
+.cat-et{background:var(--brand);color:#fff;border-radius:999px;padding:3px 12px;font-size:.78rem;font-weight:700;margin-top:4px}
+.cat-nav{position:absolute;top:calc(50% - 60px);width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.2);display:grid;place-items:center}
+.cat-nav svg{width:22px;height:22px;stroke:var(--text)}
+.cat-nav.prev{left:8px} .cat-nav.next{right:8px}
+.cat-pos{position:absolute;top:14px;left:16px;font-size:.75rem;color:var(--muted);background:rgba(255,255,255,.9);padding:2px 8px;border-radius:999px}
+
 /* Hoja inferior / teclado */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:440px;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -1633,7 +1656,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.21.1';
+const APP_VERSION = '0.22';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3440,7 +3463,7 @@ function renderHeader(){
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
-    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos'].includes(current));
+    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo'].includes(current));
     acts.innerHTML = current==='clientes' && (cliVista==='crear'||cliVista==='editar') ? '<button class="head-txt" id="hCliGuardar">GUARDAR</button>'
                    : current==='clientes' && cliVista==='lista' ? `<button class="icon-btn" id="hCliNuevo" aria-label="Crear cliente">${svg('userAdd')}</button>` : '';
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
@@ -4043,6 +4066,68 @@ function bindTilesArt(){
   });
 }
 
+/* ================= Catálogo (vista para mostrar a clientes) ================= */
+function viewCatalogo(){
+  const lista = articulos();
+  const html = categorias().map(sec=>{
+    const ps = lista.filter(p=> p.seccion===sec);
+    return ps.length ? `<div class="sec-title">${esc(sec)}</div>` + ps.map(tileHTML).join('') : '';
+  }).join('');
+  return `<div class="grid cat-grid" id="catGrid">${html || '<div class="no-results">No hay productos para mostrar.</div>'}</div>
+    <p class="cat-hint">Toca dos veces un producto para verlo en grande</p>`;
+}
+function renderCatalogo(){
+  document.getElementById('view').innerHTML = viewCatalogo(); renderHeader();
+  const orden = [...document.querySelectorAll('#catGrid .tile')].map(t=> t.dataset.pid);
+  document.querySelectorAll('#catGrid .tile').forEach(t=>{
+    let ultimo = 0;
+    t.addEventListener('pointerup', ()=>{
+      const ahora = Date.now();
+      if(ahora - ultimo < 350){ ultimo = 0; verProducto(t.dataset.pid, orden); }
+      else ultimo = ahora;
+    });
+    t.addEventListener('dblclick', e=> e.preventDefault());
+    t.addEventListener('contextmenu', e=> e.preventDefault());
+  });
+}
+function verProducto(pid, orden){
+  document.querySelector('.cat-modal')?.remove();
+  let i = Math.max(0, orden.indexOf(pid));
+  const bg = document.createElement('div'); bg.className = 'cat-modal';
+  document.body.appendChild(bg);
+  const cerrar = ()=>{ bg.remove(); document.removeEventListener('keydown', teclas); };
+  const pintar = ()=>{
+    const p = articulos().find(a=> a.id===orden[i]); if(!p) return;
+    const foto = claseFoto(p);
+    bg.innerHTML = `<div class="cat-card" role="dialog" aria-label="${esc(nombreTicket(p))}">
+      <button class="icon-btn cat-x" aria-label="Cerrar">${svg('close')}</button>
+      <div class="cat-foto ${foto ? 'ph '+foto : 'sin'}">${foto ? '' : `<span>${esc(nombreTile(p))}</span>`}</div>
+      <div class="cat-info">
+        ${p.marca ? `<span class="cat-marca">${esc(p.marca)}</span>` : ''}
+        <h3>${esc(p.nombre)}</h3>
+        ${p.pres ? `<span class="cat-pres">${esc(p.pres)}</span>` : ''}
+        <span class="cat-precio">${p.precio!=null ? fmt(p.precio) : 'Precio por confirmar'}${p.porKilo?' <small>por kg</small>':''}</span>
+        ${p.mayoreo ? `<span class="cat-may">${esc(p.mayoreo)}</span>` : ''}
+        ${p.etiqueta ? `<span class="cat-et">${esc(p.etiqueta)}</span>` : ''}
+      </div>
+      ${orden.length > 1 ? `<button class="cat-nav prev" aria-label="Anterior">${svg('back')}</button><button class="cat-nav next" aria-label="Siguiente">${svg('chev')}</button>` : ''}
+      <span class="cat-pos">${i+1} de ${orden.length}</span>
+    </div>`;
+    bg.querySelector('.cat-x').onclick = cerrar;
+    const pv = bg.querySelector('.prev'), nx = bg.querySelector('.next');
+    if(pv) pv.onclick = e=>{ e.stopPropagation(); i = (i - 1 + orden.length) % orden.length; pintar(); };
+    if(nx) nx.onclick = e=>{ e.stopPropagation(); i = (i + 1) % orden.length; pintar(); };
+  };
+  const teclas = e=>{ if(e.key==='Escape') cerrar(); else if(e.key==='ArrowRight') bg.querySelector('.next')?.click(); else if(e.key==='ArrowLeft') bg.querySelector('.prev')?.click(); };
+  document.addEventListener('keydown', teclas);
+  bg.addEventListener('click', e=>{ if(e.target===bg) cerrar(); });
+  let x0 = null;
+  bg.addEventListener('touchstart', e=>{ x0 = e.touches[0].clientX; }, {passive:true});
+  bg.addEventListener('touchend', e=>{ if(x0==null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if(Math.abs(dx) > 50 && orden.length > 1){ i = (i + (dx < 0 ? 1 : -1) + orden.length) % orden.length; pintar(); } }, {passive:true});
+  pintar();
+}
+
 /* ================= Navegación ================= */
 function viewPendiente(id){
   const m = MENU.find(x=>x.id===id);
@@ -4060,6 +4145,7 @@ function go(id){
   if(current !== id) seccionPrevia = current;
   current = id;
   document.querySelector('.cl-sheet')?.remove();
+  document.querySelector('.cat-modal')?.remove();
   document.querySelectorAll('.sheet-bg.center').forEach(x=> x.remove());
   const m = MENU.find(x=>x.id===id);
   document.getElementById('viewTitle').textContent = m.label;
@@ -4068,13 +4154,14 @@ function go(id){
   document.querySelector('main').classList.toggle('flush', esVenta);
   view.classList.toggle('wide', esVenta);
   document.querySelector('.popover')?.remove();
-  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos'].includes(id));
-  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos'].includes(id));
+  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo'].includes(id));
+  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo'].includes(id));
   if(id==='turno'){ if(!turnoActual()) turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
   else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
+  else if(id==='catalogo'){ renderCatalogo(); }
   else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : 'grid'; renderVenta(); }
   else{
     view.innerHTML = viewPendiente(id);
