@@ -467,6 +467,15 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .cat-nav.prev{left:8px} .cat-nav.next{right:8px}
 .cat-pos{position:absolute;top:14px;left:16px;font-size:.75rem;color:var(--muted);background:rgba(255,255,255,.9);padding:2px 8px;border-radius:999px}
 
+.chip-promo{background:#e8590c;color:#fff}
+.price-face .pm.promo{background:#e8590c;color:#fff;font-weight:700}
+.promo-l{display:flex;align-items:center;gap:5px;color:var(--brand);font-size:.84rem;font-weight:600;margin-top:4px}
+.promo-l svg{width:15px;height:15px;stroke:var(--brand)}
+.promo-h{display:block;color:#b05300;font-size:.8rem;margin-top:3px}
+.promo-box{border:1.5px solid var(--line);border-radius:14px;padding:12px 14px}
+.pm-row{align-items:center}
+.pm-sw{width:22px;height:22px;accent-color:var(--brand);margin:0 16px}
+
 /* Hoja inferior / teclado */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:440px;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -1656,7 +1665,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.22';
+const APP_VERSION = '0.23';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1818,6 +1827,7 @@ function viewTurno(){
     <div class="card cajon">
       <h3>Resumen</h3>
       ${fila('Ventas brutas', c.brutas, '', 'fuerte')}
+      ${fila('Descuentos por promoción', c.promo, '-', 'sub')}
       ${fila('Descuentos por pedido incompleto', c.descTotal, '-', 'sub')}
       ${fila('Cancelaciones', c.cancTotal, '-', 'sub')}
       ${fila('Ventas netas', c.netas, '', 'fuerte')}
@@ -1849,13 +1859,14 @@ function calcCajon(t){
     cancEf: sumar(descs.filter(d=> ef(d) && esCanc(d)), d=>d.monto),
     depositado: sumar(movs.filter(m=>m.tipo==='deposito'), m=>m.monto),
     salidas: sumar(movs.filter(m=>m.tipo==='salida'), m=>m.monto),
-    brutas: sumar(recs, r=>r.total),
+    brutas: sumar(recs, r=> (r.lineas||[]).reduce((s,l)=> s + listaLinea(l), 0)),
+    promo: sumar(recs, r=> (r.lineas||[]).reduce((s,l)=> s + ahorroLinea(l), 0)),
     descTotal: sumar(descs.filter(d=>!esCanc(d)), d=>d.monto),
     cancTotal: sumar(descs.filter(esCanc), d=>d.monto),
     nRecibos: recs.length, porMetodo:{}
   };
   c.teorico = r2(c.fondo + c.cobrosEf - c.descEf - c.cancEf + c.depositado - c.salidas);
-  c.netas = r2(c.brutas - c.descTotal - c.cancTotal);
+  c.netas = r2(c.brutas - c.promo - c.descTotal - c.cancTotal);
   ['Efectivo','Tarjeta','Crédito'].forEach(m=>{
     c.porMetodo[m] = r2(sumar(recs.filter(r=>r.metodo===m), r=>r.total) - sumar(descs.filter(d=>d.recibo.metodo===m), d=>d.monto));
   });
@@ -2051,7 +2062,45 @@ const txtModo = (venta, pre, cot)=> esCot() ? cot : esPre() ? pre : venta;
 const ticket = ()=> store.get(tKey(), {lineas:[]});
 const guardarTicket = t => store.set(tKey(), t);
 const r2 = n => Math.round(n*100)/100;
-const importeLinea = l => r2((l.precio||0) * l.cantidad);
+/* ===== Promociones: precio por volumen o por paquete ===== */
+const hoyISO = ()=> hoyClave();
+function promoActiva(a){
+  const pr = a && a.promo;
+  if(!pr || pr.activa===false || a.porKilo || !(pr.cantidad > 1) || !(pr.precio > 0)) return false;
+  const h = hoyISO();
+  if(pr.inicio && h < pr.inicio) return false;
+  if(pr.fin && h > pr.fin) return false;
+  return true;
+}
+const artPorId = id => store.get('articulos', []).find(a=> a.id===id);
+/* Regla congelada en recibos (promoRegla) o la vigente del producto en tickets abiertos */
+function reglaDe(l){
+  if(l.porKilo) return null;
+  if('promoRegla' in l) return l.promoRegla;
+  const a = artPorId(l.pid);
+  return promoActiva(a) ? {tipo:a.promo.tipo, cantidad:a.promo.cantidad, precio:a.promo.precio} : null;
+}
+function importeCon(l, q, regla = reglaDe(l)){
+  const p = l.precio || 0;
+  if(!regla || q <= 0) return r2(p*q);
+  if(regla.tipo==='volumen') return r2((q >= regla.cantidad ? regla.precio : p) * q);
+  const g = Math.floor(q / regla.cantidad);
+  return r2(g*regla.precio + (q - g*regla.cantidad)*p);
+}
+const textoPromo = pr => !pr ? '' : pr.tipo==='volumen' ? `${pr.cantidad}+ a ${fmt(pr.precio)} c/u` : `${pr.cantidad} x ${fmt(pr.precio)}`;
+const listaLinea = l => r2((l.precio||0) * l.cantidad);
+const importeLinea = l => importeCon(l, l.cantidad);
+const ahorroLinea = l => r2(listaLinea(l) - importeLinea(l));
+function faltaPromo(l){
+  const rg = reglaDe(l); if(!rg) return 0;
+  if(rg.tipo==='volumen') return l.cantidad >= rg.cantidad ? 0 : rg.cantidad - l.cantidad;
+  const resto = l.cantidad % rg.cantidad; return resto === 0 ? 0 : rg.cantidad - resto;
+}
+/* Congela precio de lista, promoción y costo al registrar una venta o pedido */
+const congelarLineas = lineas => lineas.map(l=>{
+  const a = artPorId(l.pid);
+  return {...l, promoRegla: reglaDe(l), costo: a && a.costo != null ? a.costo : null};
+});
 const totalTicket = t => r2(t.lineas.reduce((s,l)=> s + importeLinea(l), 0));
 const cuentaTicket = t => t.lineas.reduce((s,l)=> s + (l.porKilo ? 1 : l.cantidad), 0);
 const fmtKg = n => Number(n).toLocaleString('es-MX',{minimumFractionDigits:3, maximumFractionDigits:3});
@@ -2100,14 +2149,14 @@ function tileHTML(p){
       <div class="face" style="top:-${i*100}%;height:${SLATS*100}%">${cara}</div></div>`;
   }
   const precio = p.precio == null ? '<span class="pp" style="font-size:1rem">Sin precio</span>' : `<span class="pp">${fmt(p.precio)}</span>`;
-  const chip = p.etiqueta ? `<span class="chip-kg chip-et">${esc(p.etiqueta.toUpperCase())}</span>` : '';
+  const chip = promoActiva(p) ? `<span class="chip-kg chip-et chip-promo">PROMO</span>` : p.etiqueta ? `<span class="chip-kg chip-et">${esc(p.etiqueta.toUpperCase())}</span>` : '';
   return `<div class="tile${foto?' has-photo':''}${p.activo===false?' inactivo':''}" data-pid="${p.id}" role="button" aria-label="${esc(nombreTicket(p))}">
     <span class="chip-price">${p.precio!=null?fmt(p.precio):'Sin precio'}${p.porKilo?'/kg':''}</span>${current==='articulos' && p.activo===false?'<span class="chip-off">Oculto</span>':''}
     <div class="price-face">
       <span class="pb">${esc(p.marca||'')}</span>
       <span class="pn">${esc(nombreTile(p))}</span>
       ${precio}${p.porKilo?'<span class="pu">por kilo</span>':''}
-      ${p.mayoreo?`<span class="pm">${esc(p.mayoreo)}</span>`:''}
+      ${promoActiva(p) ? `<span class="pm promo">Promo: ${textoPromo(p.promo)}</span>` : p.mayoreo?`<span class="pm">${esc(p.mayoreo)}</span>`:''}
     </div>
     ${slats}
     ${chip}
@@ -2149,6 +2198,7 @@ function viewTicket(){
     <div class="tline" data-lid="${l.lid}">
       <div>${esc(l.nombre)}<span class="q">${l.porKilo ? fmtKg(l.cantidad)+' kg' : 'x '+l.cantidad}</span>
         ${l.precio==null?'<span class="np">Sin precio capturado</span>':''}
+        ${ahorroLinea(l) > 0 ? `<span class="promo-l">${svg('articulos')}Promo ${textoPromo(reglaDe(l))} · ahorras ${fmt(ahorroLinea(l))}</span>` : (reglaDe(l) && faltaPromo(l) ? `<span class="promo-h">Lleva ${faltaPromo(l)} más para la promo ${textoPromo(reglaDe(l))}</span>` : '')}
         ${existencia(l.pid) <= 0 ? `<span class="nostock">${svg('alert')}No disponible en inventario</span>` : ''}</div>
       <div>${fmt(importeLinea(l))}</div>
     </div>`).join('');
@@ -2429,7 +2479,7 @@ function registrarVenta(metodo, recibido){
     turno:turno.folio, dispositivo:turno.dispositivo, fecha:new Date().toISOString(),
     usuario:session.usuario, vendedor:session.nombre, cliente:t.cliente || null,
     ticketNombre:t.nombre || null, comentario:t.comentario || null,
-    lineas:t.lineas, total, metodo,
+    lineas:congelarLineas(t.lineas), total, metodo,
     recibido: metodo==='Efectivo' ? recibido : (metodo==='Tarjeta' ? total : 0),
     cambio: metodo==='Efectivo' ? r2(recibido - total) : 0,
     saldo: metodo==='Crédito' ? total : 0,
@@ -3217,7 +3267,7 @@ function bindProgramar(){
       id:'P'+Date.now(), folio:`P${turno.folio}-${String(seq).padStart(3,'0')}`,
       fecha:new Date().toISOString(), fechaEntrega, horario:document.getElementById('pHorario').value,
       comentario:document.getElementById('pCom').value.trim(),
-      cliente:t.cliente, lineas:t.lineas, total:totalTicket(t), estado:'Programado',
+      cliente:t.cliente, lineas:congelarLineas(t.lineas), total:totalTicket(t), estado:'Programado',
       turno:turno.folio, dispositivo:turno.dispositivo, usuario:session.usuario, vendedor:session.nombre,
       ticketNombre:t.nombre || null, sincronizado:false
     };
@@ -3370,7 +3420,7 @@ function abrirTeclado({producto, linea}){
   const pintar = ()=>{
     num.textContent = valor || '0';
     const n = parseFloat(valor||'0') || 0;
-    sub.textContent = fmt(r2((precio||0)*n));
+    sub.textContent = fmt(linea && !porKilo ? importeCon(linea, n) : r2((precio||0)*n));
   };
   pintar();
   bg.querySelectorAll('.keys button').forEach(b=> b.onclick = ()=>{
@@ -3459,7 +3509,7 @@ function renderHeader(){
     const enCfg = current==='config' && cfgVista!=='inicio';
     const enArt = current==='articulos' && artVista==='editar';
     const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt;
-    title.textContent = enTes ? 'Gestión de tesorería' : enCfg ? 'Impresoras' : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
+    title.textContent = enTes ? 'Gestión de tesorería' : enCfg ? (cfgVista==='promos' ? 'Promociones' : 'Impresoras') : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
@@ -3538,6 +3588,15 @@ let reciboVista = 'detalle';
 const totalNeto = r => r2((r.total||0) - (r.descuentos||[]).reduce((s,d)=> s + d.monto, 0));
 const descontado = (r, lid) => r3((r.descuentos||[]).reduce((s,d)=> s + d.lineas.filter(x=>x.lid===lid).reduce((a,x)=> a + x.cantidad, 0), 0));
 const restante = (r, l) => r3(l.cantidad - descontado(r, l.lid));
+/* Lo que baja el total al quitar piezas (respeta la promoción: si deja de cumplirse, se pierde) */
+function montoDescuento(r, elegidos){
+  const porLid = {};
+  elegidos.forEach(u=>{ porLid[u.lid] = r3((porLid[u.lid]||0) + u.cantidad); });
+  return r2(Object.entries(porLid).reduce((s,[lid,q])=>{
+    const l = r.lineas.find(x=> x.lid===lid), antes = restante(r, l);
+    return s + importeCon(l, antes) - importeCon(l, r3(antes - q));
+  }, 0));
+}
 function unidadesDescontables(r){
   const out = [];
   r.lineas.forEach(l=>{
@@ -3565,7 +3624,7 @@ function viewDescuento(r){
 function bindDescuento(r){
   const us = unidadesDescontables(r), ok = document.getElementById('dscOk');
   const sel = ()=> [...document.querySelectorAll('.dsc-row input:checked')].map(c=> us[Number(c.dataset.i)]);
-  const monto = ()=> r2(sel().reduce((s,u)=> s + (u.l.precio||0)*u.cantidad, 0));
+  const monto = ()=> montoDescuento(r, sel());
   document.querySelectorAll('.dsc-row input').forEach(c=> c.onchange = ()=>{ const m = monto(); ok.disabled = !sel().length; ok.textContent = `DESCONTAR ${fmt(m)}`; });
   ok.onclick = ()=>{
     const elegidos = sel(); if(!elegidos.length) return;
@@ -3580,7 +3639,8 @@ function bindDescuento(r){
 function aplicarDescuento(r, elegidos, monto, cancela){
   const agrup = {};
   elegidos.forEach(u=>{ const a = agrup[u.lid] || (agrup[u.lid] = {lid:u.lid, pid:u.l.pid, nombre:u.l.nombre, precio:u.l.precio, porKilo:u.l.porKilo, cantidad:0}); a.cantidad = r3(a.cantidad + u.cantidad); });
-  const lineas = Object.values(agrup).map(a=> ({...a, importe:r2((a.precio||0)*a.cantidad)}));
+  const lineas = Object.values(agrup).map(a=>{ const l = r.lineas.find(x=> x.lid===a.lid), antes = restante(r, l);
+    return {...a, importe: r2(importeCon(l, antes) - importeCon(l, r3(antes - a.cantidad)))}; });
   const version = (r.version||1) + 1;
   r.descuentos = [...(r.descuentos||[]), {id:'D'+Date.now(), version, fecha:new Date().toISOString(), usuario:session.usuario, vendedor:session.nombre,
     turno:turnoActual()?.folio || null, lineas, monto, cancelacion:cancela, motivo:'Pedido incompleto'}];
@@ -3600,7 +3660,7 @@ function htmlTicket(r){
   const fila = (a,b)=> `<div class="f"><span>${a}</span><span>${b}</span></div>`;
   const lineas = r.lineas.map(l=>{
     const q = restante(r, l);
-    return q > 0 ? `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(q)+' kg x '+fmt(l.precio||0) : q+' x '+fmt(l.precio||0), fmt(r2((l.precio||0)*q)))}` : '';
+    return q > 0 ? `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(q)+' kg x '+fmt(l.precio||0) : q+' x '+fmt(l.precio||0), fmt(r2((l.precio||0)*q)))}${importeCon(l,q) < r2((l.precio||0)*q) ? fila('  Promo '+textoPromo(reglaDe(l)), '−'+fmt(r2((l.precio||0)*q - importeCon(l,q)))) : ''}` : '';
   }).join('');
   const quitados = d.flatMap(x=> x.lineas).map(l=> `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza', '−'+fmt(l.importe))}`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Recibo ${esc(r.folio)}</title><style>
@@ -3665,6 +3725,7 @@ function lineasTicket(r){
     const q = restante(r, l); if(q <= 0) return;
     envolver(l.nombre).forEach(x=> L.push({t:x}));
     L.push({t:dos('  ' + (l.porKilo ? fmtKg(q)+' kg' : q) + ' x ' + fmt(l.precio||0), fmt(r2((l.precio||0)*q)))});
+    if(importeCon(l, q) < r2((l.precio||0)*q)) L.push({t:dos('  Promo ' + textoPromo(reglaDe(l)), '-' + fmt(r2((l.precio||0)*q - importeCon(l, q))))});
   });
   if(d.length){
     L.push({t:sep}); L.push({t:'DESCUENTO POR PEDIDO INCOMPLETO', b:true});
@@ -3706,7 +3767,7 @@ function jsonTicketPrinter(r){
     v:1, tipo: r.version > 1 ? 'venta_v'+r.version : 'venta', ancho:c.ancho, copias:c.copias,
     negocio:{nombre:c.encabezado, sub:c.sub, telefono:c.tel}, pie:c.pie,
     folio:r.folio, version:r.version||1, fecha:r.fecha, vendedor:r.vendedor||'', cliente:r.cliente?.nombre||'',
-    items:r.lineas.map(l=>({nombre:l.nombre, cantidad:restante(r,l), unidad:l.porKilo?'kg':'pza', precio:l.precio||0, importe:r2((l.precio||0)*restante(r,l))})).filter(i=>i.cantidad>0),
+    items:r.lineas.map(l=>({nombre:l.nombre, cantidad:restante(r,l), unidad:l.porKilo?'kg':'pza', precio:l.precio||0, importe:importeCon(l, restante(r,l)), promo:textoPromo(reglaDe(l))})).filter(i=>i.cantidad>0),
     descuentos:(r.descuentos||[]).flatMap(d=> d.lineas.map(l=>({nombre:l.nombre, cantidad:l.cantidad, importe:l.importe}))),
     total_original:r.total, total:neto, cancelado:!!r.cancelado,
     pago:{metodo:r.metodo, recibido:r.recibido||0, cambio:r.cambio||0, saldo:r.saldo||0},
@@ -3741,8 +3802,10 @@ function reciboDePrueba(){
 let cfgVista = 'inicio';
 function viewConfig(){
   if(cfgVista==='impresoras') return viewImpresoras();
+  if(cfgVista==='promos') return viewPromos();
   const c = impCfg();
   return `<div class="cl-home">
+    <button class="cl-opt" id="optPromo"><span class="cl-opt-ic">${svg('articulos')}</span><span><b>Promociones</b><small>${store.get('articulos',[]).filter(a=>!a.borrado && a.promo).length} configuradas · ${articulos().filter(promoActiva).length} vigentes</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optImp"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Impresoras</b><small>${esc(METODOS_IMP[c.metodo].nombre)} · ${c.ancho} mm${c.auto?' · imprime al cobrar':''}</small></span>${svg('chev')}</button>
   </div>`;
 }
@@ -3769,6 +3832,22 @@ function viewImpresoras(){
     <button class="btn ghost" id="impPrueba">${svg('recibos')}Imprimir ticket de prueba</button>
   </div>`;
 }
+function viewPromos(){
+  const ls = store.get('articulos',[]).filter(a=> !a.borrado && a.promo);
+  if(!ls.length) return `<div class="rc-wrap"><div class="rc-empty">${svg('articulos')}<p>No hay promociones. Agrégalas desde Artículos, en cada producto.</p></div></div>`;
+  return `<div class="rc-wrap">${ls.map(a=>{
+    const vig = promoActiva(a), pr = a.promo;
+    const fechas = pr.inicio || pr.fin ? `${pr.inicio ? 'desde '+pr.inicio : ''}${pr.fin ? ' hasta '+pr.fin : ''}` : 'Sin fecha límite';
+    const unit = pr.tipo==='volumen' ? pr.precio : pr.precio/pr.cantidad;
+    return `<div class="ab-row pm-row">
+      <button class="ab-main pm-edit" data-id="${a.id}">
+        <span class="ab-t"><b>${esc(nombreTicket(a))}</b><span>${textoPromo(pr)}</span></span>
+        <span class="ab-m">${pr.tipo==='volumen'?'Precio por volumen':'Paquete'} · normal ${fmt(a.precio)} → ${fmt(r2(unit))} c/u · ${esc(fechas)}${pr.activa!==false && !vig ? ' · <b class="neg">fuera de vigencia</b>' : ''}</span>
+      </button>
+      <input type="checkbox" class="pm-sw" data-id="${a.id}" ${pr.activa!==false?'checked':''} aria-label="Activar promoción">
+    </div>`;
+  }).join('')}</div>`;
+}
 function leerImpForm(){
   const v = id => document.getElementById(id);
   return {metodo:(document.querySelector('input[name="impM"]:checked')||{}).value || 'navegador', ancho:Number(v('impAncho').value), copias:Number(v('impCop').value),
@@ -3777,7 +3856,20 @@ function leerImpForm(){
 function renderConfig(){
   const view = document.getElementById('view');
   view.innerHTML = viewConfig(); renderHeader();
-  if(cfgVista==='inicio'){ document.getElementById('optImp').onclick = ()=>{ cfgVista='impresoras'; renderConfig(); }; return; }
+  if(cfgVista==='inicio'){
+    document.getElementById('optImp').onclick = ()=>{ cfgVista='impresoras'; renderConfig(); };
+    document.getElementById('optPromo').onclick = ()=>{ cfgVista='promos'; renderConfig(); };
+    return;
+  }
+  if(cfgVista==='promos'){
+    document.querySelectorAll('.pm-sw').forEach(sw=> sw.onchange = ()=>{
+      const ls = store.get('articulos',[]), a = ls.find(x=> x.id===sw.dataset.id); if(!a || !a.promo) return;
+      a.promo.activa = sw.checked; a.editado = true; store.set('articulos', ls); renderConfig();
+      toast(sw.checked ? 'Promoción activada' : 'Promoción desactivada');
+    });
+    document.querySelectorAll('.pm-edit').forEach(b=> b.onclick = ()=>{ go('articulos'); artSel = b.dataset.id; artVista = 'editar'; renderArticulos(); });
+    return;
+  }
   const prev = ()=>{
     const antes = store.get('config').imp; guardarImpCfg(leerImpForm());
     document.getElementById('impPrev').textContent = textoTicket(reciboDePrueba());
@@ -3796,7 +3888,7 @@ function viewReciboDetalle(r){
   const neto = totalNeto(r), d = r.descuentos || [];
   const lineas = (r.lineas||[]).map(l=>{
     const q = restante(r, l), quit = r3(l.cantidad - q);
-    return `<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}${quit>0 ? ` · <i class="neg">${l.porKilo ? fmtKg(quit)+' kg' : quit} descontado${!l.porKilo && quit>1?'s':''}</i>` : ''}</small></div><span>${fmt(importeLinea(l))}</span></div>`;
+    return `<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}${ahorroLinea(l)>0 ? ` · <i class="pos">promo ${textoPromo(reglaDe(l))} (−${fmt(ahorroLinea(l))})</i>` : ''}${quit>0 ? ` · <i class="neg">${l.porKilo ? fmtKg(quit)+' kg' : quit} descontado${!l.porKilo && quit>1?'s':''}</i>` : ''}</small></div><span>${fmt(importeLinea(l))}</span></div>`;
   }).join('');
   const bloqueDesc = d.map(x=>`<div class="rd-desc"><div class="rd-desc-h"><b>Versión ${x.version} · ${x.cancelacion?'Cancelación':'Descuento por pedido incompleto'}</b><span>${fecha(x.fecha)} · ${esc(x.vendedor||x.usuario)}</span></div>
       ${x.lineas.map(l=>`<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}</small></div><span class="neg">−${fmt(l.importe)}</span></div>`).join('')}</div>`).join('');
@@ -3909,6 +4001,20 @@ function formArticuloHTML(a){
       <p class="sub" style="margin-top:6px">Hasta 5 precios. Se asignarán a clientes más adelante; por ahora se usa el precio principal.</p>
     </div>
     ${a.mayoreo ? `<p class="sub">Nota del catálogo: ${esc(a.mayoreo)}</p>` : ''}
+    <div class="gfield promo-box"><label class="sw-row" style="border:0;padding-top:0"><span><b>Promoción</b><small>Se aplica sola en el ticket al llegar a la cantidad</small></span><input type="checkbox" id="pmOn" ${a.promo && a.promo.activa!==false ? 'checked' : ''}></label>
+      <div id="pmCampos" ${a.promo && a.promo.activa!==false ? '' : 'hidden'}>
+        <div class="seg2" id="pmTipo"><button type="button" data-v="volumen" class="${(a.promo?.tipo||'paquete')==='volumen'?'on':''}">Precio por volumen</button><button type="button" data-v="paquete" class="${(a.promo?.tipo||'paquete')==='paquete'?'on':''}">Paquete</button></div>
+        <div class="cf-row eq" style="margin-top:12px">
+          <div class="gfield"><label for="pmCant" id="pmCantLbl">Cantidad</label><input id="pmCant" type="number" inputmode="numeric" min="2" step="1" value="${a.promo?.cantidad ?? ''}"></div>
+          <div class="gfield"><label for="pmPrecio" id="pmPrecioLbl">Precio</label><input id="pmPrecio" type="number" inputmode="decimal" min="0" step="0.01" value="${a.promo?.precio ?? ''}"></div>
+        </div>
+        <div class="cf-row eq">
+          <div class="gfield"><label for="pmIni">Desde (opcional)</label><input id="pmIni" type="date" value="${a.promo?.inicio||''}"></div>
+          <div class="gfield"><label for="pmFin">Hasta (opcional)</label><input id="pmFin" type="date" value="${a.promo?.fin||''}"></div>
+        </div>
+        <p class="sub" id="pmResumen"></p>
+      </div>
+    </div>
     <label class="sw-row"><span><b>Mostrar en venta</b><small>Si lo desactivas, el producto se oculta en Venta, Preventa y Cotizar</small></span><input type="checkbox" id="aActivo" ${a.activo!==false?'checked':''}></label>
     <button class="btn" id="aGuardar">${a.id ? 'Guardar cambios' : 'Guardar producto'}</button>
     ${a.id ? '<button class="btn danger" id="aEliminar">Eliminar producto</button>' : ''}
@@ -3920,7 +4026,7 @@ function leerArticulo(){
   const num = x => x==='' || x==null ? null : r2(parseFloat(x));
   const precios = [...document.querySelectorAll('#aPrecios .pr-row')].map((r,i)=>({etiqueta:r.querySelector('.pr-et').value.trim() || `Precio ${i+2}`, valor:num(r.querySelector('.pr-v').value)})).filter(x=> x.valor!=null && x.valor>0);
   return {nombre:v('aNom').value.trim(), nombreForm:v('aNom').value, seccion:v('aCat').value, proveedor:v('aProv').value.trim(), precio:num(v('aPrecio').value), costo:num(v('aCosto').value),
-          porKilo:document.querySelector('#aVend .on')?.dataset.v==='kg', sku:v('aSku').value.trim().toUpperCase(), codigo:v('aCod').value.trim(), precios, activo:v('aActivo').checked};
+          promo: leerPromo(), porKilo:document.querySelector('#aVend .on')?.dataset.v==='kg', sku:v('aSku').value.trim().toUpperCase(), codigo:v('aCod').value.trim(), precios, activo:v('aActivo').checked};
 }
 function bindFormArticulo(){
   const cat = document.getElementById('aCat');
@@ -3958,6 +4064,7 @@ function bindFormArticulo(){
   const qi = document.getElementById('aQuitarImg'); if(qi) qi.onclick = ()=>{ Object.assign(artBorrador, leerArticulo()); artBorrador.foto = null; renderArticulos(true); };
   document.getElementById('aScan').onclick = ()=> escanearCodigo(cod=>{ document.getElementById('aCod').value = cod; toast('Código leído'); });
   document.getElementById('aGuardar').onclick = guardarArticulo;
+  bindPromoForm();
   const del = document.getElementById('aEliminar');
   if(del) del.onclick = ()=> confirmar({titulo:'Eliminar producto', peligro:true, ok:'Eliminar',
     texto:`¿Eliminar "${esc(nombreTicket(artBorrador))}"? Ya no aparecerá en ventas; los recibos anteriores se conservan.`,
@@ -3974,10 +4081,43 @@ function pedirTexto({titulo, etiqueta, ok, alAceptar}){
   bg.querySelector('[data-a="si"]').onclick = aceptar;
   inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); aceptar(); } });
 }
+function leerPromo(){
+  const on = document.getElementById('pmOn'); if(!on || !on.checked) return null;
+  const v = id => document.getElementById(id).value;
+  return {tipo:document.querySelector('#pmTipo .on')?.dataset.v || 'paquete', cantidad:parseInt(v('pmCant'),10)||0, precio:r2(parseFloat(v('pmPrecio'))||0),
+          inicio:v('pmIni')||'', fin:v('pmFin')||'', activa:true};
+}
+function bindPromoForm(){
+  const on = document.getElementById('pmOn'); if(!on) return;
+  const campos = document.getElementById('pmCampos');
+  const res = ()=>{
+    const pr = leerPromo(), lista = parseFloat(document.getElementById('aPrecio').value) || 0;
+    const vol = (document.querySelector('#pmTipo .on')?.dataset.v)==='volumen';
+    document.getElementById('pmCantLbl').textContent = vol ? 'A partir de (piezas)' : 'Piezas por paquete';
+    document.getElementById('pmPrecioLbl').textContent = vol ? 'Precio por pieza' : 'Precio del paquete';
+    const r = document.getElementById('pmResumen');
+    if(!pr || !(pr.cantidad>1) || !(pr.precio>0)){ r.textContent = vol ? 'Ej.: a partir de 8 piezas, cada una a $22.00' : 'Ej.: 5 piezas por $86.00; las sobrantes a precio normal'; return; }
+    const unit = vol ? pr.precio : pr.precio/pr.cantidad, ahorro = lista ? (lista-unit)*pr.cantidad : 0;
+    r.innerHTML = vol ? `Desde <b>${pr.cantidad}</b> piezas, todas a <b>${fmt(pr.precio)}</b> (precio normal ${fmt(lista)}).`
+                      : `Cada <b>${pr.cantidad}</b> piezas por <b>${fmt(pr.precio)}</b> (${fmt(r2(unit))} c/u). Las sobrantes, a ${fmt(lista)}.`;
+    if(lista && unit >= lista) r.innerHTML += ' <b class="neg">El precio de promoción no es menor al normal.</b>';
+    else if(ahorro > 0) r.innerHTML += ` El cliente ahorra ${fmt(r2(ahorro))} por cada ${pr.cantidad}.`;
+  };
+  on.onchange = ()=>{ campos.hidden = !on.checked; res(); };
+  document.querySelectorAll('#pmTipo button').forEach(b=> b.onclick = ()=>{ document.querySelectorAll('#pmTipo button').forEach(x=> x.classList.toggle('on', x===b)); res(); });
+  ['pmCant','pmPrecio','aPrecio'].forEach(id=> document.getElementById(id).addEventListener('input', res));
+  res();
+}
 function guardarArticulo(){
   const d = leerArticulo(), ls = store.get('articulos', []);
   if(!d.nombre){ toast('Escribe el nombre del producto'); document.getElementById('aNom').focus(); return; }
   if(!(d.precio > 0)){ toast('Escribe el precio'); document.getElementById('aPrecio').focus(); return; }
+  if(d.promo){
+    if(d.porKilo){ toast('Las promociones son solo para productos por pieza'); return; }
+    if(!(d.promo.cantidad > 1)){ toast('La promoción necesita una cantidad de 2 o más'); document.getElementById('pmCant').focus(); return; }
+    if(!(d.promo.precio > 0)){ toast('Escribe el precio de la promoción'); document.getElementById('pmPrecio').focus(); return; }
+    if(d.promo.inicio && d.promo.fin && d.promo.fin < d.promo.inicio){ toast('La fecha final es anterior a la inicial'); return; }
+  }
   if(!d.sku) d.sku = siguienteSku(d.seccion, ls);
   const dupSku = ls.find(a=> a.id!==artSel && !a.borrado && a.sku===d.sku);
   if(dupSku){ toast(`El identificador ${d.sku} ya es de ${nombreTicket(dupSku)}`); document.getElementById('aSku').focus(); return; }
@@ -4277,7 +4417,19 @@ document.getElementById('menuVersion').textContent = 'Versión ' + APP_VERSION +
 document.getElementById('storeName').textContent = store.get('config').tienda;
 document.getElementById('user').value = 'vendedor';
 const saved = store.get('session', null);
-DB.init().then(()=>{ if(saved){ session = saved; enterApp(); } });
+/* Promociones de siempre (se cargan una vez) */
+(function sembrarPromos(){
+  if(store.get('promosSeed') === 'v1') return;
+  const ls = store.get('articulos', []);
+  const poner = (pred, promo)=>{ const a = ls.find(pred); if(a && !a.promo){ a.promo = {...promo, inicio:'', fin:'', activa:true}; a.editado = true; } };
+  poner(a=> a.id==='p010', {tipo:'volumen', cantidad:8, precio:22});                          /* Salchicha FUD 266 g */
+  poner(a=> a.id==='p022', {tipo:'paquete', cantidad:5, precio:86});                          /* Tocineta Cianca 200 g */
+  poner(a=> a.id==='p001', {tipo:'paquete', cantidad:6, precio:221});                         /* Jamón FUD pavo americano: malla */
+  store.set('articulos', ls); store.set('promosSeed', 'v1');
+})();
+DB.init().then(()=>{
+  /* Recibos y pedidos anteriores a las promociones: se cobran a precio de lista */
+  ['recibos','pedidos'].forEach(n=> DB[n].forEach(r=>{ let c = false; (r.lineas||[]).forEach(l=>{ if(!('promoRegla' in l)){ l.promoRegla = null; c = true; } }); if(c) DB.guardar(n, r); })); if(saved){ session = saved; enterApp(); } });
 </script>
 </body>
 </html>
