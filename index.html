@@ -1848,7 +1848,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.30.1';
+const APP_VERSION = '0.30.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2267,6 +2267,19 @@ function siguienteSku(cat, lista){
     ls.push({id, seccion, marca, nombre, pres, proveedor, precio:null, costo:null, porKilo:false, precios:[], activo:false, revision:true, propio:true, editado:true,
              sku: siguienteSku(seccion, ls), creado: ahora});
   });
+  store.set('articulos', ls);
+  store.set('migraciones', [...store.get('migraciones', []), CLAVE]);
+})();
+
+/* Costos de compra (lista de Manuel, 1 nov 2026): solo se capturan donde no hay costo */
+(function costosNov2026(){
+  const CLAVE = 'costos-2026-11-01';
+  if(store.get('migraciones', []).includes(CLAVE)) return;
+  const C = {"p001": 33.33, "p002": 29.45, "p010": 20.05, "p004": 19.07, "p009": 22.79, "p007": 50.69, "p044": 12.35, "p045": 16.15, "p046": 21.38, "p047": 22.33, "p057": 24.25, "p048": 15.3, "p038": 36.89, "p039": 23.06, "p024": 26.04, "p023": 24.18, "p040": 10.41, "p028": 40.95, "p027": 27.3, "p056": 23.85, "p049": 21.86, "p030": 35.34, "p005": 30.69, "p050": 18.9, "p051": 18.9, "p059": 26.22, "p060": 26.22, "p061": 26.22, "p062": 26.22, "p042": 15.64, "p029": 29.7, "p003": 17.54, "p013": 68.17, "p006": 69.88, "p041": 8.1, "p021": 36.2, "p012": 46.3, "p026": 6.54, "p025": 10.4, "p036": 100, "p037": 45, "p031": 90, "p032": 95, "p033": 90, "p034": 90, "p022": 14, "p020": 55, "p019": 55, "p054": 59.6, "p055": 59.0, "p015": 80, "p016": 80, "pr-manchego-iassa": 68.3, "pr-queso-liquido": 16.8, "pr-media-crema-lala": 12.5, "pr-yogurt-lala-220": 7.08, "pr-empapelado-250": 17, "pr-empapelado-500": 34, "pr-manchego-regional": 50, "pr-maiz-pozolero": 18, "pr-chuleta-pavo": 64};
+  const ls = store.get('articulos', []), ahora = new Date().toISOString();
+  const vacio = a => !(Number(a.costo) > 0);
+  Object.entries(C).forEach(([id, c])=>{ const a = ls.find(x=> x.id===id); if(a && vacio(a)){ a.costo = c; a.editado = true; a.actualizado = ahora; } });
+  ls.filter(a=> /pizza/i.test(a.nombre||'') && !a.borrado && vacio(a)).forEach(a=>{ a.costo = 38.25; a.editado = true; });
   store.set('articulos', ls);
   store.set('migraciones', [...store.get('migraciones', []), CLAVE]);
 })();
