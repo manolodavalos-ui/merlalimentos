@@ -312,7 +312,7 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .map-search input{flex:1;min-width:0;border:0;outline:none;font:inherit;padding:10px 0}
 .map-go{color:var(--brand);font-weight:700;padding:8px}
 .map-wrap{position:relative;flex:1;min-height:220px;display:flex}
-.map-box{flex:1;background:#e8ecea}
+.map-box{flex:1;background:#e8ecea;isolation:isolate;z-index:0}
 .map-pin{position:absolute;left:50%;top:50%;width:34px;height:46px;margin:-46px 0 0 -17px;z-index:500;pointer-events:none;transition:transform .15s}
 .map-pin svg{width:34px;height:46px;filter:drop-shadow(0 3px 3px rgba(0,0,0,.35))}
 .map-pin-dot{position:absolute;left:50%;bottom:-3px;width:8px;height:4px;margin-left:-4px;border-radius:50%;background:rgba(0,0,0,.35)}
@@ -516,7 +516,7 @@ dd.pos{color:var(--brand)}
 .mp-res b{color:var(--text)}
 .mp-leg{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:.82rem}
 .mp-leg i{width:10px;height:10px;border-radius:50%;display:inline-block}
-.mp-box{position:relative;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+.mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
 #mpMapa{position:absolute;inset:0;background:#e8ecea}
 .mp-box .map-aviso{position:absolute;left:0;right:0;bottom:0;z-index:500}
 .mp-box .map-me{bottom:52px}
@@ -1729,7 +1729,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.27';
+const APP_VERSION = '0.27.1';
 
 /* ================= Íconos ================= */
 const I = {
