@@ -408,6 +408,41 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 #impPrueba,#hechoPrint{display:flex;align-items:center;justify-content:center;gap:8px}
 #impPrueba svg,#hechoPrint svg{width:20px;height:20px;stroke:currentColor}
 
+.add-prod{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em}
+.add-prod svg{width:20px;height:20px;stroke:#fff}
+.sub.ro{margin:0;text-align:center}
+.sec-title i{font-style:normal;color:var(--muted);font-weight:600;letter-spacing:0}
+.chip-price{position:absolute;left:5px;top:5px;z-index:4;background:rgba(255,255,255,.95);color:var(--text);font-size:.7rem;font-weight:800;padding:2px 6px;border-radius:999px;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.chip-off{position:absolute;right:5px;top:5px;z-index:4;background:var(--text);color:#fff;font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:999px}
+.tile.inactivo{opacity:.45}
+.art-mode .chip-kg{display:none}
+.art-form .sub,.sub.margen{color:var(--muted);font-size:.86rem}
+.sub.margen b{color:var(--text)}
+.art-foto{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.art-img{width:96px;height:96px;border-radius:14px;border:1.5px dashed var(--line);background:#fff center/cover no-repeat;display:grid;place-items:center;flex-shrink:0}
+.art-img svg{width:34px;height:34px;stroke:var(--disabled)}
+.art-img-acts{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.art-img-acts label.ub-b{margin:0;cursor:pointer}
+.cf-row.eq{grid-template-columns:1fr 1fr}
+.margen{margin:-8px 0 16px}
+.seg2{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;margin-top:6px}
+.seg2 button{padding:11px 6px;font-weight:600;font-size:.9rem;color:var(--muted)}
+.seg2 button.on{background:var(--brand);color:#fff}
+.cod-in{display:flex;align-items:center;gap:4px}
+.cod-in input{flex:1;min-width:0}
+.cod-in .icon-btn svg{stroke:var(--brand)}
+.pr-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.pr-row input{border:0;border-bottom:2px solid var(--line);padding:8px 0;font:inherit;outline:none;background:transparent}
+.pr-row input:focus{border-bottom-color:var(--brand)}
+.pr-et{flex:1.3;min-width:0}
+.pr-v{flex:1;min-width:0}
+.pr-row span{color:var(--muted)}
+.pr-x svg{stroke:var(--muted);width:18px;height:18px}
+.art-form .btn.danger{margin-top:10px}
+.scan-box{position:relative;flex:1;background:#000;display:grid;place-items:center;overflow:hidden}
+.scan-box video{width:100%;height:100%;object-fit:cover}
+.scan-line{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#ff3b30;box-shadow:0 0 8px #ff3b30}
+
 /* Hoja inferior / teclado */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:440px;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -1597,7 +1632,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.20';
+const APP_VERSION = '0.21';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1623,6 +1658,7 @@ const I = {
   card:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h2M11 15h3"/>',
   check:'<path d="M20 6L9 17l-5-5"/>',
   chev:'<path d="M9 18l6-6-6-6"/>',
+  scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M16 8v8"/>',
   share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
   copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
@@ -1889,15 +1925,38 @@ const CATALOGO_INICIAL = [{"id": "p001","seccion": "Jamones","marca": "FUD","nom
 /* ===== FIN CATÁLOGO ===== */
 /* Carga el catálogo cuando cambia la versión (los artículos que agregues después se conservan) */
 if(store.get('catalogoVersion') !== CATALOGO_VERSION){
-  const extras = (store.get('articulos', [])).filter(a=> a.propio);
-  store.set('articulos', [...CATALOGO_INICIAL, ...extras]);
+  /* Respeta los productos que editaste y los que agregaste tú */
+  const actuales = store.get('articulos', []);
+  const porId = Object.fromEntries(actuales.map(a=> [a.id, a]));
+  const base = CATALOGO_INICIAL.map(c=> porId[c.id] && porId[c.id].editado ? porId[c.id] : c);
+  const extras = actuales.filter(a=> a.propio);
+  store.set('articulos', [...base, ...extras]);
   store.set('catalogoVersion', CATALOGO_VERSION);
 }
+/* Categorías editables (por defecto, las secciones del catálogo) */
+const categorias = ()=>{
+  const base = store.get('categorias', null) || SECCIONES.slice();
+  store.get('articulos', []).forEach(a=>{ if(a.seccion && !base.includes(a.seccion)) base.push(a.seccion); });
+  return base;
+};
+/* Identificador: prefijo de la categoría + consecutivo (JAM-001) */
+const PREFIJOS = {'Jamones':'JAM','Salchichas':'SAL','Carnes':'CAR','Quesos':'QUE','Lácteos regionales':'LAC','Margarinas, mantequilla y queso crema':'MAR','Yogures Yoplait':'YOG','Postres y probióticos':'POS','Café Olé':'CAF','Yoplait otras presentaciones':'YOP'};
+const prefijoCat = cat => PREFIJOS[cat] || (String(cat||'GEN').normalize('NFD').replace(/[^A-Za-z]/g,'').slice(0,3).toUpperCase().padEnd(3,'X'));
+function siguienteSku(cat, lista){
+  const pre = prefijoCat(cat) + '-';
+  const max = (lista || store.get('articulos', [])).reduce((m,a)=> String(a.sku||'').startsWith(pre) ? Math.max(m, parseInt(a.sku.slice(pre.length),10)||0) : m, 0);
+  return pre + String(max+1).padStart(3,'0');
+}
+(function asignarSkus(){
+  const ls = store.get('articulos', []); let cambio = false;
+  ls.forEach(a=>{ if(!a.sku){ a.sku = siguienteSku(a.seccion, ls); cambio = true; } });
+  if(cambio) store.set('articulos', ls);
+})();
 const fotoSrc = p => p.foto ? (FOTOS[p.foto] || p.foto) : '';
 const presCorta = p => (p.pres||'').split('·')[0].trim();
 const nombreTile = p => [p.nombre, presCorta(p)].filter(Boolean).join(' ');
 const nombreTicket = p => [p.marca, p.nombre, presCorta(p)].filter(Boolean).join(' ');
-const articulos = ()=> store.get('articulos', []).filter(a=>a.activo !== false);
+const articulos = ()=> store.get('articulos', []).filter(a=> a.activo !== false && !a.borrado);
 
 /* ================= Base de datos local (IndexedDB) ================= */
 /* Los recibos se guardan en IndexedDB; si el navegador no lo permite, se usa el almacenamiento simple */
@@ -2019,7 +2078,8 @@ function tileHTML(p){
   const precio = p.precio == null ? '<span class="pp" style="font-size:1rem">Sin precio</span>' : `<span class="pp">${fmt(p.precio)}</span>`;
   const chip = p.porKilo ? '<span class="chip-kg">KG</span>'
              : p.etiqueta ? `<span class="chip-kg chip-et">${esc(p.etiqueta.toUpperCase())}</span>` : '';
-  return `<div class="tile${foto?' has-photo':''}" data-pid="${p.id}" role="button" aria-label="${esc(nombreTicket(p))}">
+  return `<div class="tile${foto?' has-photo':''}${p.activo===false?' inactivo':''}" data-pid="${p.id}" role="button" aria-label="${esc(nombreTicket(p))}">
+    ${current==='articulos' ? `<span class="chip-price">${p.precio!=null?fmt(p.precio):'Sin precio'}${p.porKilo?'/kg':''}</span>${p.activo===false?'<span class="chip-off">Oculto</span>':''}` : ''}
     <div class="price-face">
       <span class="pb">${esc(p.marca||'')}</span>
       <span class="pn">${esc(nombreTile(p))}</span>
@@ -2036,7 +2096,7 @@ function gridHTML(){
   const q = filtro.q.trim().toLowerCase();
   const lista = articulos().filter(p=> (!filtro.sec || p.seccion===filtro.sec) && (!q || nombreTicket(p).toLowerCase().includes(q)));
   if(!lista.length) return `<div class="no-results">No hay artículos que coincidan.</div>`;
-  return SECCIONES.map(sec=>{
+  return categorias().map(sec=>{
     const ps = lista.filter(p=>p.seccion===sec);
     return ps.length ? `<div class="sec-title">${esc(sec)}</div>` + ps.map(tileHTML).join('') : '';
   }).join('');
@@ -2047,7 +2107,7 @@ function viewVenta(){
   const filtroHTML = filtro.buscando
     ? `<input id="q" placeholder="Buscar artículo" value="${esc(filtro.q)}" autocomplete="off">
        <button class="icon-btn" id="qClose" aria-label="Cerrar búsqueda">${svg('close')}</button>`
-    : `<select id="sec"><option value="">Todos los artículos</option>${SECCIONES.map(s=>`<option ${s===filtro.sec?'selected':''}>${esc(s)}</option>`).join('')}</select>
+    : `<select id="sec"><option value="">Todos los artículos</option>${categorias().map(s=>`<option ${s===filtro.sec?'selected':''}>${esc(s)}</option>`).join('')}</select>
        <button class="icon-btn" id="qOpen" aria-label="Buscar">${svg('search')}</button>`;
   return `<div class="sale-bar">
       <div class="sale-actions">
@@ -3374,16 +3434,18 @@ function renderHeader(){
     const enCli = current==='clientes' && cliVista!=='inicio';
     const enTes = current==='turno' && turnoVista==='tesoreria' && !!turnoActual();
     const enCfg = current==='config' && cfgVista!=='inicio';
-    const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg;
-    title.textContent = enTes ? 'Gestión de tesorería' : enCfg ? 'Impresoras'
+    const enArt = current==='articulos' && artVista==='editar';
+    const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt;
+    title.textContent = enTes ? 'Gestión de tesorería' : enCfg ? 'Impresoras' : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
-    pill.classList.toggle('hidden', ['recibos','clientes','config'].includes(current));
+    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos'].includes(current));
     acts.innerHTML = current==='clientes' && (cliVista==='crear'||cliVista==='editar') ? '<button class="head-txt" id="hCliGuardar">GUARDAR</button>'
                    : current==='clientes' && cliVista==='lista' ? `<button class="icon-btn" id="hCliNuevo" aria-label="Crear cliente">${svg('userAdd')}</button>` : '';
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
     const hn = document.getElementById('hCliNuevo'); if(hn) hn.onclick = ()=>{ cliVista='crear'; cliSel=null; renderClientes(); };
+    if(enArt){ acts.innerHTML = '<button class="head-txt" id="hArtGuardar">GUARDAR</button>'; document.getElementById('hArtGuardar').onclick = guardarArticulo; }
     if(current==='recibos' && reciboSel && reciboVista==='detalle'){
       const r = DB.recibos.find(x=>x.id===reciboSel);
       if(r && !r.cancelado){ acts.innerHTML = '<button class="head-txt sm" id="hDesc">REALIZAR DESCUENTO</button>'; document.getElementById('hDesc').onclick = iniciarDescuento; }
@@ -3762,6 +3824,225 @@ function bindFilas(){
   document.querySelectorAll('.rc-row').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.id; reciboVista = 'detalle'; renderRecibos(); });
 }
 
+/* ================= Artículos ================= */
+let artVista = 'lista', artSel = null, artFiltro = {sec:'', q:''}, artBorrador = null;
+const puedeEditarArt = ()=> session && session.rol==='admin';
+function articulosGestion(){ return store.get('articulos', []).filter(a=> !a.borrado); }
+function gridArticulosHTML(){
+  const q = artFiltro.q.trim().toLowerCase();
+  const lista = articulosGestion().filter(p=> (!artFiltro.sec || p.seccion===artFiltro.sec) &&
+    (!q || [nombreTicket(p), p.sku, p.codigo, p.proveedor].filter(Boolean).join(' ').toLowerCase().includes(q)));
+  if(!lista.length) return `<div class="no-results">No hay artículos que coincidan.</div>`;
+  return categorias().map(sec=>{
+    const ps = lista.filter(p=>p.seccion===sec);
+    return ps.length ? `<div class="sec-title">${esc(sec)} <i>${ps.length}</i></div>` + ps.map(tileHTML).join('') : '';
+  }).join('');
+}
+function viewArticulos(){
+  const n = articulosGestion().length;
+  return `<div class="sale-bar">
+      ${puedeEditarArt() ? `<button class="btn add-prod" id="artNuevo">${svg('articulos')}AGREGAR PRODUCTO</button>` : `<p class="sub ro">Solo el administrador puede agregar o modificar productos.</p>`}
+      <div class="filter">
+        <select id="artSec"><option value="">Todas las categorías (${n})</option>${categorias().map(c=>`<option ${c===artFiltro.sec?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      </div>
+      <div class="filter"><input id="artQ" placeholder="Buscar por nombre, identificador, código o proveedor" value="${esc(artFiltro.q)}" autocomplete="off"><span class="icon-btn" aria-hidden="true">${svg('search')}</span></div>
+    </div>
+    <div class="grid art-mode" id="artGrid">${gridArticulosHTML()}</div>`;
+}
+function formArticuloHTML(a){
+  const precios = a.precios || [];
+  const prov = [...new Set(store.get('articulos',[]).map(x=>x.proveedor).filter(Boolean))];
+  const foto = fotoSrc(a);
+  const margen = (a.precio>0 && a.costo>0) ? `${fmt(r2(a.precio-a.costo))} (${Math.round((a.precio-a.costo)/a.precio*100)}%)` : '—';
+  return `<div class="gform cf art-form">
+    <div class="art-foto">
+      <div class="art-img" id="aImg" ${foto?`style="background-image:url('${foto}')"`:''}>${foto?'':svg('articulos')}</div>
+      <div class="art-img-acts">
+        <label class="ub-b" for="aFile">${svg('download')}${foto?'Cambiar imagen':'Cargar imagen'}</label>
+        <input type="file" id="aFile" accept="image/*" hidden>
+        ${foto?`<button type="button" class="ub-b" id="aQuitarImg">${svg('close')}Quitar</button>`:''}
+      </div>
+    </div>
+    <div class="gfield"><label for="aNom">Nombre del producto *</label><input id="aNom" maxlength="90" value="${esc(a.nombreForm ?? (a.id ? nombreTicket(a) : (a.nombre||'')))}" autocomplete="off"></div>
+    <div class="gfield"><label for="aCat">Categoría *</label>
+      <select class="field" id="aCat">${categorias().map(c=>`<option ${c===a.seccion?'selected':''}>${esc(c)}</option>`).join('')}<option value="__nueva">+ Nueva categoría…</option></select>
+    </div>
+    <div class="gfield"><label for="aProv">Proveedor</label><input id="aProv" list="aProvList" maxlength="60" value="${esc(a.proveedor||'')}" autocomplete="off"><datalist id="aProvList">${prov.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>
+    <div class="cf-row eq">
+      <div class="gfield"><label for="aPrecio">Precio *</label><input id="aPrecio" type="number" inputmode="decimal" min="0" step="0.01" value="${a.precio ?? ''}"></div>
+      <div class="gfield"><label for="aCosto">Costo</label><input id="aCosto" type="number" inputmode="decimal" min="0" step="0.01" value="${a.costo ?? ''}"></div>
+    </div>
+    <p class="sub margen">Margen: <b id="aMargen">${margen}</b></p>
+    <div class="gfield"><label>Vendido por</label>
+      <div class="seg2" id="aVend"><button type="button" data-v="pza" class="${!a.porKilo?'on':''}">Cantidad (pieza)</button><button type="button" data-v="kg" class="${a.porKilo?'on':''}">Peso (kg)</button></div>
+    </div>
+    <div class="cf-row eq">
+      <div class="gfield"><label for="aSku">Identificador</label><input id="aSku" maxlength="20" value="${esc(a.sku||'')}" autocomplete="off"></div>
+      <div class="gfield"><label for="aCod">Código de barras</label><div class="cod-in"><input id="aCod" inputmode="numeric" maxlength="32" value="${esc(a.codigo||'')}" autocomplete="off"><button type="button" class="icon-btn" id="aScan" aria-label="Escanear código">${svg('scan')}</button></div></div>
+    </div>
+    <div class="gfield"><label>Precios con descuento</label>
+      <div id="aPrecios">${precios.map((x,i)=> filaPrecioHTML(x,i)).join('')}</div>
+      <button type="button" class="ub-b" id="aAddPrecio" ${precios.length>=5?'hidden':''}>${svg('articulos')}Agregar precio con descuento</button>
+      <p class="sub" style="margin-top:6px">Hasta 5 precios. Se asignarán a clientes más adelante; por ahora se usa el precio principal.</p>
+    </div>
+    ${a.mayoreo ? `<p class="sub">Nota del catálogo: ${esc(a.mayoreo)}</p>` : ''}
+    <label class="sw-row"><span><b>Mostrar en venta</b><small>Si lo desactivas, el producto se oculta en Venta, Preventa y Cotizar</small></span><input type="checkbox" id="aActivo" ${a.activo!==false?'checked':''}></label>
+    <button class="btn" id="aGuardar">${a.id ? 'Guardar cambios' : 'Guardar producto'}</button>
+    ${a.id ? '<button class="btn danger" id="aEliminar">Eliminar producto</button>' : ''}
+  </div>`;
+}
+const filaPrecioHTML = (x, i)=> `<div class="pr-row" data-i="${i}"><input class="pr-et" maxlength="24" placeholder="Precio ${i+2}" value="${esc(x.etiqueta||'')}"><span>$</span><input class="pr-v" type="number" inputmode="decimal" min="0" step="0.01" value="${x.valor ?? ''}"><button type="button" class="icon-btn pr-x" aria-label="Quitar">${svg('close')}</button></div>`;
+function leerArticulo(){
+  const v = id => document.getElementById(id);
+  const num = x => x==='' || x==null ? null : r2(parseFloat(x));
+  const precios = [...document.querySelectorAll('#aPrecios .pr-row')].map((r,i)=>({etiqueta:r.querySelector('.pr-et').value.trim() || `Precio ${i+2}`, valor:num(r.querySelector('.pr-v').value)})).filter(x=> x.valor!=null && x.valor>0);
+  return {nombre:v('aNom').value.trim(), nombreForm:v('aNom').value, seccion:v('aCat').value, proveedor:v('aProv').value.trim(), precio:num(v('aPrecio').value), costo:num(v('aCosto').value),
+          porKilo:document.querySelector('#aVend .on')?.dataset.v==='kg', sku:v('aSku').value.trim().toUpperCase(), codigo:v('aCod').value.trim(), precios, activo:v('aActivo').checked};
+}
+function bindFormArticulo(){
+  const cat = document.getElementById('aCat');
+  let catPrev = cat.value;
+  cat.onchange = ()=>{
+    if(cat.value==='__nueva'){
+      cat.value = catPrev;
+      pedirTexto({titulo:'Nueva categoría', etiqueta:'Nombre de la categoría', ok:'Agregar', alAceptar:nueva=>{
+        const cs = categorias(); if(!cs.includes(nueva)){ cs.push(nueva); store.set('categorias', cs); }
+        if(![...cat.options].some(o=>o.value===nueva)) [...cat.options].find(o=>o.value==='__nueva').insertAdjacentHTML('beforebegin', `<option>${esc(nueva)}</option>`);
+        cat.value = nueva; catPrev = nueva;
+        if(!artSel) document.getElementById('aSku').value = siguienteSku(nueva);
+      }});
+      return;
+    }
+    if(!artSel){ document.getElementById('aSku').value = siguienteSku(cat.value); }
+    catPrev = cat.value;
+  };
+  document.querySelectorAll('#aVend button').forEach(b=> b.onclick = ()=> document.querySelectorAll('#aVend button').forEach(x=> x.classList.toggle('on', x===b)));
+  const margen = ()=>{ const p = parseFloat(document.getElementById('aPrecio').value), c = parseFloat(document.getElementById('aCosto').value);
+    document.getElementById('aMargen').textContent = (p>0 && c>0) ? `${fmt(r2(p-c))} (${Math.round((p-c)/p*100)}%)` : '—'; };
+  ['aPrecio','aCosto'].forEach(id=> document.getElementById(id).addEventListener('input', margen));
+  const bindPr = ()=> document.querySelectorAll('#aPrecios .pr-x').forEach(b=> b.onclick = ()=>{ b.closest('.pr-row').remove(); document.getElementById('aAddPrecio').hidden = false; });
+  bindPr();
+  document.getElementById('aAddPrecio').onclick = ()=>{
+    const cont = document.getElementById('aPrecios'), n = cont.children.length; if(n>=5) return;
+    cont.insertAdjacentHTML('beforeend', filaPrecioHTML({}, n)); bindPr();
+    cont.lastElementChild.querySelector('.pr-v').focus();
+    if(n+1>=5) document.getElementById('aAddPrecio').hidden = true;
+  };
+  document.getElementById('aFile').onchange = e=>{
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    reducirImagen(f, 320).then(url=>{ artBorrador.foto = url; Object.assign(artBorrador, leerArticulo()); renderArticulos(true); }).catch(()=> toast('No se pudo cargar la imagen'));
+  };
+  const qi = document.getElementById('aQuitarImg'); if(qi) qi.onclick = ()=>{ Object.assign(artBorrador, leerArticulo()); artBorrador.foto = null; renderArticulos(true); };
+  document.getElementById('aScan').onclick = ()=> escanearCodigo(cod=>{ document.getElementById('aCod').value = cod; toast('Código leído'); });
+  document.getElementById('aGuardar').onclick = guardarArticulo;
+  const del = document.getElementById('aEliminar');
+  if(del) del.onclick = ()=> confirmar({titulo:'Eliminar producto', peligro:true, ok:'Eliminar',
+    texto:`¿Eliminar "${esc(nombreTicket(artBorrador))}"? Ya no aparecerá en ventas; los recibos anteriores se conservan.`,
+    alAceptar:()=>{ const ls = store.get('articulos',[]); const x = ls.find(a=>a.id===artSel); if(x){ x.borrado = true; x.activo = false; x.editado = true; } store.set('articulos', ls); artVista='lista'; artSel=null; renderArticulos(); toast('Producto eliminado'); }});
+}
+function pedirTexto({titulo, etiqueta, ok, alAceptar}){
+  const bg = document.createElement('div'); bg.className = 'sheet-bg center';
+  bg.innerHTML = `<div class="dialog"><h3>${titulo}</h3><div class="gfield" style="margin:14px 0"><label for="ptIn">${etiqueta}</label><input id="ptIn" maxlength="48" autocomplete="off"></div>
+    <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">${ok}</button></div></div>`;
+  document.body.appendChild(bg);
+  const inp = bg.querySelector('#ptIn'); setTimeout(()=> inp.focus(), 50);
+  const aceptar = ()=>{ const v = inp.value.trim(); if(!v){ inp.focus(); return; } bg.remove(); alAceptar(v); };
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  bg.querySelector('[data-a="si"]').onclick = aceptar;
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); aceptar(); } });
+}
+function guardarArticulo(){
+  const d = leerArticulo(), ls = store.get('articulos', []);
+  if(!d.nombre){ toast('Escribe el nombre del producto'); document.getElementById('aNom').focus(); return; }
+  if(!(d.precio > 0)){ toast('Escribe el precio'); document.getElementById('aPrecio').focus(); return; }
+  if(!d.sku) d.sku = siguienteSku(d.seccion, ls);
+  const dupSku = ls.find(a=> a.id!==artSel && !a.borrado && a.sku===d.sku);
+  if(dupSku){ toast(`El identificador ${d.sku} ya es de ${nombreTicket(dupSku)}`); document.getElementById('aSku').focus(); return; }
+  if(d.codigo){ const dupCod = ls.find(a=> a.id!==artSel && !a.borrado && a.codigo===d.codigo); if(dupCod){ toast(`Ese código de barras ya es de ${nombreTicket(dupCod)}`); return; } }
+  const foto = artBorrador.foto ?? null;
+  if(artSel){
+    const x = ls.find(a=>a.id===artSel);
+    const cambioNombre = d.nombre !== nombreTicket(x);
+    delete d.nombreForm;
+    if(!cambioNombre) delete d.nombre;   /* conserva marca y presentación del catálogo */
+    Object.assign(x, d, {foto, editado:true, actualizado:new Date().toISOString()});
+    if(cambioNombre){ x.marca = ''; x.pres = ''; }
+    store.set('articulos', ls); toast('Cambios guardados');
+  } else {
+    delete d.nombreForm;
+    ls.push({id:'a'+Date.now(), ...d, marca:'', pres:'', foto, propio:true, creado:new Date().toISOString(), creadoPor:session.usuario});
+    store.set('articulos', ls); toast('Producto agregado');
+  }
+  artVista = 'lista'; artSel = null; artBorrador = null; renderArticulos();
+}
+function reducirImagen(file, lado){
+  return new Promise((ok, mal)=>{
+    const rd = new FileReader();
+    rd.onerror = mal;
+    rd.onload = ()=>{
+      const img = new Image();
+      img.onerror = mal;
+      img.onload = ()=>{
+        const c = document.createElement('canvas'); c.width = c.height = lado;
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0,0,lado,lado);
+        const k = Math.min(lado/img.width, lado/img.height), w = img.width*k, h = img.height*k;
+        g.drawImage(img, (lado-w)/2, (lado-h)/2, w, h);
+        ok(c.toDataURL('image/jpeg', .78));
+      };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  });
+}
+async function escanearCodigo(alLeer){
+  if(!('BarcodeDetector' in window)){ toast('Este navegador no puede escanear; escribe el código'); return; }
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); }
+  catch(e){ toast('Permite el uso de la cámara para escanear'); return; }
+  const bg = document.createElement('div'); bg.className = 'map-modal scan';
+  bg.innerHTML = `<div class="map-top"><button class="icon-btn" id="scCerrar">${svg('close')}</button><b>Escanear código de barras</b></div>
+    <div class="scan-box"><video id="scVid" playsinline muted></video><div class="scan-line"></div></div>
+    <p class="note-sm" style="padding:12px">Apunta la cámara al código de barras del producto</p>`;
+  document.body.appendChild(bg);
+  const vid = bg.querySelector('#scVid'); vid.srcObject = stream; vid.play().catch(()=>{});
+  let vivo = true;
+  const cerrar = ()=>{ vivo = false; stream.getTracks().forEach(t=> t.stop()); bg.remove(); };
+  bg.querySelector('#scCerrar').onclick = cerrar;
+  const det = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf']});
+  const ciclo = async ()=>{
+    if(!vivo) return;
+    try{ const r = await det.detect(vid); if(r && r.length){ const v = r[0].rawValue; cerrar(); alLeer(v); return; } }catch(_){}
+    setTimeout(ciclo, 250);
+  };
+  ciclo();
+}
+function renderArticulos(conservar){
+  const view = document.getElementById('view');
+  if(artVista==='lista'){
+    view.innerHTML = viewArticulos(); renderHeader();
+    const n = document.getElementById('artNuevo'); if(n) n.onclick = ()=>{ artVista='editar'; artSel=null; renderArticulos(); };
+    document.getElementById('artSec').onchange = e=>{ artFiltro.sec = e.target.value; document.getElementById('artGrid').innerHTML = gridArticulosHTML(); bindTilesArt(); };
+    document.getElementById('artQ').oninput = e=>{ artFiltro.q = e.target.value; document.getElementById('artGrid').innerHTML = gridArticulosHTML(); bindTilesArt(); };
+    bindTilesArt();
+    return;
+  }
+  if(!conservar){
+    const x = artSel && store.get('articulos',[]).find(a=>a.id===artSel);
+    artBorrador = x ? JSON.parse(JSON.stringify(x)) : {seccion: artFiltro.sec || categorias()[0], porKilo:false, precios:[], activo:true, sku: siguienteSku(artFiltro.sec || categorias()[0])};
+    if(x){ artBorrador.foto = x.foto || null; }
+  }
+  const y = window.scrollY;
+  view.innerHTML = formArticuloHTML({...artBorrador, id:artSel || null});
+  renderHeader(); bindFormArticulo();
+  window.scrollTo(0, conservar ? y : 0);
+}
+function bindTilesArt(){
+  document.querySelectorAll('#artGrid .tile').forEach(t=> t.onclick = ()=>{
+    if(!puedeEditarArt()){ toast('Solo el administrador puede modificar productos'); return; }
+    artSel = t.dataset.pid; artVista = 'editar'; renderArticulos();
+  });
+}
+
 /* ================= Navegación ================= */
 function viewPendiente(id){
   const m = MENU.find(x=>x.id===id);
@@ -3787,12 +4068,13 @@ function go(id){
   document.querySelector('main').classList.toggle('flush', esVenta);
   view.classList.toggle('wide', esVenta);
   document.querySelector('.popover')?.remove();
-  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config'].includes(id));
-  view.classList.toggle('wide', esVenta || ['recibos','clientes','config'].includes(id));
+  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos'].includes(id));
+  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos'].includes(id));
   if(id==='turno'){ if(!turnoActual()) turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
   else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
+  else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
   else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : 'grid'; renderVenta(); }
   else{
     view.innerHTML = viewPendiente(id);
@@ -3850,6 +4132,7 @@ document.getElementById('logoutBtn').onclick = ()=>{
 /* ================= Utilidades ================= */
 const drawer = document.getElementById('drawer'), scrim = document.getElementById('scrim');
 document.getElementById('menuBtn').onclick = ()=>{
+  if(current==='articulos' && artVista==='editar'){ artVista = 'lista'; artSel = null; artBorrador = null; renderArticulos(); return; }
   if(current==='config' && cfgVista!=='inicio'){ cfgVista = 'inicio'; renderConfig(); return; }
   if(current==='turno' && turnoVista==='tesoreria'){ turnoVista = 'resumen'; go('turno'); return; }
   if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return; }
