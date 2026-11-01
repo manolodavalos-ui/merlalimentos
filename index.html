@@ -492,6 +492,15 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .deuda-r.actual{font-weight:600}
 dd.pos{color:var(--brand)}
 
+.ch-row{width:100%;text-align:left}
+.ch-row:active{background:var(--bg)}
+.ch-star svg{width:15px;height:15px;stroke:#d99a00;fill:#ffd76a;vertical-align:-2px;margin-right:4px}
+.filtro .dia svg{width:14px;height:14px;stroke:currentColor;vertical-align:-2px;margin-right:3px}
+.cd-acts{display:grid;gap:10px;margin-top:16px}
+.cd-acts .btn{margin:0;display:flex;align-items:center;justify-content:center;gap:8px}
+.cd-acts .btn svg{width:18px;height:18px;stroke:currentColor}
+#cdRef:not(.ghost) svg{fill:#ffd76a;stroke:#fff}
+
 /* Hoja inferior / teclado */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:440px;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -1681,7 +1690,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.24';
+const APP_VERSION = '0.25';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1707,6 +1716,7 @@ const I = {
   card:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h2M11 15h3"/>',
   check:'<path d="M20 6L9 17l-5-5"/>',
   chev:'<path d="M9 18l6-6-6-6"/>',
+  star:'<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>',
   scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M16 8v8"/>',
   share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
@@ -2013,12 +2023,12 @@ const articulos = ()=> store.get('articulos', []).filter(a=> a.activo !== false 
 /* Los recibos se guardan en IndexedDB; si el navegador no lo permite, se usa el almacenamiento simple */
 const DB = {
   idb:null, recibos:[], pedidos:[],
-  TABLAS:['recibos','pedidos'],
+  TABLAS:['recibos','pedidos','cotizaciones'],
   init(){
     return new Promise(resolve=>{
       const fallback = ()=>{ this.idb = null; this.TABLAS.forEach(n=> this[n] = store.get(n, [])); resolve(); };
       let req;
-      try{ req = indexedDB.open('merkalimentos', 2); }catch(e){ return fallback(); }
+      try{ req = indexedDB.open('merkalimentos', 3); }catch(e){ return fallback(); }
       const t = setTimeout(fallback, 2500);
       req.onupgradeneeded = ()=>{
         const db = req.result;
@@ -2055,7 +2065,11 @@ const DB = {
     if(this.idb) this._put(n, r); else store.set(n, this[n]);
   },
   guardarRecibo(r){ this.guardar('recibos', r); },
-  guardarPedido(r){ this.guardar('pedidos', r); }
+  guardarPedido(r){ this.guardar('pedidos', r); },
+  borrar(n, id){
+    this[n] = this[n].filter(x=> x.id!==id);
+    if(this.idb){ try{ this.idb.transaction(n,'readwrite').objectStore(n).delete(id); }catch(e){} } else store.set(n, this[n]);
+  }
 };
 
 /* ================= Inventario ================= */
@@ -2246,10 +2260,14 @@ function renderVenta(){
   if(ventaVista==='cotizacion'){
     view.innerHTML = viewCotizacion(); renderHeader(); bindCotizacion(); window.scrollTo(0,0); return;
   }
-  if(['programar','programado','pedidos','inicioPre','pedidoDet'].includes(ventaVista)){
-    view.innerHTML = {programar:viewProgramar, programado:viewProgramado, pedidos:viewPedidos, inicioPre:viewInicioPre, pedidoDet:viewPedidoDet}[ventaVista]();
+  if(['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet'].includes(ventaVista)){
+    view.innerHTML = {programar:viewProgramar, programado:viewProgramado, pedidos:viewPedidos, inicioPre:viewInicioPre, pedidoDet:viewPedidoDet,
+                      inicioCot:viewInicioCot, cotHist:viewCotHist, cotDet:viewCotDet}[ventaVista]();
     renderHeader();
-    if(ventaVista==='programar') bindProgramar();
+    if(ventaVista==='inicioCot') bindInicioCot();
+    else if(ventaVista==='cotHist') bindCotHist();
+    else if(ventaVista==='cotDet') bindCotDet();
+    else if(ventaVista==='programar') bindProgramar();
     else if(ventaVista==='programado') bindProgramado();
     else if(ventaVista==='inicioPre') bindInicioPre();
     else if(ventaVista==='pedidos'){
@@ -3165,6 +3183,99 @@ function folioCotizacion(){
   const d = new Date();
   return `COT-${store.get('config').numDispositivo||1}-${String(d.getDate()).padStart(2,'0')}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getFullYear()).slice(2)}-${String(n).padStart(2,'0')}`;
 }
+/* ===== Inicio de Cotizar e historial ===== */
+let cotSel = null, cotFiltro = 'todas';
+const vigenciaCot = c => { const d = new Date(c.fecha); d.setDate(d.getDate() + (c.vigencia||7)); return d; };
+function viewInicioCot(){
+  const t = ticket(), n = cuentaTicket(t), hist = DB.cotizaciones, refs = hist.filter(c=> c.referencia).length;
+  return `<div class="cl-home">
+    <button class="cl-opt" id="optCotizar"><span class="cl-opt-ic">${svg('cotizar')}</span><span><b>Cotizar</b>
+      <small>${n ? `Tienes una cotización en curso con ${n} ${n===1?'producto':'productos'}` : 'Armar una cotización y compartirla en PDF'}</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optCotHist"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Cotizaciones realizadas</b>
+      <small>${hist.length ? `${hist.length} en el historial${refs?` · ${refs} como referencia`:''}` : 'Aún no hay cotizaciones'}</small></span>${svg('chev')}</button>
+  </div>`;
+}
+function bindInicioCot(){
+  document.getElementById('optCotizar').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
+  document.getElementById('optCotHist').onclick = ()=>{ ventaVista = 'cotHist'; renderVenta(); };
+}
+function viewCotHist(){
+  const hoy = new Date();
+  const todas = DB.cotizaciones.slice().sort((a,b)=> b.fecha.localeCompare(a.fecha));
+  const ls = cotFiltro==='ref' ? todas.filter(c=> c.referencia) : todas;
+  const tabs = `<div class="dias filtro"><button class="dia${cotFiltro==='todas'?' on':''}" data-f="todas">Todas (${todas.length})</button><button class="dia${cotFiltro==='ref'?' on':''}" data-f="ref">${svg('star')}Referencias (${todas.filter(c=>c.referencia).length})</button></div>`;
+  if(!ls.length) return `<div class="rc-wrap">${tabs}<div class="rc-empty">${svg('cotizar')}<p>${cotFiltro==='ref' ? 'No hay cotizaciones guardadas como referencia.' : 'Las cotizaciones que compartas o descargues aparecerán aquí.'}</p></div></div>`;
+  let html = '', dia = '';
+  ls.forEach(c=>{
+    const d = new Date(c.fecha), k = hoyClave(d), vig = vigenciaCot(c) >= hoy;
+    if(k!==dia){ dia = k; html += `<div class="rc-day">${fechaLarga(d)}</div>`; }
+    html += `<button class="ab-row ch-row" data-cot="${esc(c.id)}"><span class="ab-main">
+      <span class="ab-t"><b>${c.referencia?`<i class="ch-star">${svg('star')}</i>`:''}${esc(c.nombre)}</b><span>${fmt(c.total)}</span></span>
+      <span class="ab-m">#${esc(c.folio)}${c.para?' · '+esc(c.para):''} · ${(c.lineas||[]).length} ${(c.lineas||[]).length===1?'producto':'productos'}</span>
+      <span class="ab-m"><b class="${vig?'pos':'neg'}">${vig?'Vigente':'Vencida'}</b> · hasta ${vigenciaCot(c).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}${c.envios>1?` · enviada ${c.envios} veces`:''}</span>
+    </span></button>`;
+  });
+  return `<div class="rc-wrap">${tabs}${html}</div>`;
+}
+function bindCotHist(){
+  document.querySelectorAll('.filtro .dia').forEach(b=> b.onclick = ()=>{ cotFiltro = b.dataset.f; renderVenta(); });
+  document.querySelectorAll('[data-cot]').forEach(b=> b.onclick = ()=>{ cotSel = b.dataset.cot; ventaVista = 'cotDet'; renderVenta(); });
+}
+function viewCotDet(){
+  const c = DB.cotizaciones.find(x=> x.id===cotSel);
+  if(!c) return viewCotHist();
+  const vig = vigenciaCot(c) >= new Date();
+  const lineas = (c.lineas||[]).map(l=>`<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}${ahorroLinea(l)>0?` · <i class="pos">promo ${textoPromo(reglaDe(l))}</i>`:''}</small></div><span>${fmt(importeLinea(l))}</span></div>`).join('');
+  return `<div class="rc-wrap rd">
+    <div class="rd-head"><span class="big">${fmt(c.total)}</span><span class="lbl">${esc(c.nombre)}</span></div>
+    <dl class="meta rd-meta">
+      <dt>Folio</dt><dd>#${esc(c.folio)}</dd>
+      <dt>Fecha</dt><dd>${fecha(c.fecha)}</dd>
+      ${c.para?`<dt>Dirigida a</dt><dd>${esc(c.para)}</dd>`:''}
+      <dt>Vigencia</dt><dd class="${vig?'pos':'neg'}">${vig?'Vigente':'Vencida'} · hasta ${vigenciaCot(c).toLocaleDateString('es-MX',{day:'numeric',month:'long'})}</dd>
+      <dt>Elaboró</dt><dd>${esc(c.vendedor||c.usuario||'')}</dd>
+      ${c.ahorro>0?`<dt>Ahorro por promociones</dt><dd class="pos">${fmt(c.ahorro)}</dd>`:''}
+    </dl>
+    <div class="rd-lines">${lineas || '<p class="sub" style="padding:12px 0">Esta cotización se registró sin detalle de productos.</p>'}</div>
+    <div class="rd-tot"><span>Total</span><b>${fmt(c.total)}</b></div>
+    <div class="gfield" style="margin-top:14px"><label for="cdNota">Nota de referencia</label><input class="field" id="cdNota" maxlength="140" placeholder="Ej. Precio acordado con el cliente" value="${esc(c.nota||'')}"></div>
+    <div class="cd-acts">
+      <button class="btn ${c.referencia?'ghost':''}" id="cdRef">${svg('star')}${c.referencia?'Quitar de referencias':'Guardar como referencia'}</button>
+      ${(c.lineas||[]).length ? `<button class="btn ghost" id="cdPdf">${svg('share')}Compartir PDF de nuevo</button>
+      <button class="btn ghost" id="cdBase">${svg('cotizar')}Usar como base para una nueva</button>` : ''}
+      <button class="btn danger" id="cdDel">Eliminar del historial</button>
+    </div>
+  </div>`;
+}
+function bindCotDet(){
+  const c = DB.cotizaciones.find(x=> x.id===cotSel); if(!c) return;
+  const nota = document.getElementById('cdNota');
+  nota.onchange = ()=>{ c.nota = nota.value.trim(); DB.guardar('cotizaciones', c); toast('Nota guardada'); };
+  document.getElementById('cdRef').onclick = ()=>{ c.referencia = !c.referencia; c.nota = nota.value.trim(); DB.guardar('cotizaciones', c); renderVenta(); toast(c.referencia ? 'Guardada como referencia' : 'Quitada de referencias'); };
+  const pdf = document.getElementById('cdPdf');
+  if(pdf) pdf.onclick = async ()=>{
+    const t = {lineas:c.lineas, folioCot:c.folio, nombre:c.nombre, para:c.para, vigencia:c.vigencia, fechaCot:c.fecha};
+    let doc; try{ doc = pdfCotizacion(t); }catch(e){ toast('No se pudo generar el PDF'); return; }
+    const blob = doc.output('blob'), nombre = limpiarNombreArchivo(c.nombre) + '.pdf';
+    c.envios = (c.envios||0) + 1; DB.guardar('cotizaciones', c);
+    const file = new File([blob], nombre, {type:'application/pdf'});
+    try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:c.nombre}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
+    descargarBlob(blob, nombre); toast('Se descargó el PDF');
+  };
+  const base = document.getElementById('cdBase');
+  if(base) base.onclick = ()=>{
+    const usar = ()=>{
+      const lineas = c.lineas.map(l=>{ const {promoRegla, costo, ...x} = l; const a = artPorId(l.pid); return {...x, lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), precio: a ? a.precio : l.precio, nombre: a ? nombreTicket(a) : l.nombre}; });
+      guardarTicket({lineas, para:c.para, vigencia:c.vigencia, nombre:c.nombre + ' (copia)'});
+      ventaVista = 'ticket'; renderVenta(); toast('Cotización cargada con precios actuales');
+    };
+    if(ticket().lineas.length) confirmar({titulo:'Reemplazar la cotización en curso', texto:'Tienes productos en la cotización actual. Se reemplazarán por los de esta cotización.', ok:'Reemplazar', alAceptar:usar});
+    else usar();
+  };
+  document.getElementById('cdDel').onclick = ()=> confirmar({titulo:'Eliminar cotización', peligro:true, ok:'Eliminar',
+    texto:`¿Eliminar "${esc(c.nombre)}" (#${esc(c.folio)}) del historial? No se puede deshacer.`,
+    alAceptar:()=>{ DB.borrar('cotizaciones', c.id); cotSel = null; ventaVista = 'cotHist'; renderVenta(); toast('Cotización eliminada'); }});
+}
 function iniciarCotizacion(){
   if(!ticket().lineas.length){ toast('Agrega productos a la cotización'); return; }
   ventaVista = 'cotizacion'; renderVenta();
@@ -3204,7 +3315,7 @@ function pdfCotizacion(t){
   const doc = new jsPDF({unit:'mm', format:'letter'});
   const W = 215.9, H = 279.4, M = 16;
   const verde = [31,111,74], gris = [107,118,114];
-  const hoy = new Date(), hasta = new Date(); hasta.setDate(hasta.getDate() + (t.vigencia||7));
+  const hoy = t.fechaCot ? new Date(t.fechaCot) : new Date(), hasta = new Date(hoy); hasta.setDate(hasta.getDate() + (t.vigencia||7));
   const fLarga = d => d.toLocaleDateString('es-MX',{day:'numeric', month:'long', year:'numeric'});
   const pie = ()=>{
     doc.setDrawColor(220,226,224); doc.line(M, H-20, W-M, H-20);
@@ -3258,11 +3369,15 @@ function pdfCotizacion(t){
   return doc;
 }
 function registrarCotizacion(t){
-  const lista = store.get('cotizacionesEmitidas', []);
-  if(!lista.some(x=>x.folio===t.folioCot)){
-    lista.push({folio:t.folioCot, nombre:t.nombre, para:t.para||'', total:totalTicket(t), lineas:t.lineas.length, fecha:new Date().toISOString(), usuario:session.usuario});
-    store.set('cotizacionesEmitidas', lista.slice(-300));
-  }
+  const previa = DB.cotizaciones.find(x=> x.folio===t.folioCot);
+  const ahora = new Date().toISOString();
+  DB.guardar('cotizaciones', {
+    id: t.folioCot, folio: t.folioCot, nombre: t.nombre, para: t.para || '', vigencia: t.vigencia || 7,
+    lineas: congelarLineas(t.lineas), total: totalTicket(t), ahorro: ahorroTicket(t),
+    fecha: previa ? previa.fecha : ahora, actualizada: ahora, envios: (previa?.envios || 0) + 1,
+    referencia: previa ? !!previa.referencia : false, nota: previa?.nota || '',
+    usuario: session.usuario, vendedor: session.nombre
+  });
 }
 function descargarBlob(blob, nombre){
   const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -3540,11 +3655,12 @@ function renderHeader(){
   const pill = document.getElementById('shiftPill');
   const acts = document.getElementById('headActions');
   const mb = document.getElementById('menuBtn');
-  if(enVenta() && ['programar','programado','pedidos','inicioPre','pedidoDet'].includes(ventaVista)){
-    title.textContent = {programar:'Programar entrega', programado:'Entrega programada', pedidos:'Ventas programadas', inicioPre:'Preventa', pedidoDet:'Venta programada'}[ventaVista];
+  if(enVenta() && ['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet'].includes(ventaVista)){
+    title.textContent = {programar:'Programar entrega', programado:'Entrega programada', pedidos:'Ventas programadas', inicioPre:'Preventa', pedidoDet:'Venta programada',
+                         inicioCot:'Cotizar', cotHist:'Cotizaciones realizadas', cotDet:'Cotización'}[ventaVista];
     pill.classList.add('hidden');
     acts.innerHTML = '';
-    const conMenu = ventaVista==='programado' || ventaVista==='inicioPre';
+    const conMenu = ventaVista==='programado' || ventaVista==='inicioPre' || ventaVista==='inicioCot';
     mb.innerHTML = svg(conMenu ? 'menu' : 'back');
     mb.classList.toggle('keep', !conMenu);
   } else if(enVenta() && (ventaVista==='guardar' || ventaVista==='abiertos')){
@@ -3570,7 +3686,7 @@ function renderHeader(){
     pill.classList.add('hidden');
     acts.innerHTML = (esCot() ? '' : `<button class="icon-btn" id="hCliente" aria-label="Agregar cliente">${svg('userAdd')}</button>`) +
                       `<button class="icon-btn" id="hMas" aria-label="Más opciones">${svg('more')}</button>`;
-    const atras = ventaVista==='ticket' || esPre();
+    const atras = ventaVista==='ticket' || esPre() || esCot();
     mb.innerHTML = svg(atras ? 'back' : 'menu');
     mb.classList.toggle('keep', atras);
     document.getElementById('ticketBtn').onclick = ()=>{ ventaVista = 'ticket'; renderVenta(); };
@@ -4389,7 +4505,7 @@ function go(id){
   else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
   else if(id==='catalogo'){ renderCatalogo(); }
-  else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : 'grid'; renderVenta(); }
+  else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : id==='cotizar' ? 'inicioCot' : 'grid'; renderVenta(); }
   else{
     view.innerHTML = viewPendiente(id);
     const b = document.getElementById('toShift'); if(b) b.onclick = ()=> go('turno');
@@ -4457,6 +4573,9 @@ document.getElementById('menuBtn').onclick = ()=>{
   if(enVenta() && ventaVista==='pedidoDet'){ ventaVista = 'pedidos'; renderVenta(); return; }
   if(enVenta() && ventaVista==='pedidos'){ ventaVista = esPre() ? 'inicioPre' : 'grid'; renderVenta(); return; }
   if(enVenta() && esPre() && ventaVista==='grid'){ ventaVista = 'inicioPre'; renderVenta(); return; }
+  if(enVenta() && esCot() && ventaVista==='grid'){ ventaVista = 'inicioCot'; renderVenta(); return; }
+  if(enVenta() && ventaVista==='cotDet'){ ventaVista = 'cotHist'; renderVenta(); return; }
+  if(enVenta() && ventaVista==='cotHist'){ ventaVista = 'inicioCot'; renderVenta(); return; }
   if(enVenta() && ventaVista==='guardar'){ ventaVista = ventaPrev==='ticket' ? 'ticket' : 'grid'; renderVenta(); return; }
   if(enVenta() && ventaVista==='abiertos'){ ventaVista = ventaPrev==='ticket' ? 'ticket' : 'grid'; renderVenta(); return; }
   if(enVenta() && ventaVista==='cobro'){ ventaVista = 'ticket'; renderVenta(); return; }
@@ -4515,6 +4634,9 @@ const saved = store.get('session', null);
   store.set('articulos', ls); store.set('promosSeed', 'v1');
 })();
 DB.init().then(()=>{
+  /* Cotizaciones emitidas en versiones anteriores (solo resumen) pasan al historial */
+  const viejas = store.get('cotizacionesEmitidas', []);
+  if(viejas.length){ viejas.forEach(v=>{ if(!DB.cotizaciones.some(c=> c.folio===v.folio)) DB.guardar('cotizaciones', {id:v.folio, folio:v.folio, nombre:v.nombre, para:v.para||'', vigencia:7, lineas:[], total:v.total, fecha:v.fecha, envios:1, referencia:false, usuario:v.usuario}); }); store.del('cotizacionesEmitidas'); }
   /* Recibos y pedidos anteriores a las promociones: se cobran a precio de lista */
   ['recibos','pedidos'].forEach(n=> DB[n].forEach(r=>{ let c = false; (r.lineas||[]).forEach(l=>{ if(!('promoRegla' in l)){ l.promoRegla = null; c = true; } }); if(c) DB.guardar(n, r); })); if(saved){ session = saved; enterApp(); } });
 </script>
