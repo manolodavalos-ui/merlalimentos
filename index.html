@@ -591,6 +591,48 @@ dd.pos{color:var(--brand)}
 .rc-rec-in label{margin:0;font-size:.74rem}
 .rc-rec-in input{width:100%;padding:9px 6px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:.92rem;background:#fff;margin-top:3px}
 .ir-s{display:block;color:var(--muted);font-size:.78rem;font-weight:400}
+.inf-top{display:flex;flex-direction:column;gap:8px;padding:12px 16px 4px}
+.inf-rango{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border:1.5px solid var(--brand);border-radius:14px;background:var(--brand-soft);text-align:left}
+.inf-rango > svg{width:22px;height:22px;stroke:var(--brand);flex-shrink:0}
+.inf-rango span{flex:1;min-width:0}.inf-rango b{display:block;font-size:1.02rem}.inf-rango small{display:block;color:var(--muted);font-size:.8rem}
+.inf-comp{padding:10px 12px;font-size:.92rem}
+.inf-pad{padding-top:12px}
+.inf-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.inf-kpi{background:var(--bg);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:1px}
+.inf-kpi small{color:var(--muted);font-size:.78rem}.inf-kpi b{font-size:1.2rem;font-weight:800}
+.inf-kpi em{font-style:normal;font-size:.72rem;color:var(--warn)}
+.dl{font-size:.78rem;font-weight:700;color:var(--muted);white-space:nowrap}
+.dl.up{color:#1e7e45}.dl.down{color:var(--danger)}
+.inf-card{margin-top:12px;padding:16px 14px}
+.ch{margin-top:4px}.ch svg{width:100%;height:auto;display:block}
+.ch-ax{font-size:9px;fill:#6b7672;font-family:system-ui,sans-serif}.ch-ax.mk{font-weight:700;fill:#1c2321}
+.ch-hit{cursor:pointer}.ch-hit.sel{fill:rgba(31,111,74,.08)}
+.ch-tip{font-size:.84rem;color:var(--muted);min-height:1.3em;margin-bottom:4px}.ch-tip b{color:var(--text)}
+.ch-leg{display:flex;gap:14px;font-size:.78rem;color:var(--muted);margin:2px 0 4px}
+.ch-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.inf-ctl{padding:10px 16px 4px}.inf-ctl select{margin-top:8px;padding:10px 12px;font-size:.92rem}
+.inf-row{display:flex;align-items:stretch;gap:10px;width:100%;padding:0 16px;text-align:left}
+.inf-row .rc-main{padding:11px 0}
+.inf-n{width:22px;flex-shrink:0;padding-top:13px;color:var(--muted);font-size:.85rem;font-weight:700}
+.inf-row .cr-amt{gap:2px}
+.cr-bar.ct i{background:#7aa7f0}
+.inf-sub{margin:0 16px 8px 48px;padding:4px 12px;background:var(--bg);border-radius:12px}
+.inf-anio{display:flex;align-items:center;justify-content:center;gap:16px;font-size:1.2rem;margin-bottom:10px}
+.inf-anio .icon-btn{font-size:1.6rem;width:40px;height:40px;color:var(--brand)}
+.inf-anio .icon-btn:disabled{opacity:.3}
+.cal h3{margin-bottom:8px}
+.cal-pre{margin-bottom:10px}.cal-pre .dia{font-size:.8rem;padding:6px 9px}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin:4px 0}
+.cal-nav b{font-size:1rem}.cal-nav .icon-btn{font-size:1.5rem;width:38px;height:38px;color:var(--brand)}
+.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.cal-g em{font-style:normal;font-size:.74rem;color:var(--muted);padding:4px 0}
+.cal-d{position:relative;aspect-ratio:1;border-radius:10px;font-size:.92rem;font-weight:600;background:transparent}
+.cal-d i{position:absolute;bottom:4px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--brand-2)}
+.cal-d.on{background:var(--brand-soft);color:var(--brand)}
+.cal-d.ext{background:var(--brand);color:#fff}.cal-d.ext i{background:#fff}
+.cal-d.hoy{outline:1.5px solid var(--brand);outline-offset:-1.5px}
+.cal-d:disabled{color:var(--disabled)}
+.cal-sel{margin:8px 0 0;text-align:center}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1806,7 +1848,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.29';
+const APP_VERSION = '0.30';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3898,7 +3940,7 @@ function renderHeader(){
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
-    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario'].includes(current));
+    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes'].includes(current));
     acts.innerHTML = current==='clientes' && (cliVista==='crear'||cliVista==='editar') ? '<button class="head-txt" id="hCliGuardar">GUARDAR</button>'
                    : current==='clientes' && cliVista==='lista' ? `<button class="icon-btn" id="hCliNuevo" aria-label="Crear cliente">${svg('userAdd')}</button>` : '';
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
@@ -4862,9 +4904,9 @@ const camionetaConStock = ()=> Object.entries(inv2().camioneta).filter(([pid,q])
 function ventasPorProducto(dias){
   const desde = masDias(-(dias-1)), out = {};
   DB.recibos.filter(r=> !r.cancelado && !r.reemplazadoPor && hoyClave(new Date(r.fecha)) >= desde).forEach(r=> (r.lineas||[]).forEach(l=>{
-    const x = out[l.pid] || (out[l.pid] = {cant:0, importe:0, costo:0, sinCosto:false});
+    const x = out[l.pid] || (out[l.pid] = {cant:0, importe:0, conCosto:0, costo:0, sinCosto:false});
     x.cant = r3(x.cant + l.cantidad); x.importe = r2(x.importe + importeLinea(l));
-    const c = l.costo != null ? l.costo : costoArt(artPorId(l.pid)); if(c > 0) x.costo = r2(x.costo + c*l.cantidad); else x.sinCosto = true;
+    const c = l.costo != null ? l.costo : costoArt(artPorId(l.pid)); if(c > 0){ x.costo = r2(x.costo + c*l.cantidad); x.conCosto = r2(x.conCosto + importeLinea(l)); } else x.sinCosto = true;
   }));
   return out;
 }
@@ -5250,7 +5292,7 @@ function confirmarRecepcion(){
 function viewReportesInv(){
   const arts = invArts(), dias = invRepDias, vs = ventasPorProducto(dias);
   const val = (ub, campo) => r2(arts.reduce((s,a)=> s + (campo==='precio' ? a.precio : costoArt(a)) * Math.max(0, stockEn(ub, a.id)), 0));
-  const top = Object.entries(vs).map(([pid,x])=> ({pid, ...x, util: r2(x.importe - x.costo)})).sort((a,b)=> b.importe - a.importe);
+  const top = Object.entries(vs).map(([pid,x])=> ({pid, ...x, util: r2(x.conCosto - x.costo)})).sort((a,b)=> b.importe - a.importe);
   const desde = masDias(-(dias-1));
   const quietos = arts.filter(a=> totalStock(a.id) > 0 && !vs[a.id]).map(a=> ({a, valor:valorCosto(a.id, totalStock(a.id))})).sort((x,y)=> y.valor - x.valor);
   const mermas = DB.movimientos.filter(m=> ['merma','caducidad','consumo','faltante','conteo'].includes(m.tipo) && m.cant < 0 && hoyClave(new Date(m.fecha)) >= desde);
@@ -5265,7 +5307,7 @@ function viewReportesInv(){
       ${sinCosto ? `<p class="note-sm" style="text-align:left">${sinCosto} productos sin costo capturado (no suman al valor ni a la utilidad).</p>` : ''}
     </div>
     <div class="card cajon"><h3>Más vendidos · ${dias} días</h3>
-      ${top.slice(0,10).map(x=>`<div class="cj-row"><span>${esc(nombreTicket(artPorId(x.pid)||{nombre:x.pid}))}<small class="ir-s">${fmtCant(x.pid, x.cant)} · utilidad ${x.costo ? fmt(x.util) + ' (' + Math.round(x.util/x.importe*100) + '%)' : 'sin costo'}</small></span><b>${fmt(x.importe)}</b></div>`).join('') || '<p class="sub">Sin ventas en el periodo.</p>'}
+      ${top.slice(0,10).map(x=>`<div class="cj-row"><span>${esc(nombreTicket(artPorId(x.pid)||{nombre:x.pid}))}<small class="ir-s">${fmtCant(x.pid, x.cant)} · utilidad ${x.costo ? fmt(x.util) + ' (' + Math.round(x.util/x.conCosto*100) + '%)' + (x.sinCosto ? ' · costo incompleto' : '') : 'sin costo'}</small></span><b>${fmt(x.importe)}</b></div>`).join('') || '<p class="sub">Sin ventas en el periodo.</p>'}
       ${top.length ? `<div class="cj-teo"><span>Utilidad bruta</span><b>${fmt(r2(top.reduce((s,x)=> s + (x.costo ? x.util : 0), 0)))}</b></div>` : ''}
     </div>
     <div class="card cajon"><h3>Sin movimiento · ${dias} días</h3>
@@ -5377,6 +5419,267 @@ function atrasInv(){
 }
 const TITULOS_INV = {articulo:'Producto', carga:'Cargar camioneta', liquidacion:'Liquidar camioneta', conteo:'Conteo de inventario', conteos:'Conteos realizados', conteoDet:'Conteo',
   ajuste:'Movimiento de inventario', compras:'Compras', compra:'Orden de compra', recepcion:'Recibir mercancía', reportes:'Reportes de inventario'};
+
+/* ================= Informes ================= */
+let infDesde = null, infHasta = null, infComp = 'anterior', infTab = 'resumen', infOrden = 'ventas', infCat = '', infCliF = 'todos', infAnio = new Date().getFullYear(), infAbierto = null;
+const infTips = {};
+const C_ACT = '#1f6f4a', C_COMP = '#c3ccc8';
+const DIAS_CORTOS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const kDate = k => { const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d); };
+const sumaDias = (k, n) => { const d = kDate(k); d.setDate(d.getDate() + n); return hoyClave(d); };
+const nDias = (a, b) => diasEntre(a, b) + 1;
+const fCorta = k => kDate(k).toLocaleDateString('es-MX', {day:'numeric', month:'short'});
+const fRango = (a, b) => a===b ? kDate(a).toLocaleDateString('es-MX',{weekday:'short', day:'numeric', month:'short', year:'numeric'}) : `${fCorta(a)} – ${kDate(b).toLocaleDateString('es-MX',{day:'numeric', month:'short', year:'numeric'})}`;
+const lunesDe = k => { const d = kDate(k); d.setDate(d.getDate() - ((d.getDay()+6)%7)); return hoyClave(d); };
+function rangoComp(){
+  if(infComp==='nada') return null;
+  if(infComp==='semana') return [sumaDias(infDesde,-7), sumaDias(infHasta,-7)];
+  if(infComp==='anio'){ const f = k => { const d = kDate(k); d.setFullYear(d.getFullYear()-1); return hoyClave(d); }; return [f(infDesde), f(infHasta)]; }
+  const n = nDias(infDesde, infHasta); return [sumaDias(infDesde, -n), sumaDias(infDesde, -1)];
+}
+const TXT_COMP = {anterior:'Periodo anterior', semana:'Semana anterior (−7 días)', anio:'Mismo periodo del año pasado', nada:'Sin comparar'};
+const recVigentes = (a, b) => DB.recibos.filter(r=> !r.cancelado && !r.reemplazadoPor && (k => k >= a && k <= b)(hoyClave(new Date(r.fecha))));
+/* Acumulador: utilidad solo sobre lo que tiene costo (si falta, se marca "costo incompleto") */
+const acc0 = ()=> ({ventas:0, conCosto:0, costo:0, cant:0, tickets:new Set(), dias:new Set()});
+function acumLinea(x, l, r){
+  const imp = importeLinea(l), c = l.costo != null ? l.costo : costoArt(artPorId(l.pid));
+  x.ventas += imp; x.cant += l.cantidad; x.tickets.add(r.id); x.dias.add(hoyClave(new Date(r.fecha)));
+  if(c > 0){ x.conCosto += imp; x.costo += c * l.cantidad; }
+}
+const util = x => r2(x.conCosto - x.costo);
+const margen = x => x.conCosto > 0 ? (x.conCosto - x.costo) / x.conCosto : null;
+const incompleto = x => x.ventas - x.conCosto > 0.01;
+function totales(recs){
+  const x = acc0(); let ahorro = 0; const clis = new Set(); const met = {};
+  recs.forEach(r=>{ (r.lineas||[]).forEach(l=> acumLinea(x, l, r)); ahorro += ahorroRecibo(r); if(r.cliente?.id) clis.add(r.cliente.id); met[r.metodo] = (met[r.metodo]||0) + r.total; });
+  return {...x, ventas:r2(x.ventas), nTickets:recs.length, prom: recs.length ? x.ventas/recs.length : 0, clientes:clis.size, ahorro:r2(ahorro), met};
+}
+function porClave(recs, clave){
+  const m = {};
+  recs.forEach(r=> (r.lineas||[]).forEach(l=>{ const k = clave(l, r); (m[k] || (m[k] = acc0())); acumLinea(m[k], l, r); }));
+  return m;
+}
+function delta(a, b, fmtFn){
+  if(b == null) return '';
+  if(!b && !a) return '';
+  if(!b) return `<span class="dl up">nuevo</span>`;
+  const p = (a - b) / Math.abs(b);
+  if(Math.abs(p) < 0.005) return `<span class="dl">= 0%</span>`;
+  return `<span class="dl ${p>0?'up':'down'}">${p>0?'▲':'▼'} ${Math.abs(p*100).toFixed(Math.abs(p)<0.1?1:0)}%</span>`;
+}
+const pct = v => v==null ? '—' : (v*100).toFixed(1) + '%';
+
+/* Gráfica de barras en SVG: serie actual y comparación en gris */
+function barras(id, labels, a, b, {alto = 150, cada = 1, marcar = [], tips} = {}){
+  const W = 340, H = alto, pl = 34, pb = 20, pt = 8, n = labels.length;
+  const max = Math.max(1, ...a, ...(b || [])), paso = max > 0 ? niceStep(max/3) : 1, top = Math.ceil(max/paso)*paso;
+  const y = v => pt + (H - pt - pb) * (1 - v/top), gw = (W - pl) / n, bw = Math.max(2, Math.min(18, gw * (b ? 0.36 : 0.62)));
+  const rect = (x, v, col) => { const h = Math.max(0, y(0) - y(v)); if(h < 0.5) return ''; const r = Math.min(3, bw/2, h); const yy = y(v);
+    return `<path d="M${x},${y(0)}V${yy+r}Q${x},${yy} ${x+r},${yy}H${x+bw-r}Q${x+bw},${yy} ${x+bw},${yy+r}V${y(0)}Z" fill="${col}"/>`; };
+  let g = '';
+  for(let v = 0; v <= top + 0.001; v += paso) g += `<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#e6ebe9" stroke-width="1"/><text x="${pl-4}" y="${y(v)+3.5}" text-anchor="end" class="ch-ax">${corto(v)}</text>`;
+  labels.forEach((lb, i)=>{
+    const x0 = pl + gw*i, cx = x0 + gw/2;
+    if(b){ g += rect(cx - bw - 1, b[i]||0, C_COMP) + rect(cx + 1, a[i]||0, C_ACT); } else g += rect(cx - bw/2, a[i]||0, C_ACT);
+    if(i % cada === 0 || marcar.includes(i)) g += `<text x="${cx}" y="${H-5}" text-anchor="middle" class="ch-ax${marcar.includes(i)?' mk':''}">${lb}</text>`;
+    g += `<rect x="${x0}" y="0" width="${gw}" height="${H-pb}" fill="transparent" data-i="${i}" class="ch-hit"/>`;
+  });
+  infTips[id] = tips || labels.map((lb,i)=> `${lb}: <b>${fmt(a[i]||0)}</b>${b ? ` · comparación ${fmt(b[i]||0)}` : ''}`);
+  return `<div class="ch" data-ch="${id}"><div class="ch-tip" id="tip-${id}">Toca una barra para ver el detalle</div><svg viewBox="0 0 ${W} ${H}" role="img">${g}<line x1="${pl}" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="#9aa5a1" stroke-width="1"/></svg></div>`;
+}
+function niceStep(x){ const p = Math.pow(10, Math.floor(Math.log10(x))), f = x/p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
+const corto = v => v >= 1e6 ? (v/1e6).toFixed(1).replace('.0','')+'M' : v >= 1000 ? (v/1000).toFixed(v>=1e4?0:1).replace('.0','')+'k' : String(Math.round(v));
+const leyenda = comp => comp ? `<div class="ch-leg"><span><i style="background:${C_ACT}"></i>Periodo elegido</span><span><i style="background:${C_COMP}"></i>${TXT_COMP[infComp]}</span></div>` : '';
+
+/* Serie por día / semana / mes según el largo del rango */
+function serieTiempo(recs, a, b){
+  const n = nDias(a, b), modo = n <= 62 ? 'dia' : n <= 400 ? 'semana' : 'mes';
+  const claves = [], labels = [], tips = [];
+  if(modo==='dia') for(let i=0;i<n;i++){ const k = sumaDias(a,i); claves.push(k); const d = kDate(k); labels.push(n <= 14 ? DIAS_CORTOS[(d.getDay()+6)%7].slice(0,2)+' '+d.getDate() : String(d.getDate())); tips.push(kDate(k).toLocaleDateString('es-MX',{weekday:'long', day:'numeric', month:'short'})); }
+  else if(modo==='semana'){ let k = lunesDe(a); while(k <= b){ claves.push(k); labels.push(String(kDate(k).getDate())); tips.push('Semana del ' + fCorta(k)); k = sumaDias(k, 7); } }
+  else { let d = kDate(a); d.setDate(1); while(hoyClave(d) <= b){ claves.push(hoyClave(d).slice(0,7)); labels.push(MESES[d.getMonth()]); tips.push(d.toLocaleDateString('es-MX',{month:'long', year:'numeric'})); d.setMonth(d.getMonth()+1); } }
+  const idx = r => { const k = hoyClave(new Date(r.fecha)); return modo==='dia' ? claves.indexOf(k) : modo==='semana' ? claves.indexOf(lunesDe(k)) : claves.indexOf(k.slice(0,7)); };
+  const val = new Array(claves.length).fill(0); recs.forEach(r=>{ const i = idx(r); if(i >= 0) val[i] += r.total; });
+  return {modo, labels, val, tips, cada: Math.ceil(claves.length / (modo==='dia' && n <= 14 ? 14 : 10))};
+}
+
+/* ===== Vistas ===== */
+function viewInformes(){
+  if(!infDesde){ infHasta = hoyClave(); infDesde = lunesDe(infHasta); }
+  const comp = rangoComp();
+  const tabs = [['resumen','Resumen'],['productos','Productos'],['proveedores','Proveedores'],['clientes','Clientes'],['tendencia','Año']];
+  const cuerpo = {resumen:infResumen, productos:infProductos, proveedores:infProveedores, clientes:infClientes, tendencia:infTendencia}[infTab](comp);
+  return `<div class="rc-wrap inf">
+    ${infTab!=='tendencia' ? `<div class="inf-top">
+      <button class="inf-rango" id="infCal">${svg('turno')}<span><b>${fRango(infDesde, infHasta)}</b><small>${nDias(infDesde, infHasta)} ${nDias(infDesde, infHasta)===1?'día':'días'}${comp ? ' · vs ' + fRango(comp[0], comp[1]) : ''}</small></span>${svg('chev')}</button>
+      <select class="field inf-comp" id="infComp">${Object.entries(TXT_COMP).map(([k,t])=>`<option value="${k}" ${k===infComp?'selected':''}>Comparar: ${t}</option>`).join('')}</select>
+    </div>` : ''}
+    <div class="dias filtro">${tabs.map(([k,t])=>`<button class="dia${infTab===k?' on':''}" data-t="${k}">${t}</button>`).join('')}</div>
+    ${cuerpo}
+  </div>`;
+}
+function kpi(t, a, b, f = fmt, extra = ''){
+  return `<div class="inf-kpi"><small>${t}</small><b>${a==null?'—':f(a)}</b>${b!==undefined ? delta(a||0, b) : ''}${extra}</div>`;
+}
+function infResumen(comp){
+  const rA = recVigentes(infDesde, infHasta), rB = comp ? recVigentes(comp[0], comp[1]) : null;
+  const A = totales(rA), B = rB ? totales(rB) : null;
+  if(!rA.length && !(rB && rB.length)) return `<div class="rc-empty">${svg('informes')}<p>No hay ventas en este periodo.</p></div>`;
+  const sA = serieTiempo(rA, infDesde, infHasta), sB = comp ? serieTiempo(rB, comp[0], comp[1]) : null;
+  const nombreModo = {dia:'por día', semana:'por semana', mes:'por mes'}[sA.modo];
+  const semA = new Array(7).fill(0), semB = new Array(7).fill(0);
+  rA.forEach(r=> semA[(new Date(r.fecha).getDay()+6)%7] += r.total); if(rB) rB.forEach(r=> semB[(new Date(r.fecha).getDay()+6)%7] += r.total);
+  const tipsT = sA.tips.map((t,i)=> `${t}: <b>${fmt(sA.val[i])}</b>${sB ? ` · comparación ${fmt(sB.val[i]||0)}` : ''}`);
+  return `<div class="cr-pad inf-pad">
+    <div class="inf-kpis">
+      ${kpi('Ventas netas', A.ventas, B?.ventas)}
+      ${kpi('Utilidad bruta', util(A), B ? util(B) : undefined, fmt, incompleto(A) ? '<em>costo incompleto</em>' : '')}
+      ${kpi('Margen', margen(A), undefined, pct, B && margen(B)!=null && margen(A)!=null ? `<span class="dl ${margen(A)>=margen(B)?'up':'down'}">${margen(A)>=margen(B)?'▲':'▼'} ${Math.abs((margen(A)-margen(B))*100).toFixed(1)} pts</span>` : '')}
+      ${kpi('Tickets', A.nTickets, B?.nTickets, n=> String(n))}
+      ${kpi('Ticket promedio', A.prom, B?.prom)}
+      ${kpi('Clientes atendidos', A.clientes, B?.clientes, n=> String(n))}
+    </div>
+    ${A.ahorro > 0 ? `<p class="note-sm" style="text-align:left">Descuento por promociones en el periodo: <b>${fmt(A.ahorro)}</b>${B && B.ahorro ? ' (comparación '+fmt(B.ahorro)+')' : ''}.</p>` : ''}
+    <div class="card cajon inf-card"><h3>Ventas ${nombreModo}</h3>${leyenda(comp)}${barras('tiempo', sA.labels, sA.val, sB ? sB.val : null, {cada:sA.cada, tips:tipsT})}</div>
+    <div class="card cajon inf-card"><h3>Por día de la semana</h3><p class="sub" style="margin:0 0 6px">Total vendido cada día de visita en el periodo</p>${leyenda(comp)}${barras('semana', DIAS_CORTOS, semA, rB ? semB : null)}</div>
+    <div class="card cajon inf-card"><h3>Forma de pago</h3>${['Efectivo','Tarjeta','Crédito'].map(m=>`<div class="cj-row"><span>${m}</span><b>${fmt(A.met[m]||0)} ${B ? delta(A.met[m]||0, B.met[m]||0) : ''}</b></div>`).join('')}</div>
+  </div>`;
+}
+function infProductos(comp){
+  const mA = porClave(recVigentes(infDesde, infHasta), l=> l.pid), mB = comp ? porClave(recVigentes(comp[0], comp[1]), l=> l.pid) : {};
+  const val = (x) => !x ? 0 : infOrden==='ventas' ? x.ventas : infOrden==='utilidad' ? util(x) : infOrden==='cantidad' ? x.cant : (margen(x) ?? -1);
+  let ls = Object.entries(mA).map(([pid,x])=> ({pid, a:artPorId(pid), x, y:mB[pid]})).filter(o=> !infCat || o.a?.seccion===infCat).sort((p,q)=> val(q.x) - val(p.x));
+  const tot = ls.reduce((s,o)=> s + o.x.ventas, 0);
+  const perdidos = comp ? Object.keys(mB).filter(pid=> !mA[pid] && (!infCat || artPorId(pid)?.seccion===infCat)) : [];
+  const fv = o => infOrden==='cantidad' ? fmtCant(o.pid, o.x.cant) : infOrden==='margen' ? pct(margen(o.x)) : fmt(infOrden==='utilidad' ? util(o.x) : o.x.ventas);
+  return `<div class="inf-ctl"><div class="dias">${[['ventas','Ventas'],['utilidad','Utilidad'],['cantidad','Cantidad'],['margen','Margen']].map(([k,t])=>`<button class="dia${infOrden===k?' on':''}" data-o="${k}">${t}</button>`).join('')}</div>
+    <select class="field" id="infCat"><option value="">Todas las categorías</option>${categorias().map(c=>`<option ${c===infCat?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    ${ls.length ? ls.slice(0,150).map((o,i)=>`<div class="inf-row">
+      <span class="inf-n">${i+1}</span>
+      <span class="rc-main"><b>${esc(o.a ? nombreTicket(o.a) : o.pid)}</b><small>${fmtCant(o.pid, o.x.cant)} · ${fmt(o.x.ventas)} · utilidad ${o.x.conCosto ? fmt(util(o.x)) + ' (' + pct(margen(o.x)) + ')' + (incompleto(o.x) ? ' · costo incompleto' : '') : 'sin costo'}${o.a?.proveedor ? ' · ' + esc(o.a.proveedor) : ''}</small><i class="cr-bar"><i style="width:${tot ? Math.max(1, Math.round(o.x.ventas/tot*100)) : 0}%"></i></i></span>
+      <span class="cr-amt"><b>${fv(o)}</b>${comp ? delta(val(o.x), o.y ? val(o.y) : 0) : ''}</span></div>`).join('') : `<div class="rc-empty"><p>Sin ventas en el periodo.</p></div>`}
+    ${perdidos.length ? `<div class="rc-day">Se vendieron en la comparación pero no ahora (${perdidos.length})</div>${perdidos.slice(0,30).map(pid=>`<div class="inf-row"><span class="inf-n">·</span><span class="rc-main"><b>${esc(artPorId(pid) ? nombreTicket(artPorId(pid)) : pid)}</b><small>antes ${fmt(mB[pid].ventas)}</small></span><span class="cr-amt"><span class="dl down">▼ 100%</span></span></div>`).join('')}` : ''}`;
+}
+function infProveedores(comp){
+  const k = l => artPorId(l.pid)?.proveedor || 'Sin proveedor';
+  const rA = recVigentes(infDesde, infHasta), mA = porClave(rA, k), mB = comp ? porClave(recVigentes(comp[0], comp[1]), k) : {};
+  const prodA = porClave(rA, l=> k(l) + '|' + l.pid);
+  const ls = Object.entries(mA).sort((p,q)=> util(q[1]) - util(p[1]) || q[1].ventas - p[1].ventas);
+  const totU = ls.reduce((s,[,x])=> s + Math.max(0, util(x)), 0);
+  if(!ls.length) return `<div class="rc-empty"><p>Sin ventas en el periodo.</p></div>`;
+  return `<p class="note-sm" style="text-align:left;padding:0 16px">Ordenados por utilidad. Toca un proveedor para ver sus productos. El proveedor se toma de cada artículo.</p>
+    ${ls.map(([p,x], i)=>{ const y = mB[p], abierto = infAbierto===p;
+      const prods = abierto ? Object.entries(prodA).filter(([kk])=> kk.startsWith(p+'|')).map(([kk,v])=> ({pid:kk.split('|')[1], v})).sort((a,b)=> util(b.v) - util(a.v) || b.v.ventas - a.v.ventas) : [];
+      return `<button class="inf-row inf-prov" data-p="${esc(p)}">
+        <span class="inf-n">${i+1}</span>
+        <span class="rc-main"><b>${esc(p)}</b><small>ventas ${fmt(x.ventas)} · margen ${pct(margen(x))}${incompleto(x)?' · costo incompleto':''} · ${new Set(Object.keys(prodA).filter(kk=> kk.startsWith(p+'|'))).size} productos</small><i class="cr-bar"><i style="width:${totU ? Math.max(1, Math.round(Math.max(0,util(x))/totU*100)) : 0}%"></i></i></span>
+        <span class="cr-amt"><b>${fmt(util(x))}</b>${comp ? delta(util(x), y ? util(y) : 0) : ''}</span></button>
+        ${abierto ? `<div class="inf-sub">${prods.map(o=>`<div class="cj-row"><span>${esc(artPorId(o.pid) ? nombreTicket(artPorId(o.pid)) : o.pid)}<small class="ir-s">${fmtCant(o.pid, o.v.cant)} · ${fmt(o.v.ventas)} · ${o.v.conCosto ? pct(margen(o.v)) : 'sin costo'}</small></span><b>${fmt(util(o.v))}</b></div>`).join('')}</div>` : ''}`; }).join('')}`;
+}
+function infClientes(comp){
+  const rA = recVigentes(infDesde, infHasta), rB = comp ? recVigentes(comp[0], comp[1]) : [];
+  const sem = new Set(); for(let k = lunesDe(infDesde); k <= infHasta; k = sumaDias(k,7)) sem.add(k);
+  const m = {};
+  const add = (r, lado) => { const id = r.cliente?.id || '__mostrador'; const x = m[id] || (m[id] = {id, nombre: r.cliente ? (cliDe(id, r.cliente).tienda || r.cliente.nombre) : 'Mostrador (sin cliente)', a:0, b:0, t:0, semanas:new Set(), ultima:''});
+    if(lado==='a'){ x.a += r.total; x.t++; x.semanas.add(lunesDe(hoyClave(new Date(r.fecha)))); if(r.fecha > x.ultima) x.ultima = r.fecha; } else x.b += r.total; };
+  rA.forEach(r=> add(r,'a')); rB.forEach(r=> add(r,'b'));
+  const estado = x => !comp ? null : x.b===0 ? 'nuevo' : x.a===0 ? 'perdido' : (x.a-x.b)/x.b >= 0.15 ? 'crece' : (x.a-x.b)/x.b <= -0.15 ? 'baja' : 'estable';
+  const ETQ = {nuevo:['Nuevo','up'], perdido:['Dejó de comprar','down'], crece:['Creciendo','up'], baja:['Bajando','down'], estable:['Estable','']};
+  const ls = Object.values(m).filter(x=> x.id!=='__mostrador').map(x=> ({...x, e:estado(x), constancia: x.semanas.size / sem.size}));
+  const most = m.__mostrador;
+  const cnt = k => ls.filter(x=> x.e===k).length;
+  const fl = ls.filter(x=> infCliF==='todos' || x.e===infCliF).sort((p,q)=> (q.a - p.a) || (q.b - p.b));
+  const chip = (k,t,n)=> `<button class="dia${infCliF===k?' on':''}" data-c="${k}">${t}${n!=null?' · '+n:''}</button>`;
+  return `${comp ? `<div class="inf-ctl"><div class="dias">${chip('todos','Todos',ls.length)}${chip('crece','Creciendo',cnt('crece'))}${chip('estable','Estables',cnt('estable'))}${chip('baja','Bajando',cnt('baja'))}${chip('nuevo','Nuevos',cnt('nuevo'))}${chip('perdido','Dejaron de comprar',cnt('perdido'))}</div></div>`
+      : `<p class="note-sm" style="text-align:left;padding:0 16px">Elige una comparación para ver quién crece, baja o dejó de comprar.</p>`}
+    <p class="note-sm" style="text-align:left;padding:0 16px;margin-top:4px">Constancia = semanas con compra de las ${sem.size} del periodo. Creciendo o bajando = cambio de 15% o más contra la comparación.</p>
+    ${fl.length ? fl.map((x,i)=>`<div class="inf-row">
+      <span class="inf-n">${i+1}</span>
+      <span class="rc-main"><b>${esc(x.nombre)}</b><small>${x.t} ${x.t===1?'compra':'compras'} · constancia ${x.semanas.size}/${sem.size}${x.ultima ? ' · última ' + new Date(x.ultima).toLocaleDateString('es-MX',{day:'numeric',month:'short'}) : ''}${comp ? ' · antes ' + fmt(x.b) : ''}</small>
+        <i class="cr-bar ct"><i style="width:${Math.round(x.constancia*100)}%"></i></i></span>
+      <span class="cr-amt"><b>${fmt(x.a)}</b>${x.e ? `<span class="dl ${ETQ[x.e][1]}">${x.e==='crece'||x.e==='baja' ? delta(x.a, x.b).replace(/<[^>]+>/g,'') : ETQ[x.e][0]}</span>` : ''}</span></div>`).join('') : `<div class="rc-empty"><p>No hay clientes en este filtro.</p></div>`}
+    ${most && infCliF==='todos' ? `<div class="inf-row"><span class="inf-n">·</span><span class="rc-main"><b>${most.nombre}</b><small>${most.t} ventas</small></span><span class="cr-amt"><b>${fmt(most.a)}</b>${comp ? delta(most.a, most.b) : ''}</span></div>` : ''}`;
+}
+function infTendencia(){
+  const y = infAnio, ventasAnio = yy => DB.recibos.filter(r=> !r.cancelado && !r.reemplazadoPor && new Date(r.fecha).getFullYear()===yy);
+  const rA = ventasAnio(y), rB = ventasAnio(y-1);
+  const mesA = new Array(12).fill(0), mesB = new Array(12).fill(0), accM = Array.from({length:12}, acc0);
+  rA.forEach(r=>{ const d = new Date(r.fecha); mesA[d.getMonth()] += r.total; (r.lineas||[]).forEach(l=> acumLinea(accM[d.getMonth()], l, r)); });
+  rB.forEach(r=> mesB[new Date(r.fecha).getMonth()] += r.total);
+  /* día del mes: promedio de los meses transcurridos */
+  const dia = new Array(31).fill(0), veces = new Array(31).fill(0), hoy = new Date();
+  for(let mth = 0; mth < 12; mth++){ const dimes = new Date(y, mth+1, 0).getDate(); for(let d = 1; d <= dimes; d++){ if(new Date(y, mth, d) <= hoy) veces[d-1]++; } }
+  rA.forEach(r=> dia[new Date(r.fecha).getDate()-1] += r.total);
+  const prom = dia.map((v,i)=> veces[i] ? v/veces[i] : 0);
+  /* semanas del año */
+  const ini = lunesDe(`${y}-01-01`), semVal = [], semLab = [], semTip = [];
+  for(let k = ini, i = 1; kDate(k).getFullYear() <= y && i <= 53; k = sumaDias(k,7), i++){ semLab.push(String(i)); semTip.push(`Semana ${i} (desde ${fCorta(k)})`); const fin = sumaDias(k,6); semVal.push(rA.filter(r=>{ const kk = hoyClave(new Date(r.fecha)); return kk >= k && kk <= fin; }).reduce((s,r)=> s + r.total, 0)); }
+  const tot = mesA.reduce((s,v)=> s+v, 0), totB = mesB.reduce((s,v)=> s+v, 0);
+  if(!rA.length && !rB.length) return `<div class="inf-anio">${navAnio(y)}</div><div class="rc-empty"><p>No hay ventas en ${y}.</p></div>`;
+  return `<div class="cr-pad inf-pad">
+    <div class="inf-anio">${navAnio(y)}</div>
+    <div class="inf-kpis">${kpi('Ventas del año', tot, totB || undefined)}${kpi('Utilidad bruta', r2(accM.reduce((s,x)=> s + util(x), 0)))}</div>
+    <div class="card cajon inf-card"><h3>Ventas por mes</h3><div class="ch-leg"><span><i style="background:${C_ACT}"></i>${y}</span><span><i style="background:${C_COMP}"></i>${y-1}</span></div>
+      ${barras('meses', MESES, mesA, mesB)}
+      ${mesA.map((v,i)=> v || mesB[i] ? `<div class="cj-row"><span>${MESES[i]}<small class="ir-s">utilidad ${fmt(util(accM[i]))} · margen ${pct(margen(accM[i]))}</small></span><b>${fmt(v)} ${delta(v, mesB[i])}</b></div>` : '').join('')}
+    </div>
+    <div class="card cajon inf-card"><h3>Día del mes (quincenas)</h3><p class="sub" style="margin:0 0 6px">Venta promedio de cada día del mes en ${y}. Marcados los días 15 y 30.</p>
+      ${barras('diames', Array.from({length:31}, (_,i)=> String(i+1)), prom, null, {cada:5, marcar:[14,29], tips: prom.map((v,i)=> `Día ${i+1}: promedio <b>${fmt(v)}</b> (${veces[i]} ${veces[i]===1?'mes':'meses'})`)})}
+    </div>
+    <div class="card cajon inf-card"><h3>Semanas del año</h3><p class="sub" style="margin:0 0 6px">Sirve para ubicar festividades y temporadas.</p>
+      ${barras('semanas', semLab, semVal, null, {cada:4, tips: semTip.map((t,i)=> `${t}: <b>${fmt(semVal[i])}</b>`)})}
+    </div>
+  </div>`;
+}
+const navAnio = y => `<button class="icon-btn" id="infAnt" aria-label="Año anterior">‹</button><b>${y}</b><button class="icon-btn" id="infSig" aria-label="Año siguiente" ${y >= new Date().getFullYear() ? 'disabled' : ''}>›</button>`;
+
+/* ===== Calendario para elegir el rango ===== */
+function abrirCalendario(){
+  let d1 = infDesde, d2 = infHasta, mes = kDate(infHasta); mes.setDate(1);
+  const conVenta = new Set(DB.recibos.filter(r=> !r.cancelado && !r.reemplazadoPor).map(r=> hoyClave(new Date(r.fecha))));
+  const hoy = hoyClave();
+  const presets = [['Hoy', hoy, hoy], ['Ayer', sumaDias(hoy,-1), sumaDias(hoy,-1)], ['Esta semana', lunesDe(hoy), hoy], ['Semana pasada', sumaDias(lunesDe(hoy),-7), sumaDias(lunesDe(hoy),-1)],
+    ['Últimos 7 días', sumaDias(hoy,-6), hoy], ['Últimos 28 días', sumaDias(hoy,-27), hoy], ['Este mes', hoy.slice(0,8)+'01', hoy],
+    ['Mes pasado', (()=>{ const d = kDate(hoy); d.setDate(1); d.setMonth(d.getMonth()-1); return hoyClave(d); })(), sumaDias(hoy.slice(0,8)+'01', -1)], ['Este año', hoy.slice(0,4)+'-01-01', hoy]];
+  const bg = dialogo(`<div class="cal"></div>`), box = bg.querySelector('.cal');
+  const pintar = ()=>{
+    const y = mes.getFullYear(), m = mes.getMonth(), primero = (new Date(y, m, 1).getDay()+6)%7, dimes = new Date(y, m+1, 0).getDate();
+    let celdas = ''; for(let i=0;i<primero;i++) celdas += '<span></span>';
+    for(let d=1; d<=dimes; d++){ const k = hoyClave(new Date(y, m, d)), en = d2 ? (k >= d1 && k <= d2) : k===d1;
+      celdas += `<button class="cal-d${en?' on':''}${k===d1||k===d2?' ext':''}${k===hoy?' hoy':''}" data-k="${k}" ${k > hoy ? 'disabled' : ''}>${d}${conVenta.has(k)?'<i></i>':''}</button>`; }
+    box.innerHTML = `<h3>Elegir días</h3>
+      <div class="dias cal-pre">${presets.map(([t,a,b],i)=>`<button class="dia${a===d1&&b===d2?' on':''}" data-p="${i}">${t}</button>`).join('')}</div>
+      <div class="cal-nav"><button class="icon-btn" data-m="-1" aria-label="Mes anterior">‹</button><b>${(t=> t.charAt(0).toUpperCase()+t.slice(1))(mes.toLocaleDateString('es-MX',{month:'long', year:'numeric'}))}</b><button class="icon-btn" data-m="1" aria-label="Mes siguiente">›</button></div>
+      <div class="cal-g">${['L','M','M','J','V','S','D'].map(x=>`<em>${x}</em>`).join('')}${celdas}</div>
+      <p class="sub cal-sel">${d2 ? fRango(d1, d2) + ` · ${nDias(d1,d2)} días` : fRango(d1, d1) + ' · toca el último día'}</p>
+      <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">Aplicar</button></div>`;
+    box.querySelectorAll('[data-m]').forEach(b=> b.onclick = ()=>{ mes.setMonth(mes.getMonth() + Number(b.dataset.m)); pintar(); });
+    box.querySelectorAll('.cal-d').forEach(b=> b.onclick = ()=>{ const k = b.dataset.k; if(!d1 || d2){ d1 = k; d2 = null; } else if(k < d1){ d1 = k; } else d2 = k; pintar(); });
+    box.querySelectorAll('[data-p]').forEach(b=> b.onclick = ()=>{ const p = presets[Number(b.dataset.p)]; d1 = p[1]; d2 = p[2]; mes = kDate(d2); mes.setDate(1); pintar(); });
+    box.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+    box.querySelector('[data-a="si"]').onclick = ()=>{ infDesde = d1; infHasta = d2 || d1; bg.remove(); renderInformes(); };
+  };
+  pintar();
+}
+
+function renderInformes(){
+  const view = document.getElementById('view'), sy = window.scrollY;
+  view.innerHTML = viewInformes(); renderHeader();
+  const $ = id => document.getElementById(id);
+  document.querySelectorAll('.inf > .dias.filtro .dia').forEach(b=> b.onclick = ()=>{ infTab = b.dataset.t; infAbierto = null; renderInformes(); window.scrollTo(0,0); });
+  const cal = $('infCal'); if(cal) cal.onclick = abrirCalendario;
+  const cp = $('infComp'); if(cp) cp.onchange = ()=>{ infComp = cp.value; renderInformes(); };
+  document.querySelectorAll('[data-o]').forEach(b=> b.onclick = ()=>{ infOrden = b.dataset.o; renderInformes(); });
+  const ct = $('infCat'); if(ct) ct.onchange = ()=>{ infCat = ct.value; renderInformes(); };
+  document.querySelectorAll('[data-c]').forEach(b=> b.onclick = ()=>{ infCliF = b.dataset.c; renderInformes(); });
+  document.querySelectorAll('.inf-prov').forEach(b=> b.onclick = ()=>{ infAbierto = infAbierto===b.dataset.p ? null : b.dataset.p; renderInformes(); window.scrollTo(0, sy); });
+  const an = $('infAnt'), sg = $('infSig'); if(an) an.onclick = ()=>{ infAnio--; renderInformes(); }; if(sg) sg.onclick = ()=>{ infAnio++; renderInformes(); };
+  document.querySelectorAll('.ch').forEach(ch=>{
+    const id = ch.dataset.ch, tip = ch.querySelector('.ch-tip');
+    ch.querySelectorAll('.ch-hit').forEach(h=> h.onclick = ()=>{ ch.querySelectorAll('.ch-hit').forEach(x=> x.classList.remove('sel')); h.classList.add('sel'); tip.innerHTML = infTips[id][Number(h.dataset.i)]; });
+  });
+}
 
 /* ================= Créditos y cobranza ================= */
 const filaCj = (lbl, v, signo, cls='')=> `<div class="cj-row ${cls}"><span>${lbl}</span><b>${signo==='-' && v ? '−' : ''}${fmt(v)}</b></div>`;
@@ -5940,8 +6243,8 @@ function go(id){
   document.querySelector('main').classList.toggle('flush', esVenta);
   view.classList.toggle('wide', esVenta);
   document.querySelector('.popover')?.remove();
-  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario'].includes(id));
-  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario'].includes(id));
+  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes'].includes(id));
+  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes'].includes(id));
   if(id==='turno'){ if(!turnoActual()) turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
@@ -5949,6 +6252,7 @@ function go(id){
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
   else if(id==='catalogo'){ renderCatalogo(); }
   else if(id==='mapa'){ mapaDia = null; renderMapa(); }
+  else if(id==='informes'){ infTab = 'resumen'; infAbierto = null; renderInformes(); }
   else if(id==='inventario'){ invVista = 'inicio'; invBorr = null; invQ = ''; invFiltro = 'todos'; renderInventario(); }
   else if(id==='creditos'){ credVista = 'inicio'; credCli = null; credFiltro = 'todos'; credQ = ''; renderCreditos(); }
   else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : id==='cotizar' ? 'inicioCot' : 'grid'; renderVenta(); }
