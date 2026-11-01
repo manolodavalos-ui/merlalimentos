@@ -1,5 +1,5 @@
 /* Merkalimentos: funciona sin internet y se actualiza sola cuando hay conexión */
-const CACHE = 'merkalimentos-v20';
+const CACHE = 'merkalimentos-v21';
 const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
@@ -10,6 +10,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;   /* mapas y otros sitios: directo a internet */
+  if (url.pathname.includes('/catalogo/')) return;   /* el catálogo de clientes tiene su propio funcionamiento */
   if (e.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {
     /* La app: primero internet (versión más nueva); sin señal, la copia guardada */
     e.respondWith(fetch(e.request).then(r => { const copia = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', copia)); return r; })

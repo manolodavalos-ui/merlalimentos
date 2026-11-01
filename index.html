@@ -641,6 +641,17 @@ dd.pos{color:var(--brand)}
 .dev-add svg{width:18px;height:18px;stroke:var(--danger)}
 .dev-opts .pay small{display:block;font-size:.72rem;color:var(--muted);font-weight:500}
 .dev-opts{grid-template-columns:1fr 1fr}
+.cat-top{padding:12px 16px 0}
+.cat-est{font-size:.82rem;color:var(--muted);margin:8px 0 0}
+.cat-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--danger);color:#fff;font-size:.72rem;font-style:normal;font-weight:800;margin-left:6px}
+.menu .cat-badge{margin-left:auto}
+.pe-list{border-top:1px solid var(--line)}
+.pe-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+.pe-row > span:first-child{flex:1;min-width:0}.pe-row small{display:block;color:var(--muted);font-size:.78rem}
+.pe-in{display:flex;align-items:center;gap:3px;color:var(--muted)}
+.gfield .pe-in input{width:72px;border:1.5px solid var(--line);border-radius:10px;padding:7px 6px;font-size:1rem;text-align:right}
+.pe-link{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);word-break:break-all}
+.gh-pasos{margin:0 0 16px 18px;font-size:.88rem;line-height:1.5;color:var(--text)}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1856,7 +1867,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.31';
+const APP_VERSION = '0.32';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1946,7 +1957,7 @@ function renderMenu(){
     if(m.sep) return '<hr>';
     const ok = puede(m.id);
     return `<button data-id="${m.id}" class="${m.id===current?'active':''}" ${ok?'':'disabled'}>
-      ${svg(m.id)}<span>${m.label}</span>${ok?'':svg('lock','lock')}</button>`;
+      ${svg(m.id)}<span>${m.label}</span>${m.id==='catalogo' && ok && nuevosRecibidos() ? `<i class="cat-badge">${nuevosRecibidos()}</i>` : ''}${ok?'':svg('lock','lock')}</button>`;
   }).join('');
   el.querySelectorAll('button[data-id]').forEach(b=> b.onclick = ()=>{ go(b.dataset.id); closeDrawer(); });
 }
@@ -2443,12 +2454,13 @@ function agregarPieza(p){
   const t = ticket();
   const l = t.lineas.find(x=> x.pid===p.id && !x.porKilo);
   if(l) l.cantidad += 1;
-  else t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio:p.precio, porKilo:false, cantidad:1});
+  else { const e = precioEspecial(t.cliente, p.id); t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio: e ?? p.precio, porKilo:false, cantidad:1, ...(e ? {especial:true, promoRegla:null} : {})}); }
   guardarTicket(t); actualizarVentaUI(p.id);
 }
 function agregarPeso(p, kg){
   const t = ticket();
-  t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio:p.precio, porKilo:true, cantidad:kg});
+  const e = precioEspecial(t.cliente, p.id);
+  t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio: e ?? p.precio, porKilo:true, cantidad:kg, ...(e ? {especial:true} : {})});
   guardarTicket(t); actualizarVentaUI(p.id);
 }
 
@@ -2943,7 +2955,7 @@ function barraCliente(){
     <button class="cli-x" id="cliCambiar">Cambiar</button></div>`;
 }
 function asignarCliente(c){
-  const t = ticket(); t.cliente = c ? clienteRef(c) : null; t.preguntado = true; guardarTicket(t);
+  const t = ticket(); t.cliente = c ? clienteRef(c) : null; t.preguntado = true; if(!esCot()) repreciarTicket(t); guardarTicket(t);
 }
 function necesitaPreguntarCliente(){
   if(!enVenta() || ventaVista!=='grid' || esCot()) return false;
@@ -3181,6 +3193,7 @@ function formClienteHTML(c){
       </div>
     </div>
     <div class="gfield"><label for="fRef">Referencia</label><textarea id="fRef" rows="2" maxlength="200" placeholder="Ej. Portón verde, frente a la escuela">${esc(c.referencia||'')}</textarea></div>
+    ${bloquePreciosEsp(c)}
     <button class="btn" id="fGuardar">${c.id ? 'Guardar cambios' : 'Guardar cliente'}</button>
     ${c.id && session.rol==='admin' ? '<button class="btn danger" id="fEliminar">Eliminar cliente</button>' : ''}
   </div>`;
@@ -3191,7 +3204,8 @@ function leerFormCliente(){
     diasVisita:[...document.querySelectorAll('#fDias .dia.on')].map(b=>b.dataset.d),
     numero:soloDigitos(v('fNum')), telefono:soloDigitos(v('fTel')), nombre:v('fNom'), tienda:v('fTien'),
     direccion:v('fDir'), colonia:v('fCol'), ciudad:v('fCiu'), estado:v('fEdo'), cp:soloDigitos(v('fCp')), referencia:v('fRef'),
-    lat:cliBorrador.lat ?? null, lng:cliBorrador.lng ?? null
+    lat:cliBorrador.lat ?? null, lng:cliBorrador.lng ?? null,
+    preciosEspeciales: leerPreciosEsp()
   };
 }
 function bindFormCliente(){
@@ -3213,6 +3227,7 @@ function bindFormCliente(){
   const cop = document.getElementById('ubCopiar');
   if(cop) cop.onclick = ()=> copiarTexto(linkMapa(cliBorrador.lat, cliBorrador.lng), 'Ubicación copiada');
   document.getElementById('fGuardar').onclick = guardarClienteForm;
+  bindPreciosEsp();
   const del = document.getElementById('fEliminar');
   if(del) del.onclick = ()=>{
     const c = clientes().find(x=>x.id===cliSel); if(!c) return;
@@ -3232,10 +3247,10 @@ function guardarClienteForm(){
   const lista = clientes(), ahora = new Date().toISOString();
   if(cliSel){
     const i = lista.findIndex(x=>x.id===cliSel);
-    lista[i] = {...lista[i], ...d, actualizado:ahora, actualizadoPor:session.usuario};
+    lista[i] = {...lista[i], ...d, catalogo: lista[i].catalogo || nuevoToken(), actualizado:ahora, actualizadoPor:session.usuario};
     store.set('clientes', lista); toast('Cambios guardados');
   } else {
-    lista.push({id:'C'+Date.now(), ...d, creado:ahora, creadoPor:session.usuario});
+    lista.push({id:'C'+Date.now(), ...d, catalogo:nuevoToken(), creado:ahora, creadoPor:session.usuario});
     store.set('clientes', lista); toast('Cliente guardado');
   }
   cliVista = 'lista'; cliSel = null; cliBorrador = null; renderClientes();
@@ -3285,7 +3300,8 @@ function renderClientes(conservar){
     cliBorrador = cliVista==='editar' ? {...(clientes().find(x=>x.id===cliSel)||{})} : {numero:siguienteNumeroCliente(), diasVisita:[]};
   } else if(conservar && document.getElementById('fNom')){
     const lat = cliBorrador.lat, lng = cliBorrador.lng;
-    Object.assign(cliBorrador, leerFormCliente(), {lat, lng});
+    const pe = cliBorrador.preciosEspeciales;
+    Object.assign(cliBorrador, leerFormCliente(), {lat, lng}, pe ? {preciosEspeciales:pe} : {});
   }
   const y = window.scrollY;
   if(cliVista==='crear') view.innerHTML = formClienteHTML(cliBorrador);
@@ -4012,8 +4028,9 @@ function renderHeader(){
     const enArt = current==='articulos' && artVista==='editar';
     const enCred = current==='creditos' && credVista!=='inicio';
     const enInv = current==='inventario' && invVista!=='inicio';
-    const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt || enCred || enInv;
-    title.textContent = enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
+    const enCat = current==='catalogo' && catVista!=='ver';
+    const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt || enCred || enInv || enCat;
+    title.textContent = enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
@@ -4362,10 +4379,12 @@ function viewConfig(){
   if(cfgVista==='impresoras') return viewImpresoras();
   if(cfgVista==='promos') return viewPromos();
   if(cfgVista==='devol') return viewDevolCfg();
+  if(cfgVista==='gh') return viewGhCfg();
   const c = impCfg();
   return `<div class="cl-home">
     <button class="cl-opt" id="optPromo"><span class="cl-opt-ic">${svg('articulos')}</span><span><b>Promociones</b><small>${store.get('articulos',[]).filter(a=>!a.borrado && a.promo).length} configuradas · ${articulos().filter(promoActiva).length} vigentes</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optDev"><span class="cl-opt-ic">${svg('back')}</span><span><b>Devoluciones</b><small>${devCfg().proveedores.join(', ') || 'Ningún proveedor'} · hasta ${devCfg().dias} días de caducado</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optGh"><span class="cl-opt-ic">${svg('catalogo')}</span><span><b>Catálogo en línea</b><small>${ghCfg().token ? 'Clave de GitHub guardada' + (ghCfg().publicado ? ' · publicado ' + new Date(ghCfg().publicado).toLocaleDateString('es-MX',{day:'numeric',month:'short'}) : '') : 'Falta la clave para publicar'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optImp"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Impresoras</b><small>${esc(METODOS_IMP[c.metodo].nombre)} · ${c.ancho} mm${c.auto?' · imprime al cobrar':''}</small></span>${svg('chev')}</button>
   </div>`;
 }
@@ -4420,9 +4439,11 @@ function renderConfig(){
     document.getElementById('optImp').onclick = ()=>{ cfgVista='impresoras'; renderConfig(); };
     document.getElementById('optPromo').onclick = ()=>{ cfgVista='promos'; renderConfig(); };
     document.getElementById('optDev').onclick = ()=>{ cfgVista='devol'; renderConfig(); };
+    document.getElementById('optGh').onclick = ()=>{ cfgVista='gh'; renderConfig(); };
     return;
   }
   if(cfgVista==='devol'){ document.getElementById('dvGuardar').onclick = guardarDevolCfg; return; }
+  if(cfgVista==='gh'){ document.getElementById('ghGuardar').onclick = guardarGhForm; return; }
   if(cfgVista==='promos'){
     document.querySelectorAll('.pm-sw').forEach(sw=> sw.onchange = ()=>{
       const ls = store.get('articulos',[]), a = ls.find(x=> x.id===sw.dataset.id); if(!a || !a.promo) return;
@@ -4782,16 +4803,29 @@ function bindTilesArt(){
 
 /* ================= Catálogo (vista para mostrar a clientes) ================= */
 function viewCatalogo(){
-  const lista = articulos();
+  if(catVista==='pedidos') return viewPedidosRec();
+  const lista = articulos(), adm = session.rol==='admin', g = ghCfg(), nRec = nuevosRecibidos();
+  const top = `<div class="cat-top">
+    <div class="cr-acc" style="padding:0">
+      <button class="ub-b" id="catEnviar">${svg('whatsapp')}Enviar catálogo a un cliente</button>
+      <button class="ub-b" id="catPed">${svg('recibos')}Pedidos recibidos${nRec ? ` <i class="cat-badge">${nRec}</i>` : ''}</button>
+      ${adm ? `<button class="ub-b" id="catPub">${svg('share')}Publicar</button>` : ''}
+    </div>
+    ${adm ? `<p class="cat-est">${!g.token ? 'Para publicar, guarda la clave de GitHub en Configuración → Catálogo en línea' : g.publicado ? `Publicado ${new Date(g.publicado).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${catalogoPendiente() ? ' · <b class="warn">hay cambios sin publicar</b>' : ' · al día'}` : '<b class="warn">Aún no se ha publicado</b>'}</p>` : ''}
+  </div>`;
   const html = categorias().map(sec=>{
     const ps = lista.filter(p=> p.seccion===sec);
     return ps.length ? `<div class="sec-title">${esc(sec)}</div>` + ps.map(tileHTML).join('') : '';
   }).join('');
-  return `<div class="grid cat-grid" id="catGrid">${html || '<div class="no-results">No hay productos para mostrar.</div>'}</div>
+  return top + `<div class="grid cat-grid" id="catGrid">${html || '<div class="no-results">No hay productos para mostrar.</div>'}</div>
     <p class="cat-hint">Toca dos veces un producto para verlo en grande</p>`;
 }
 function renderCatalogo(){
   document.getElementById('view').innerHTML = viewCatalogo(); renderHeader();
+  if(catVista==='pedidos'){ document.querySelectorAll('.pr-row').forEach(b=> b.onclick = ()=> detallePedidoRec(b.dataset.id)); return; }
+  document.getElementById('catEnviar').onclick = ()=> elegirClienteSimple(enviarCatalogo);
+  document.getElementById('catPed').onclick = ()=>{ catVista = 'pedidos'; renderCatalogo(); window.scrollTo(0,0); };
+  const pub = document.getElementById('catPub'); if(pub) pub.onclick = ()=> publicarConAviso();
   const orden = [...document.querySelectorAll('#catGrid .tile')].map(t=> t.dataset.pid);
   document.querySelectorAll('#catGrid .tile').forEach(t=>{
     let ultimo = 0;
@@ -5524,6 +5558,211 @@ function atrasInv(){
 }
 const TITULOS_INV = {devoluciones:'Devoluciones de clientes', articulo:'Producto', carga:'Cargar camioneta', liquidacion:'Liquidar camioneta', conteo:'Conteo de inventario', conteos:'Conteos realizados', conteoDet:'Conteo',
   ajuste:'Movimiento de inventario', compras:'Compras', compra:'Orden de compra', recepcion:'Recibir mercancía', reportes:'Reportes de inventario'};
+
+/* ================= Catálogo en línea y pedidos de clientes ================= */
+const CAT_URL = 'https://manolodavalos-ui.github.io/merlalimentos/catalogo/';
+const WA_NEGOCIO = '529611080808';
+let catVista = 'ver', pedRecSel = null;
+const ghCfg = ()=> ({token:'', repo:'manolodavalos-ui/merlalimentos', rama:'main', ...(store.get('config').gh || {})});
+function guardarGh(c){ const cfg = store.get('config'); cfg.gh = {...ghCfg(), ...c}; store.set('config', cfg); }
+const nuevoToken = ()=> Array.from(crypto.getRandomValues(new Uint8Array(9)), b=> 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
+function tokenCliente(id){
+  const ls = clientes(), c = ls.find(x=> x.id===id); if(!c) return null;
+  if(!c.catalogo){ c.catalogo = nuevoToken(); store.set('clientes', ls); }
+  return c.catalogo;
+}
+const linkCatalogo = tok => CAT_URL + (tok ? '?c=' + tok : '');
+
+/* ----- Precios especiales por cliente ----- */
+function precioEspecial(cref, pid){
+  if(!cref?.id) return null;
+  const c = clientes().find(x=> x.id===cref.id), v = c?.preciosEspeciales?.[pid];
+  return Number(v) > 0 ? Number(v) : null;
+}
+const precioPara = (p, cref) => precioEspecial(cref, p.id) ?? p.precio;
+function repreciarTicket(t){
+  (t.lineas||[]).forEach(l=>{
+    const a = artPorId(l.pid); if(!a) return;
+    const e = precioEspecial(t.cliente, l.pid);
+    if(e){ l.precio = e; l.especial = true; l.promoRegla = null; }
+    else if(l.especial){ l.precio = a.precio; delete l.especial; delete l.promoRegla; }
+  });
+}
+function bloquePreciosEsp(c){
+  const pe = c.preciosEspeciales || {}, adm = session.rol==='admin', ids = Object.keys(pe);
+  return `<div class="gfield"><label>Precios especiales autorizados</label>
+    <div class="pe-list">${ids.length ? ids.map(pid=>{ const a = artPorId(pid);
+      return `<div class="pe-row" data-pid="${pid}"><span><b>${esc(a ? nombreTicket(a) : pid)}</b><small>normal ${a ? fmt(a.precio) : '—'}${a && a.costo ? ' · costo ' + fmt(a.costo) : ''}</small></span>
+        ${adm ? `<span class="pe-in">$<input type="number" inputmode="decimal" min="0" step="0.5" value="${pe[pid]}"></span><button type="button" class="co-del pe-del" aria-label="Quitar">${svg('trash')}</button>` : `<b class="pos">${fmt(pe[pid])}</b>`}</div>`; }).join('')
+      : `<p class="note-sm" style="text-align:left;margin:4px 0">Sin precios especiales: ve los precios normales.</p>`}</div>
+    ${adm ? `<button type="button" class="ub-b" id="peAdd" style="margin-top:8px">+ Agregar producto con precio especial</button>` : ''}
+  </div>
+  ${c.id ? `<div class="gfield"><label>Catálogo en línea</label><div class="pe-link"><span>${c.catalogo ? esc(linkCatalogo(c.catalogo)) : 'Se crea su link al guardar'}</span>${c.catalogo ? `<button type="button" class="ub-b" id="peEnviar">${svg('whatsapp')}Enviar</button>` : ''}</div></div>` : ''}`;
+}
+function leerPreciosEsp(){
+  const out = {};
+  document.querySelectorAll('.pe-row').forEach(r=>{ const i = r.querySelector('input'); const v = i ? Number(i.value) : (cliBorrador.preciosEspeciales||{})[r.dataset.pid]; if(v > 0) out[r.dataset.pid] = r2(v); });
+  return out;
+}
+function bindPreciosEsp(){
+  const add = document.getElementById('peAdd');
+  if(add) add.onclick = ()=>{ Object.assign(cliBorrador, leerFormCliente()); elegirArticulo(pid=>{ const pe = {...(cliBorrador.preciosEspeciales||{})}; if(!pe[pid]) pe[pid] = artPorId(pid)?.precio || 0; cliBorrador.preciosEspeciales = pe; renderClientes(true); }); };
+  document.querySelectorAll('.pe-del').forEach(b=> b.onclick = ()=>{ Object.assign(cliBorrador, leerFormCliente()); const pe = {...cliBorrador.preciosEspeciales}; delete pe[b.closest('.pe-row').dataset.pid]; cliBorrador.preciosEspeciales = pe; renderClientes(true); });
+  const env = document.getElementById('peEnviar'); if(env) env.onclick = ()=> enviarCatalogo(cliSel);
+}
+
+/* ----- Publicación en GitHub (un solo commit con todos los archivos) ----- */
+function datosCatalogo(){
+  const c = impCfg();
+  return {v:1, publicado:new Date().toISOString(), negocio:{nombre:c.encabezado, sub:c.sub, tel:c.tel, wa:WA_NEGOCIO}, secciones:categorias(),
+    productos: articulos().filter(p=> p.precio != null).map(p=>({id:p.id, s:p.seccion, m:p.marca||'', n:p.nombre, pr:p.pres||'', p:p.precio, kg:!!p.porKilo,
+      may:p.mayoreo||'', et:p.etiqueta||'', promo: promoActiva(p) ? textoPromo(p.promo) : '', f: p.foto ? (FOTOS[p.foto] ? p.foto : p.foto) : ''}))};
+}
+const datosClienteCat = c => ({n:c.nombre, t:c.tienda||'', tel:c.telefono||'', dir:[c.direccion, c.colonia].filter(Boolean).join(', '), precios:c.preciosEspeciales||{}});
+function archivosCatalogo(){
+  const fs = [{path:'catalogo/datos.json', content:JSON.stringify(datosCatalogo())}];
+  clientes().forEach(c=>{ if(c.catalogo) fs.push({path:`catalogo/c/${c.catalogo}.json`, content:JSON.stringify(datosClienteCat(c))}); });
+  return fs;
+}
+const hashTxt = t => { let h = 5381; for(let i=0;i<t.length;i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+const firmaCatalogo = ()=> hashTxt(archivosCatalogo().map(f=> f.path + (f.path==='catalogo/datos.json' ? f.content.replace(/"publicado":"[^"]*"/,'') : f.content)).join('|'));
+const catalogoPendiente = ()=> ghCfg().firma !== firmaCatalogo();
+async function gh(ruta, opts = {}){
+  const c = ghCfg();
+  const r = await fetch(`https://api.github.com/repos/${c.repo}${ruta}`, {...opts, headers:{Authorization:'Bearer ' + c.token, Accept:'application/vnd.github+json', 'Content-Type':'application/json'}});
+  if(!r.ok){ const t = await r.text().catch(()=> ''); const e = new Error(r.status + ' ' + t.slice(0,160)); e.status = r.status; throw e; }
+  return r.json();
+}
+async function publicarCatalogo(){
+  const c = ghCfg();
+  if(!c.token){ toast('Primero guarda la clave de GitHub en Configuración'); cfgVista = 'gh'; go('config'); return false; }
+  if(!navigator.onLine){ toast('Sin internet: publica cuando tengas señal'); return false; }
+  const fs = archivosCatalogo();
+  const ref = await gh(`/git/ref/heads/${c.rama}`), base = ref.object.sha;
+  const commit = await gh(`/git/commits/${base}`);
+  const tree = await gh('/git/trees', {method:'POST', body:JSON.stringify({base_tree:commit.tree.sha, tree:fs.map(f=> ({path:f.path, mode:'100644', type:'blob', content:f.content}))})});
+  const nuevo = await gh('/git/commits', {method:'POST', body:JSON.stringify({message:`Catálogo publicado desde la app (${fs.length} archivos)`, tree:tree.sha, parents:[base]})});
+  await gh(`/git/refs/heads/${c.rama}`, {method:'PATCH', body:JSON.stringify({sha:nuevo.sha})});
+  guardarGh({publicado:new Date().toISOString(), firma:firmaCatalogo(), tokens:clientes().filter(x=> x.catalogo).map(x=> x.catalogo)});
+  return true;
+}
+async function publicarConAviso(despues){
+  const t = document.getElementById('toast');
+  toast('Publicando catálogo…');
+  try{ if(await publicarCatalogo()){ toast('Catálogo publicado. Se ve en 1 a 2 minutos'); if(current==='catalogo') renderCatalogo(); despues && despues(); } }
+  catch(e){ toast(e.status===401 || e.status===403 ? 'La clave de GitHub no es válida o no tiene permiso' : e.status===404 ? 'No se encontró el repositorio' : 'No se pudo publicar: ' + e.message.slice(0,60)); }
+}
+
+/* ----- Enviar catálogo ----- */
+function elegirClienteSimple(cb){
+  const bg = dialogo(`<h3>Enviar catálogo a…</h3><input class="field" id="ecQ" placeholder="Buscar cliente" autocomplete="off"><div class="ea-list" id="ecL"></div>`);
+  const pintar = ()=>{ const q = bg.querySelector('#ecQ').value;
+    bg.querySelector('#ecL').innerHTML = clientes().filter(c=> coincideBusqueda([c.nombre, c.tienda, c.numero, c.colonia].filter(Boolean).join(' '), q)).sort((a,b)=> (a.tienda||a.nombre).localeCompare(b.tienda||b.nombre,'es')).slice(0,80)
+      .map(c=>`<button class="ea-row" data-id="${c.id}"><b>${esc(c.tienda || c.nombre)}</b><small>${c.tienda?esc(c.nombre)+' · ':''}${c.telefono ? esc(c.telefono) : 'sin teléfono'}${Object.keys(c.preciosEspeciales||{}).length ? ' · precios especiales' : ''}</small></button>`).join('') || '<p class="note-sm">Sin resultados</p>';
+    bg.querySelectorAll('.ea-row').forEach(r=> r.onclick = ()=>{ bg.remove(); cb(r.dataset.id); }); };
+  bg.querySelector('#ecQ').oninput = pintar; pintar(); setTimeout(()=> bg.querySelector('#ecQ').focus(), 50);
+}
+function enviarCatalogo(id){
+  const tok = tokenCliente(id), c = clientes().find(x=> x.id===id); if(!c) return;
+  const abrir = ()=> window.open(urlWa(c.telefono, `Hola ${c.nombre}, te comparto *Cliente consentido Merkalimentos*, nuestro catálogo${Object.keys(c.preciosEspeciales||{}).length ? ' con tus precios especiales' : ''}. Desde ahí puedes hacer tu pedido y lo puedes agregar a tu pantalla de inicio:\n${linkCatalogo(tok)}`), '_blank');
+  const publicado = (ghCfg().tokens || []).includes(tok);
+  if(publicado && !catalogoPendiente()) return abrir();
+  if(session.rol==='admin') return confirmar({titulo: publicado ? 'Hay cambios sin publicar' : 'Este cliente aún no tiene su catálogo publicado', ok:'Publicar y enviar',
+    texto: publicado ? 'Publica para que vea los precios actuales.' : 'Se publicará el catálogo con sus precios y después se abre WhatsApp.', alAceptar:()=> publicarConAviso(abrir)});
+  confirmar({titulo:'Catálogo sin publicar', ok:'Enviar de todos modos', texto:'El administrador debe publicar el catálogo para que este cliente vea sus precios. Mientras, verá los precios normales.', alAceptar: abrir});
+}
+
+/* ----- Pedidos recibidos del catálogo ----- */
+const pedidosRecibidos = ()=> store.get('pedidosRecibidos', []);
+const nuevosRecibidos = ()=> pedidosRecibidos().filter(p=> p.estado==='Nuevo').length;
+function decodificarPedido(txt){
+  const b = txt.replace(/-/g,'+').replace(/_/g,'/'), json = decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4))));
+  return JSON.parse(json);
+}
+(function recibirPedidoDeLink(){
+  try{
+    const q = new URLSearchParams(location.search), raw = q.get('pedido'); if(!raw) return;
+    const o = decodificarPedido(raw);
+    if(o && o.id && Array.isArray(o.l)){
+      const ls = pedidosRecibidos();
+      if(!ls.some(p=> p.id===o.id)){
+        const c = o.c ? clientes().find(x=> x.catalogo===o.c) : null;
+        ls.push({id:o.id, fecha:o.f || new Date().toISOString(), recibido:new Date().toISOString(), token:o.c || null, clienteId:c?.id || null,
+          cliente:{nombre:o.cli?.n || c?.nombre || 'Cliente', tienda:o.cli?.t || c?.tienda || '', telefono:o.cli?.tel || c?.telefono || ''},
+          lineas:o.l.map(([pid, cant, precio, nombre])=> ({pid, cantidad:Number(cant), precio:Number(precio), nombre: nombre || nombreTicket(artPorId(pid) || {nombre:pid}), porKilo: !!artPorId(pid)?.porKilo})),
+          nota:o.nota || '', estado:'Nuevo'});
+        store.set('pedidosRecibidos', ls);
+      }
+      store.set('abrirPedidoRec', o.id);
+    }
+    history.replaceState(null, '', location.pathname);
+  }catch(_){ try{ history.replaceState(null, '', location.pathname); }catch(__){} }
+})();
+const totalPedRec = p => r2(p.lineas.reduce((s,l)=> s + l.precio*l.cantidad, 0));
+function viewPedidosRec(){
+  const ls = pedidosRecibidos().slice().sort((a,b)=> b.recibido.localeCompare(a.recibido));
+  if(!ls.length) return `<div class="rc-wrap"><div class="rc-empty">${svg('catalogo')}<p>Aún no llegan pedidos del catálogo.<br>Cuando un cliente envíe su pedido por WhatsApp, toca el link del mensaje y aparecerá aquí.</p></div></div>`;
+  const col = {Nuevo:'tag-v', Atendido:'tag-v', Descartado:'tag-c'};
+  return `<div class="rc-wrap">${ls.map(p=>`<button class="rc-row pr-row" data-id="${p.id}">
+    <span class="rc-ic">${svg(p.estado==='Nuevo' ? 'alert' : 'check')}</span>
+    <span class="rc-main"><b>${esc(p.cliente.tienda || p.cliente.nombre)} <i class="${col[p.estado]}">${p.estado}</i></b><small>${new Date(p.fecha).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${p.lineas.length} productos${p.clienteId ? '' : ' · cliente no registrado'}</small></span>
+    <span class="rc-folio">${fmt(totalPedRec(p))}</span></button>`).join('')}</div>`;
+}
+function detallePedidoRec(id){
+  const p = pedidosRecibidos().find(x=> x.id===id); if(!p) return;
+  const bg = dialogo(`<h3>Pedido de ${esc(p.cliente.tienda || p.cliente.nombre)}</h3>
+    <p class="sub">${new Date(p.fecha).toLocaleString('es-MX',{dateStyle:'medium', timeStyle:'short'})}${p.cliente.telefono ? ' · ' + esc(p.cliente.telefono) : ''}${p.clienteId ? '' : ' · <b class="neg">no está en tus clientes</b>'}</p>
+    <div class="deuda">${p.lineas.map(l=>`<div class="deuda-r"><span>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad} × ${fmt(l.precio)}${artPorId(l.pid) && artPorId(l.pid).precio !== l.precio ? ' · precio especial' : ''}</small></span><b>${fmt(r2(l.precio*l.cantidad))}</b></div>`).join('')}
+      <div class="deuda-h" style="margin:8px 0 0"><span>Total</span><b class="deuda-t">${fmt(totalPedRec(p))}</b></div></div>
+    ${p.nota ? `<p class="sub"><b>Nota:</b> ${esc(p.nota)}</p>` : ''}
+    <div class="cd-acts">
+      ${p.estado!=='Atendido' ? `<button class="btn" data-a="pre">${svg('preventa')}Pasar a preventa</button><button class="btn ghost" data-a="venta">${svg('venta')}Pasar a venta</button>` : ''}
+      ${p.cliente.telefono ? `<button class="btn ghost" data-a="wa">${svg('whatsapp')}Escribir al cliente</button>` : ''}
+      ${p.estado==='Nuevo' ? `<button class="btn ghost danger-o" data-a="desc">Descartar</button>` : ''}
+      <button class="btn ghost" data-a="x">Cerrar</button>
+    </div>`);
+  const act = (a, f)=>{ const b = bg.querySelector(`[data-a="${a}"]`); if(b) b.onclick = ()=>{ bg.remove(); f(); }; };
+  act('x', ()=>{}); act('wa', ()=> window.open(urlWa(p.cliente.telefono, `Hola ${p.cliente.nombre}, recibimos tu pedido por ${fmt(totalPedRec(p))}. ¡Gracias!`), '_blank'));
+  act('desc', ()=>{ marcarPedRec(p.id, 'Descartado'); renderCatalogo(); });
+  act('pre', ()=> cargarPedidoRec(p, 'preventa')); act('venta', ()=> cargarPedidoRec(p, 'venta'));
+}
+function marcarPedRec(id, estado){ store.set('pedidosRecibidos', pedidosRecibidos().map(x=> x.id===id ? {...x, estado, atendido: new Date().toISOString()} : x)); renderMenu(); }
+function cargarPedidoRec(p, modo){
+  if(!turnoActual()){ toast('Abre un turno para pasar el pedido'); return; }
+  go(modo);
+  if(ticket().lineas.length){ toast('Tienes un ticket en curso: guárdalo o termínalo primero'); return; }
+  const c = p.clienteId ? clientes().find(x=> x.id===p.clienteId) : null;
+  const lineas = p.lineas.map(l=>{ const a = artPorId(l.pid);
+    return {lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:l.pid, nombre:l.nombre, precio:l.precio, porKilo:l.porKilo, cantidad:l.cantidad, ...(a && a.precio !== l.precio ? {especial:true, promoRegla:null} : {})}; });
+  guardarTicket({lineas, cliente: c ? clienteRef(c) : null, preguntado:true, nombre:`Pedido catálogo · ${p.cliente.tienda || p.cliente.nombre}`, comentario:p.nota || ''});
+  marcarPedRec(p.id, 'Atendido');
+  ventaVista = 'ticket'; renderVenta();
+  toast(c ? 'Pedido cargado: revisa y ' + (modo==='preventa' ? 'programa la entrega' : 'cobra') : 'Pedido cargado: asigna el cliente');
+}
+
+/* ----- Configuración de GitHub ----- */
+function viewGhCfg(){
+  const c = ghCfg();
+  return `<div class="gform cf">
+    <p class="sub">Para publicar el catálogo desde la app se usa una clave de GitHub con permiso solo sobre tu repositorio.</p>
+    <ol class="gh-pasos">
+      <li>En GitHub: <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token</b>.</li>
+      <li>Nombre: <i>Merkalimentos catálogo</i>. Expiración: la más larga.</li>
+      <li><b>Repository access:</b> Only select repositories → <i>merlalimentos</i>.</li>
+      <li><b>Permissions → Contents:</b> Read and write.</li>
+      <li>Genera y copia la clave (empieza con <i>github_pat_</i>) y pégala aquí.</li>
+    </ol>
+    <div class="gfield"><label for="ghTok">Clave de GitHub</label><input id="ghTok" type="password" autocomplete="off" value="${esc(c.token)}" placeholder="github_pat_…"></div>
+    <div class="gfield"><label for="ghRepo">Repositorio</label><input id="ghRepo" value="${esc(c.repo)}" autocomplete="off"></div>
+    ${c.publicado ? `<p class="note-sm" style="text-align:left">Última publicación: ${new Date(c.publicado).toLocaleString('es-MX',{dateStyle:'medium', timeStyle:'short'})}</p>` : ''}
+    <button class="btn" id="ghGuardar">Guardar y probar</button>
+  </div>`;
+}
+async function guardarGhForm(){
+  guardarGh({token:document.getElementById('ghTok').value.trim(), repo:document.getElementById('ghRepo').value.trim() || 'manolodavalos-ui/merlalimentos'});
+  try{ const r = await gh(''); toast(r.permissions && r.permissions.push === false ? 'La clave no tiene permiso de escritura' : 'Clave guardada y verificada ✓'); cfgVista = 'inicio'; renderConfig(); }
+  catch(e){ toast(e.status===401 ? 'La clave no es válida' : e.status===404 ? 'No se encontró el repositorio (revisa el permiso de la clave)' : 'No se pudo verificar: ' + e.message.slice(0,50)); }
+}
 
 /* ================= Devoluciones de clientes ================= */
 const PROV_DEV_DEF = ['Sigma','Cremería Edgar','Capistrano'];
@@ -6517,7 +6756,7 @@ function go(id){
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
   else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
-  else if(id==='catalogo'){ renderCatalogo(); }
+  else if(id==='catalogo'){ catVista = 'ver'; renderCatalogo(); }
   else if(id==='mapa'){ mapaDia = null; renderMapa(); }
   else if(id==='informes'){ infTab = 'resumen'; infAbierto = null; renderInformes(); }
   else if(id==='inventario'){ invVista = 'inicio'; invBorr = null; invQ = ''; invFiltro = 'todos'; renderInventario(); }
@@ -6566,6 +6805,8 @@ function enterApp(){
   document.getElementById('whoRole').textContent = session.rol==='admin' ? 'Administrador' : 'Vendedor';
   updateShiftPill();
   go('turno');
+  const pr = store.get('abrirPedidoRec', null);
+  if(pr){ store.del('abrirPedidoRec'); go('catalogo'); catVista = 'pedidos'; renderCatalogo(); setTimeout(()=> detallePedidoRec(pr), 100); }
 }
 
 document.getElementById('logoutBtn').onclick = ()=>{
@@ -6583,6 +6824,7 @@ document.getElementById('menuBtn').onclick = ()=>{
   if(current==='config' && cfgVista!=='inicio'){ cfgVista = 'inicio'; renderConfig(); return; }
   if(current==='creditos' && credVista!=='inicio'){ atrasCreditos(); return; }
   if(current==='inventario' && invVista!=='inicio'){ atrasInv(); return; }
+  if(current==='catalogo' && catVista!=='ver'){ catVista = 'ver'; renderCatalogo(); return; }
   if(current==='turno' && turnoVista==='tesoreria'){ turnoVista = 'resumen'; go('turno'); return; }
   if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return; }
   if(current==='recibos' && reciboSel){ reciboSel = null; renderRecibos(); return; }
