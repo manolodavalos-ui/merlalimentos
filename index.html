@@ -546,6 +546,8 @@ dd.pos{color:var(--brand)}
 .cr-bar{flex-basis:100%;height:5px;border-radius:3px;background:var(--bg);margin-top:5px;overflow:hidden;display:block}
 .cr-bar i{display:block;height:100%;background:var(--brand-2)}
 .cr-rep .card{margin-bottom:12px}
+.disp-ch{margin:4px 0 6px}
+.t-head .disp-ch{margin-top:10px}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1761,7 +1763,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.28';
+const APP_VERSION = '0.28.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1890,10 +1892,12 @@ function viewTurno(){
       <p class="sub">Indica el efectivo con el que inicias en caja.</p>
       <dl class="meta">
         <dt>Vendedor</dt><dd>${esc(session.nombre)}</dd>
-        <dt>Dispositivo</dt><dd>${esc(cfg.dispositivo)}</dd>
+        <dt>Dispositivo</dt><dd>${cfg.dispositivoElegido ? esc(cfg.dispositivo) : '<span class="neg">Sin elegir</span>'}</dd>
         <dt>Turno</dt><dd>${siguienteTurnoDelDia() > MAX_TURNOS_DIA ? 'Límite del día' : folioTurno(cfg.numDispositivo, siguienteTurnoDelDia())}</dd>
         <dt>Fecha</dt><dd>${fecha(new Date().toISOString())}</dd>
       </dl>
+      <label>¿Qué celular es este?</label>
+      ${chipsDispositivo(cfg)}
       <label for="cash">Efectivo inicial</label>
       <div class="money"><span>$</span><input class="field" id="cash" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
       <button class="btn" id="openShift">Abrir turno</button>
@@ -1910,6 +1914,7 @@ function viewTurno(){
     <div class="card t-head">
       <div class="status-open"><span class="dot"></span>Turno ${esc(t.folio || t.numero)}</div>
       <p class="sub" style="margin:0">${esc(t.nombre)} · ${esc(t.dispositivo)} · desde ${fecha(t.abierto)}</p>
+      ${!cfg.dispositivoElegido ? `<div class="notice">Este turno se abrió sin elegir el celular y quedó como ${esc(t.dispositivo)}. ¿Qué celular es este? Si eliges otro, se corrigen el turno y los folios de sus tickets.</div>${chipsDispositivo(cfg, true)}` : ''}
     </div>
     <div class="card cajon">
       <h3>Cajón de dinero</h3>
@@ -1935,6 +1940,38 @@ function viewTurno(){
     </div>
     ${movs.length ? `<div class="card cajon"><h3>Movimientos de caja</h3>${movs.map(m=>`<div class="cj-mov"><span><b>${m.tipo==='deposito'?'Depósito':'Pago / salida'}</b><small>${hora(m.fecha)}${m.comentario?' · '+esc(m.comentario):''}</small></span><b class="${m.tipo==='deposito'?'pos':'neg'}">${m.tipo==='deposito'?'+':'−'}${fmt(m.monto)}</b></div>`).join('')}</div>` : ''}
     <button class="btn" id="goSell">Ir a Venta</button>`;
+}
+
+/* ===== Dispositivo: cada celular tiene su número (TPV1, TPV2…) ===== */
+function chipsDispositivo(cfg, corregir){
+  return `<div class="dias disp-ch">${[1,2,3].map(n=>`<button class="dia${cfg.dispositivoElegido && cfg.numDispositivo===n ? ' on' : ''}" data-n="${n}">TPV${n}${n===1?' · principal':n===2?' · respaldo':''}</button>`).join('')}</div>`;
+}
+function elegirDispositivo(n){
+  const cfg = store.get('config'), t = turnoActual(), antes = cfg.numDispositivo;
+  const aplicar = ()=>{
+    cfg.dispositivo = 'TPV' + n; cfg.numDispositivo = n; cfg.dispositivoElegido = true; store.set('config', cfg);
+    if(t && antes !== n) renumerarTurno(t, n);
+    updateShiftPill(); go('turno'); toast(`Este celular es TPV${n}`);
+  };
+  if(t && antes !== n) return confirmar({titulo:`Cambiar a TPV${n}`, ok:'Corregir', texto:`El turno <b>${esc(t.folio)}</b> pasará a <b>${n}${esc(t.folio.slice(t.folio.indexOf('-')))}</b> y sus tickets, pedidos y abonos cambiarán de folio.`, alAceptar: aplicar});
+  aplicar();
+}
+function renumerarTurno(t, n){
+  const viejo = t.folio, nuevo = n + viejo.slice(viejo.indexOf('-'));
+  const fx = v => typeof v === 'string' ? v.split(viejo).join(nuevo) : v;
+  const arreglar = (tabla, x) => {
+    if(x.turno !== viejo) return;
+    x.turno = nuevo; x.folio = fx(x.folio); x.dispositivo = 'TPV' + n;
+    if(x.descuento) x.descuento.turno = fx(x.descuento.turno);
+    if(x.cancelacion) x.cancelacion.turno = fx(x.cancelacion.turno);
+    if(x.aplicaciones) x.aplicaciones.forEach(a=> a.folio = fx(a.folio));
+    if(x.pagos) x.pagos.forEach(p=> p.folio = fx(p.folio));
+    x.sincronizado = false; DB.guardar(tabla, x);
+  };
+  ['recibos','pedidos','abonos'].forEach(tb=> DB[tb].slice().forEach(x=> arreglar(tb, x)));
+  /* abonos de otros turnos que hacen referencia a tickets de este turno */
+  DB.abonos.forEach(a=> { if((a.aplicaciones||[]).some(x=> x.folio.includes(viejo))){ a.aplicaciones.forEach(x=> x.folio = fx(x.folio)); DB.guardar('abonos', a); } });
+  t.folio = nuevo; t.dispositivo = 'TPV' + n; t.numDispositivo = n; store.set('turno', t);
 }
 
 /* ================= Cajón de dinero ================= */
@@ -2014,10 +2051,12 @@ function bindTesoreria(){
 }
 
 function bindTurno(){
+  document.querySelectorAll('.disp-ch .dia').forEach(b=> b.onclick = ()=> elegirDispositivo(Number(b.dataset.n)));
   const open = document.getElementById('openShift');
   if(open) open.onclick = ()=>{
     const v = parseFloat(document.getElementById('cash').value || '0');
     if(isNaN(v) || v < 0){ toast('Escribe un monto válido'); return; }
+    if(!store.get('config').dispositivoElegido){ toast('Elige qué celular es este (TPV1, TPV2…)'); return; }
     const n = siguienteTurnoDelDia();
     if(n > MAX_TURNOS_DIA){ toast(`Se alcanzó el máximo de ${MAX_TURNOS_DIA} turnos por día en este dispositivo`); return; }
     store.set('turnoSeq', {fecha:hoyClave(), n});
