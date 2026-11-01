@@ -476,6 +476,22 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .pm-row{align-items:center}
 .pm-sw{width:22px;height:22px;accent-color:var(--brand);margin:0 16px}
 
+.tahorro{display:flex;align-items:center;justify-content:flex-end;gap:6px;color:var(--brand);font-size:.88rem;font-weight:600;padding:0 2px 12px}
+.tahorro svg{width:16px;height:16px;stroke:var(--brand)}
+.cred-dlg{max-width:420px}
+.cred-dlg label{margin-top:12px}
+.cred-tot{display:flex;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--bg);font-size:.95rem}
+.cred-tot b{font-size:1.1rem}
+.cred-saldo{text-align:right;margin:14px 0 4px;color:var(--muted)}
+.cred-saldo b{color:var(--text);font-size:1.15rem}
+.deuda{margin:14px 0;padding:14px;border-radius:14px;background:#fff7e6;border:1px solid #f3dcae;font-size:.92rem}
+.deuda-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.deuda-t{font-size:1.3rem;color:#8a4b00}
+.deuda-r{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #f0dcb4}
+.deuda-r small{display:block;color:var(--muted);font-size:.8rem}
+.deuda-r.actual{font-weight:600}
+dd.pos{color:var(--brand)}
+
 /* Hoja inferior / teclado */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:440px;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -1665,7 +1681,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.23';
+const APP_VERSION = '0.24';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1854,7 +1870,7 @@ function calcCajon(t){
   const movs = t.movimientos || [];
   const c = {
     fondo: Number(t.efectivoInicial)||0,
-    cobrosEf: sumar(recs.filter(r=>r.metodo==='Efectivo'), r=>r.total),
+    cobrosEf: r2(sumar(recs.filter(r=>r.metodo==='Efectivo'), r=>r.total) + sumar(recs.filter(r=>r.metodo==='Crédito'), r=> r.credito?.anticipo||0)),
     descEf: sumar(descs.filter(d=> ef(d) && !esCanc(d)), d=>d.monto),
     cancEf: sumar(descs.filter(d=> ef(d) && esCanc(d)), d=>d.monto),
     depositado: sumar(movs.filter(m=>m.tipo==='deposito'), m=>m.monto),
@@ -2102,6 +2118,15 @@ const congelarLineas = lineas => lineas.map(l=>{
   return {...l, promoRegla: reglaDe(l), costo: a && a.costo != null ? a.costo : null};
 });
 const totalTicket = t => r2(t.lineas.reduce((s,l)=> s + importeLinea(l), 0));
+const ahorroTicket = t => r2(t.lineas.reduce((s,l)=> s + ahorroLinea(l), 0));
+/* Ahorro por promociones de lo que quedó en el recibo (considera descuentos por pedido incompleto) */
+const ahorroRecibo = r => r2((r.lineas||[]).reduce((s,l)=>{ const q = typeof restante==='function' && r.descuentos ? restante(r,l) : l.cantidad; return s + r2((l.precio||0)*q) - importeCon(l, q); }, 0));
+function deudaCliente(id){
+  const pend = DB.recibos.filter(r=> r.metodo==='Crédito' && !r.cancelado && (r.saldo||0) > 0.004 && r.cliente && r.cliente.id===id)
+    .sort((a,b)=> (a.credito?.fechaPago||a.fecha).localeCompare(b.credito?.fechaPago||b.fecha));
+  return {total: r2(pend.reduce((s,r)=> s + r.saldo, 0)), recibos: pend};
+}
+const masDias = n => { const d = new Date(); d.setDate(d.getDate()+n); return hoyClave(d); };
 const cuentaTicket = t => t.lineas.reduce((s,l)=> s + (l.porKilo ? 1 : l.cantidad), 0);
 const fmtKg = n => Number(n).toLocaleString('es-MX',{minimumFractionDigits:3, maximumFractionDigits:3});
 
@@ -2206,7 +2231,7 @@ function viewTicket(){
     ${t.nombre ? `<div class="tk-name">${svg('recibos')}<div><b>${esc(t.nombre)}</b>${t.comentario?`<small>${esc(t.comentario)}</small>`:''}</div></div>` : ''}
     <div class="tk-cli">${barraCliente()}</div>
     <div class="ticket-list">
-      ${t.lineas.length ? filas + `<div class="ttotal"><span>Total</span><span>${fmt(totalTicket(t))}</span></div>`
+      ${t.lineas.length ? filas + `<div class="ttotal"><span>Total</span><span>${fmt(totalTicket(t))}</span></div>${ahorroTicket(t) > 0 ? `<div class="tahorro">${svg('articulos')}Ahorro por promociones: ${fmt(ahorroTicket(t))}</div>` : ''}`
                         : `<div class="ticket-empty">${txtModo('El ticket está vacío','El pedido está vacío','La cotización está vacía')}.<br>Toca un producto para agregarlo.</div>`}
     </div>
     <div class="ticket-foot"><div class="sale-actions">
@@ -2463,13 +2488,49 @@ function bindCobro(){
   };
   document.getElementById('payTarjeta').onclick = ()=> registrarVenta('Tarjeta', total);
   document.getElementById('payCredito').onclick = ()=>{
-    if(ticket().cliente) return registrarVenta('Crédito', 0);
-    toast('Para vender a crédito asigna un cliente');
-    abrirSelectorCliente({alElegir:()=> registrarVenta('Crédito', 0)});
+    const c = ticket().cliente;
+    if(c && c.id) return abrirCredito();
+    confirmar({titulo:'La venta a crédito necesita un cliente', texto:'Selecciona o registra al cliente para poder dar seguimiento a la cobranza.', ok:'Elegir cliente',
+      alAceptar:()=> abrirSelectorCliente({alElegir:()=>{ if(ticket().cliente?.id) abrirCredito(); }})});
   };
 }
 
-function registrarVenta(metodo, recibido){
+/* Ventana de crédito: fecha de pago, anticipo opcional y nota */
+function abrirCredito(){
+  const t = ticket(), c = t.cliente, total = totalTicket(t), deuda = deudaCliente(c.id);
+  const bg = document.createElement('div'); bg.className = 'sheet-bg center';
+  bg.innerHTML = `<div class="dialog cred-dlg" role="dialog">
+    <div class="dlg-icon ok">${svg('creditos')}</div>
+    <h3>Venta a crédito</h3>
+    <div class="cli-bar static" style="margin:10px 0">${svg('clientes')}<span><b>${esc(c.nombre)}${c.tienda?' · '+esc(c.tienda):''}</b><small>${deuda.recibos.length ? `Ya debe ${fmt(deuda.total)} en ${deuda.recibos.length} ${deuda.recibos.length===1?'ticket':'tickets'}` : 'Sin adeudos pendientes'}</small></span></div>
+    <div class="cred-tot"><span>Importe de esta venta</span><b>${fmt(total)}</b></div>
+    <label for="crFecha">Fecha de pago</label>
+    <input class="field" id="crFecha" type="date" min="${hoyClave()}" value="${masDias(7)}">
+    <div class="dias" id="crPlazo">${[[7,'7 días'],[15,'15 días'],[30,'30 días']].map(([n,tx])=>`<button type="button" class="dia${n===7?' on':''}" data-n="${n}">${tx}</button>`).join('')}</div>
+    <label for="crAnt">Anticipo en efectivo (opcional)</label>
+    <div class="money"><span>$</span><input class="field" id="crAnt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+    <label for="crNota">Nota (opcional)</label>
+    <input class="field" id="crNota" maxlength="120" placeholder="Ej. Paga el viernes al recibir mercancía" autocomplete="off">
+    <div class="cred-saldo">Saldo a crédito: <b id="crSaldo">${fmt(total)}</b></div>
+    <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">Registrar crédito</button></div>
+  </div>`;
+  document.body.appendChild(bg);
+  const fecha = bg.querySelector('#crFecha'), ant = bg.querySelector('#crAnt'), saldo = bg.querySelector('#crSaldo');
+  bg.querySelectorAll('#crPlazo .dia').forEach(b=> b.onclick = ()=>{ fecha.value = masDias(Number(b.dataset.n)); bg.querySelectorAll('#crPlazo .dia').forEach(x=> x.classList.toggle('on', x===b)); });
+  fecha.oninput = ()=> bg.querySelectorAll('#crPlazo .dia').forEach(x=> x.classList.toggle('on', masDias(Number(x.dataset.n))===fecha.value));
+  ant.oninput = ()=>{ const a = r2(parseFloat(ant.value)||0); saldo.textContent = fmt(r2(Math.max(0, total - a))); };
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  bg.querySelector('[data-a="si"]').onclick = ()=>{
+    const a = r2(parseFloat(ant.value)||0);
+    if(!fecha.value){ toast('Elige la fecha de pago'); fecha.focus(); return; }
+    if(fecha.value < hoyClave()){ toast('La fecha de pago no puede ser anterior a hoy'); return; }
+    if(a < 0 || a >= total){ toast(a >= total ? 'El anticipo cubre todo: cóbralo en efectivo' : 'Anticipo no válido'); ant.focus(); return; }
+    bg.remove();
+    registrarVenta('Crédito', a, {fechaPago:fecha.value, nota:bg.querySelector('#crNota').value.trim(), anticipo:a});
+  };
+}
+
+function registrarVenta(metodo, recibido, credito){
   const t = ticket(), turno = turnoActual();
   const total = totalTicket(t);
   const seq = (turno.recibos || 0) + 1;
@@ -2480,9 +2541,10 @@ function registrarVenta(metodo, recibido){
     usuario:session.usuario, vendedor:session.nombre, cliente:t.cliente || null,
     ticketNombre:t.nombre || null, comentario:t.comentario || null,
     lineas:congelarLineas(t.lineas), total, metodo,
-    recibido: metodo==='Efectivo' ? recibido : (metodo==='Tarjeta' ? total : 0),
+    recibido: metodo==='Efectivo' ? recibido : (metodo==='Tarjeta' ? total : (metodo==='Crédito' ? (credito?.anticipo||0) : 0)),
     cambio: metodo==='Efectivo' ? r2(recibido - total) : 0,
-    saldo: metodo==='Crédito' ? total : 0,
+    saldo: metodo==='Crédito' ? r2(total - (credito?.anticipo||0)) : 0,
+    credito: metodo==='Crédito' ? (credito || null) : null,
     sinExistencia: t.lineas.filter(l=> existencia(l.pid) <= 0).map(l=>l.pid),
     sincronizado:false
   };
@@ -2505,11 +2567,24 @@ function viewHecho(){
       <dt>Forma de pago</dt><dd>${esc(r.metodo)}</dd>
       <dt>Importe total</dt><dd>${fmt(r.total)}</dd>
       ${r.metodo==='Efectivo' ? `<dt>Efectivo recibido</dt><dd>${fmt(r.recibido)}</dd>` : ''}
+      ${r.metodo==='Crédito' && r.credito?.anticipo ? `<dt>Anticipo</dt><dd>${fmt(r.credito.anticipo)}</dd>` : ''}
       ${r.metodo==='Crédito' ? `<dt>Saldo a crédito</dt><dd>${fmt(r.saldo)}</dd>` : ''}
+      ${r.metodo==='Crédito' && r.credito?.fechaPago ? `<dt>Fecha de pago</dt><dd>${fechaCorta(r.credito.fechaPago)}</dd>` : ''}
+      ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
     </dl>
-    ${r.metodo==='Crédito' && !r.cliente ? '<div class="notice">Esta venta a crédito no tiene cliente asignado. Lo conectaremos cuando armemos Clientes y Créditos y cobranza.</div>' : ''}
+    ${r.metodo==='Crédito' && r.cliente?.id ? bloqueDeuda(r) : ''}
     <button class="btn ghost" id="hechoPrint">${svg('recibos')}Imprimir ticket</button>
     <button class="btn" id="nuevaVenta">Nueva venta</button>
+  </div>`;
+}
+function bloqueDeuda(r){
+  const d = deudaCliente(r.cliente.id), hoy = hoyClave();
+  if(d.recibos.length <= 1) return `<div class="deuda"><b>${esc(r.cliente.nombre)}</b> no tiene otros adeudos. Saldo total: <b>${fmt(d.total)}</b></div>`;
+  return `<div class="deuda">
+    <div class="deuda-h"><span>Deuda acumulada de <b>${esc(r.cliente.nombre)}</b></span><b class="deuda-t">${fmt(d.total)}</b></div>
+    ${d.recibos.map(x=>{ const fp = x.credito?.fechaPago, venc = fp && fp < hoy;
+      return `<div class="deuda-r${x.id===r.id?' actual':''}"><span>#${esc(x.folio)}${x.id===r.id?' · esta venta':''}<small>${new Date(x.fecha).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}${fp?` · paga ${fechaCorta(fp)}`:''}${venc?' · <b class="neg">vencido</b>':''}</small></span><b>${fmt(x.saldo)}</b></div>`; }).join('')}
+    <p class="sub" style="margin:6px 0 0">${d.recibos.length} tickets pendientes de pago</p>
   </div>`;
 }
 function bindHecho(){
@@ -3678,10 +3753,13 @@ function htmlTicket(r){
     <div class="s"></div>
     ${d.length ? fila('Total original', fmt(r.total)) + fila('Descuento', '−'+fmt(r2(r.total-neto))) : ''}
     <div class="f t"><span>${r.cancelado ? 'CANCELADO' : 'TOTAL'}</span><span>${fmt(neto)}</span></div>
+    ${r.metodo==='Crédito' && r.credito?.anticipo ? fila('Anticipo', fmt(r.credito.anticipo)) : ''}
     ${fila(esc(r.metodo), r.metodo==='Crédito' ? 'Saldo '+fmt(r.saldo||0) : fmt(r.metodo==='Efectivo' ? r.recibido : r.total))}
+    ${r.metodo==='Crédito' && r.credito?.fechaPago ? fila('Fecha de pago', r.credito.fechaPago.split('-').reverse().join('/')) : ''}
     ${r.metodo==='Efectivo' ? fila('Cambio', fmt(r.cambio||0)) : ''}
     ${r.metodo==='Efectivo' && d.length && !r.cancelado ? fila('A devolver', fmt(r2(r.total-neto))) : ''}
     ${r.cancelado && r.metodo==='Efectivo' ? fila('A devolver', fmt(r.total)) : ''}
+    ${ahorroRecibo(r) > 0 ? `<div class="s"></div><div class="c">Ahorro por promociones: ${fmt(ahorroRecibo(r))}</div>` : ''}
     <div class="s"></div><div class="c">${esc(impCfg().pie)}</div>
   </body></html>`;
 }
@@ -3735,9 +3813,14 @@ function lineasTicket(r){
   if(d.length){ L.push({t:dos('Total original', fmt(r.total))}); L.push({t:dos('Descuento', '-' + fmt(r2(r.total - neto)))}); }
   L.push({t:dos(r.cancelado ? 'CANCELADO' : 'TOTAL', fmt(neto)), b:true, g:true});
   if(r.metodo==='Efectivo'){ L.push({t:dos('Efectivo', fmt(r.recibido||0))}); L.push({t:dos('Cambio', fmt(r.cambio||0))}); if(d.length) L.push({t:dos('A devolver', fmt(r.cancelado ? r.total : r2(r.total-neto)))}); }
-  else if(r.metodo==='Crédito') L.push({t:dos('Credito - saldo', fmt(r.saldo||0))});
+  else if(r.metodo==='Crédito'){
+    if(r.credito?.anticipo) L.push({t:dos('Anticipo', fmt(r.credito.anticipo))});
+    L.push({t:dos('Credito - saldo', fmt(r.saldo||0)), b:true});
+    if(r.credito?.fechaPago) L.push({t:dos('Fecha de pago', r.credito.fechaPago.split('-').reverse().join('/'))});
+  }
   else L.push({t:dos(r.metodo, fmt(neto))});
   L.push({t:sep});
+  if(ahorroRecibo(r) > 0){ L.push({t:centro('Ahorro por promociones: ' + fmt(ahorroRecibo(r)))}); L.push({t:sep}); }
   if(c.pie) envolver(c.pie).forEach(x=> L.push({t:centro(x)}));
   return L;
 }
@@ -3913,7 +3996,11 @@ function viewReciboDetalle(r){
       <dt>${esc(r.metodo)}</dt><dd>${fmt(r.metodo==='Crédito' ? r.saldo : (r.metodo==='Efectivo' ? r.recibido : r.total))}</dd>
       ${r.metodo==='Efectivo' ? `<dt>Cambio</dt><dd>${fmt(r.cambio)}</dd>` : ''}
       ${r.metodo==='Efectivo' && d.length ? `<dt>A devolver al cliente</dt><dd class="neg">${fmt(r2(r.total-neto))}</dd>` : ''}
+      ${r.metodo==='Crédito' && r.credito?.anticipo ? `<dt>Anticipo</dt><dd>${fmt(r.credito.anticipo)}</dd>` : ''}
       ${r.metodo==='Crédito' ? `<dt>Saldo pendiente</dt><dd>${fmt(r.saldo)}</dd>` : ''}
+      ${r.metodo==='Crédito' && r.credito?.fechaPago ? `<dt>Fecha de pago</dt><dd>${fechaCorta(r.credito.fechaPago)}</dd>` : ''}
+      ${r.credito?.nota ? `<dt>Nota</dt><dd>${esc(r.credito.nota)}</dd>` : ''}
+      ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
     </dl>
     <button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir ${r.version>1 ? 'versión '+r.version : 'recibo'}</button>
   </div>`;
