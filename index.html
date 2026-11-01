@@ -510,6 +510,36 @@ dd.pos{color:var(--brand)}
 .popover button svg{width:18px;height:18px;stroke:currentColor;vertical-align:-4px;margin-right:8px}
 .popover button.neg{color:var(--danger)}
 
+.mp-wrap{background:#fff;min-height:calc(100vh - 64px);padding-bottom:20px}
+.mp-dias{border-bottom:0}
+.mp-res{padding:0 16px 10px;font-size:.9rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.mp-res b{color:var(--text)}
+.mp-leg{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:.82rem}
+.mp-leg i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.mp-box{position:relative;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+#mpMapa{position:absolute;inset:0;background:#e8ecea}
+.mp-box .map-aviso{position:absolute;left:0;right:0;bottom:0;z-index:500}
+.mp-box .map-me{bottom:52px}
+.mp-vacio{position:absolute;left:12px;right:12px;top:12px;z-index:500;background:rgba(28,35,33,.85);color:#fff;font-size:.86rem;padding:10px 12px;border-radius:10px;text-align:center}
+.pin-c{background:none;border:0}
+.pin-c svg{width:32px;height:44px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.mp-pop{display:flex;flex-direction:column;gap:3px;font-family:inherit}
+.mp-pop b{font-size:1rem}
+.mp-pop small{color:#555;font-size:.82rem;line-height:1.3}
+.mp-est{align-self:flex-start;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;margin-bottom:2px}
+.mp-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.mp-acts .ub-b{padding:7px 9px;font-size:.8rem}
+.mp-list{margin:12px 12px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.mp-row{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-bottom:1px solid var(--line);text-align:left}
+.mp-row:last-child{border-bottom:0}
+.mp-row:active{background:var(--bg)}
+.mp-n{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:grid;place-items:center;color:#fff;font-weight:800;font-size:.78rem;flex-shrink:0}
+.mp-n{transform:none;border-radius:50%}
+.mp-t{flex:1;min-width:0}
+.mp-t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-t small{display:block;color:var(--muted);font-size:.82rem}
+.mp-sin{font-size:.72rem;color:var(--warn);background:#fff4e5;padding:2px 7px;border-radius:999px;white-space:nowrap}
+
 /* Hoja inferior / teclado */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:440px;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -1699,7 +1729,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.26';
+const APP_VERSION = '0.27';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3718,7 +3748,7 @@ function renderHeader(){
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
-    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo'].includes(current));
+    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo','mapa'].includes(current));
     acts.innerHTML = current==='clientes' && (cliVista==='crear'||cliVista==='editar') ? '<button class="head-txt" id="hCliGuardar">GUARDAR</button>'
                    : current==='clientes' && cliVista==='lista' ? `<button class="icon-btn" id="hCliNuevo" aria-label="Crear cliente">${svg('userAdd')}</button>` : '';
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
@@ -4525,6 +4555,115 @@ function verProducto(pid, orden){
   pintar();
 }
 
+/* ================= Mapa de clientes ================= */
+let mapaInst = null, mapaDia = null, mapaMarcas = {};
+const DIA_IDX = ['dom','lun','mar','mie','jue','vie','sab'];
+const diaHoy = ()=> DIA_IDX[new Date().getDay()];
+function fechaDeDia(k){   /* fecha de ese día en la semana actual (lunes a domingo) */
+  const hoy = new Date(); const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+  const d = new Date(lunes); d.setDate(lunes.getDate() + ['lun','mar','mie','jue','vie','sab','dom'].indexOf(k)); return d;
+}
+function atendidoEn(c, clave){
+  const venta = DB.recibos.find(r=> r.cliente && r.cliente.id===c.id && !r.cancelado && !r.reemplazadoPor && hoyClave(new Date(r.fecha))===clave);
+  const pedido = DB.pedidos.find(p=> p.cliente && p.cliente.id===c.id && p.estado!=='Cancelado' && hoyClave(new Date(p.fecha))===clave);
+  return venta ? {tipo:'Venta', ref:venta} : pedido ? {tipo:'Pedido', ref:pedido} : null;
+}
+function clientesDelDia(k){
+  const clave = hoyClave(fechaDeDia(k));
+  return clientes().filter(c=> (c.diasVisita||[]).includes(k))
+    .sort((a,b)=> ((a.orden||999)-(b.orden||999)) || a.nombre.localeCompare(b.nombre,'es'))
+    .map((c,i)=> ({c, n: c.orden || i+1, at: atendidoEn(c, clave)}));
+}
+const pinIcon = (color, n)=> L.divIcon({className:'pin-c', iconSize:[32,44], iconAnchor:[16,44], popupAnchor:[0,-40],
+  html:`<svg viewBox="0 0 32 44"><path d="M16 0C7.2 0 0 7 0 15.8 0 27.6 16 44 16 44s16-16.4 16-28.2C32 7 24.8 0 16 0z" fill="${color}" stroke="#fff" stroke-width="2"/><circle cx="16" cy="15.5" r="10" fill="rgba(255,255,255,.95)"/><text x="16" y="20" text-anchor="middle" font-size="${String(n).length>2?10:12}" font-weight="800" font-family="system-ui,sans-serif" fill="${color}">${n}</text></svg>`});
+const COLOR_PEND = '#1a73e8', COLOR_OK = '#1e8e3e';
+function viewMapa(){
+  if(!mapaDia) mapaDia = diaHoy();
+  const ls = clientesDelDia(mapaDia), conUb = ls.filter(x=> tieneUbicacion(x.c)), sinUb = ls.filter(x=> !tieneUbicacion(x.c));
+  const ok = ls.filter(x=> x.at).length;
+  const f = fechaDeDia(mapaDia), esHoy = mapaDia===diaHoy();
+  return `<div class="mp-wrap">
+    <div class="dias filtro mp-dias">${DIAS.map(([k,t])=>`<button class="dia${k===mapaDia?' on':''}" data-d="${k}">${t}${k===diaHoy()?' ·':''}</button>`).join('')}</div>
+    <div class="mp-res"><b>${DIA_LARGO[mapaDia]} ${f.getDate()}</b>${esHoy?' (hoy)':''} · ${ls.length} ${ls.length===1?'cliente':'clientes'}
+      <span class="mp-leg"><i style="background:${COLOR_OK}"></i>${ok} atendidos <i style="background:${COLOR_PEND}"></i>${ls.length-ok} por atender</span></div>
+    <div class="mp-box"><div id="mpMapa"></div>
+      ${!conUb.length ? `<div class="mp-vacio">${ls.length ? 'Ninguno de estos clientes tiene ubicación marcada.' : 'No hay clientes con visita este día.'}</div>` : ''}
+      <button class="map-me" id="mpMe" aria-label="Mi ubicación">${svg('gps')}</button>
+      <div class="map-aviso hidden" id="mpAviso">No se pudo cargar el mapa (¿sin internet?).</div>
+    </div>
+    <div class="mp-list">
+      ${ls.map(x=>`<button class="mp-row" data-cid="${x.c.id}">
+        <span class="mp-n" style="background:${x.at?COLOR_OK:COLOR_PEND}">${x.n}</span>
+        <span class="mp-t"><b>${esc(x.c.tienda || x.c.nombre)}</b><small>${esc([x.c.tienda?x.c.nombre:'', x.c.colonia].filter(Boolean).join(' · '))}${x.at?` · <span class="pos">${x.at.tipo} ${fmt(x.at.ref.total)}</span>`:''}</small></span>
+        ${tieneUbicacion(x.c) ? '' : `<span class="mp-sin">Sin ubicación</span>`}
+      </button>`).join('')}
+    </div>
+    ${sinUb.length ? `<p class="note-sm">${sinUb.length} sin ubicación: márcala en Clientes para verlos en el mapa.</p>` : ''}
+  </div>`;
+}
+function popupCliente(x){
+  const c = x.c;
+  return `<div class="mp-pop">
+    <span class="mp-est" style="background:${x.at?COLOR_OK:COLOR_PEND}">${x.at ? 'Atendido · '+x.at.tipo+' '+fmt(x.at.ref.total) : 'Por atender'}</span>
+    <b>${x.n}. ${esc(c.tienda || c.nombre)}</b>
+    ${c.tienda ? `<small>${esc(c.nombre)}</small>` : ''}
+    <small>${esc([c.direccion, c.colonia].filter(Boolean).join(', ') || 'Sin dirección')}</small>
+    ${c.referencia ? `<small><i>${esc(c.referencia)}</i></small>` : ''}
+    <div class="mp-acts">
+      <a class="ub-b" href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener">${svg('mapa')}Cómo llegar</a>
+      ${c.telefono ? `<a class="ub-b" href="https://wa.me/52${c.telefono}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a>` : ''}
+      <button class="ub-b" data-pedido="${c.id}">${svg('preventa')}Tomar pedido</button>
+    </div>
+  </div>`;
+}
+function tomarPedido(cid){
+  if(!turnoActual()){ toast('Abre un turno para tomar pedidos'); return; }
+  const c = clientes().find(x=> x.id===cid); if(!c) return;
+  go('preventa');
+  const t = ticket();
+  if(t.lineas.length && t.cliente && t.cliente.id!==c.id){ toast(`Tienes un pedido en curso de ${t.cliente.nombre}; guárdalo o termínalo primero`); return; }
+  asignarCliente(c); ventaVista = 'grid'; renderVenta(); toast(`Pedido para ${c.tienda || c.nombre}`);
+}
+function cerrarMapa(){ try{ mapaInst && mapaInst.remove(); }catch(_){} mapaInst = null; mapaMarcas = {}; }
+function renderMapa(){
+  cerrarMapa();
+  const view = document.getElementById('view');
+  view.innerHTML = viewMapa(); renderHeader();
+  document.querySelectorAll('.mp-dias .dia').forEach(b=> b.onclick = ()=>{ mapaDia = b.dataset.d; renderMapa(); });
+  const ls = clientesDelDia(mapaDia), conUb = ls.filter(x=> tieneUbicacion(x.c));
+  try{
+    if(typeof L === 'undefined') throw 0;
+    mapaInst = L.map('mpMapa', {zoomControl:true}).setView(CENTRO_DEFAULT, 13);
+    let fallas = 0;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OpenStreetMap'})
+      .on('tileerror', ()=>{ if(++fallas===4) document.getElementById('mpAviso')?.classList.remove('hidden'); })
+      .on('tileload', ()=>{ fallas = 0; document.getElementById('mpAviso')?.classList.add('hidden'); }).addTo(mapaInst);
+    conUb.forEach(x=>{
+      const m = L.marker([Number(x.c.lat), Number(x.c.lng)], {icon:pinIcon(x.at?COLOR_OK:COLOR_PEND, x.n), zIndexOffset: x.at ? 0 : 500}).addTo(mapaInst);
+      m.bindPopup(popupCliente(x), {maxWidth:280, minWidth:220, autoPanPaddingTopLeft:[16,16], autoPanPaddingBottomRight:[16,16]});
+      mapaMarcas[x.c.id] = m;
+    });
+    if(conUb.length) mapaInst.fitBounds(L.latLngBounds(conUb.map(x=> [Number(x.c.lat), Number(x.c.lng)])), {padding:[40,40], maxZoom:16});
+    mapaInst.on('popupopen', e=>{ const b = e.popup.getElement().querySelector('[data-pedido]'); if(b) b.onclick = ()=> tomarPedido(b.dataset.pedido); });
+    /* mi ubicación como referencia */
+    let yo = null;
+    const ver = (centrar)=> obtenerPos(pos=>{
+      if(!pos || !mapaInst) { if(centrar) toast(estadoPos==='denegado' ? 'Activa el permiso de ubicación' : 'No se pudo obtener tu ubicación'); return; }
+      if(!yo) yo = L.circleMarker([pos.lat, pos.lng], {radius:8, color:'#fff', weight:3, fillColor:'#5f3dc4', fillOpacity:1}).addTo(mapaInst).bindTooltip('Tú');
+      else yo.setLatLng([pos.lat, pos.lng]);
+      if(centrar) mapaInst.setView([pos.lat, pos.lng], 16);
+    }, centrar);
+    ver(false);
+    document.getElementById('mpMe').onclick = ()=> ver(true);
+    setTimeout(()=> mapaInst && mapaInst.invalidateSize(), 80);
+  }catch(e){ document.getElementById('mpAviso')?.classList.remove('hidden'); }
+  document.querySelectorAll('.mp-row').forEach(r=> r.onclick = ()=>{
+    const m = mapaMarcas[r.dataset.cid];
+    if(m){ mapaInst.setView(m.getLatLng(), 17, {animate:false}); setTimeout(()=> m.openPopup(), 30); document.getElementById('mpMapa').scrollIntoView({behavior:'smooth', block:'center'}); }
+    else toast('Este cliente no tiene ubicación; márcala en Clientes');
+  });
+}
+
 /* ================= Navegación ================= */
 function viewPendiente(id){
   const m = MENU.find(x=>x.id===id);
@@ -4541,6 +4680,7 @@ function go(id){
   if(!puede(id)){ toast('No tienes permiso para esta sección'); return; }
   if(current !== id) seccionPrevia = current;
   current = id;
+  if(id!=='mapa') cerrarMapa();
   document.querySelector('.cl-sheet')?.remove();
   document.querySelector('.cat-modal')?.remove();
   document.querySelectorAll('.sheet-bg.center').forEach(x=> x.remove());
@@ -4551,14 +4691,15 @@ function go(id){
   document.querySelector('main').classList.toggle('flush', esVenta);
   view.classList.toggle('wide', esVenta);
   document.querySelector('.popover')?.remove();
-  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo'].includes(id));
-  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo'].includes(id));
+  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa'].includes(id));
+  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa'].includes(id));
   if(id==='turno'){ if(!turnoActual()) turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
   else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
   else if(id==='catalogo'){ renderCatalogo(); }
+  else if(id==='mapa'){ mapaDia = null; renderMapa(); }
   else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : id==='cotizar' ? 'inicioCot' : 'grid'; renderVenta(); }
   else{
     view.innerHTML = viewPendiente(id);
