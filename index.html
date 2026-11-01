@@ -392,6 +392,22 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 #rdPrint svg{width:20px;height:20px;stroke:currentColor}
 @media (min-width:900px){.dsc-foot{left:290px}}
 
+.imp-ops{display:grid;gap:8px;margin-top:6px}
+.imp-op{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1.5px solid var(--line);border-radius:12px;margin:0;color:var(--text);font-size:.95rem;cursor:pointer}
+.imp-op input{width:20px;height:20px;accent-color:var(--brand);margin-top:2px;flex-shrink:0}
+.imp-op b{display:block}
+.imp-op small{display:block;color:var(--muted);font-size:.82rem;margin-top:2px;line-height:1.35}
+.imp-op.on{border-color:var(--brand);background:var(--brand-soft)}
+.sw-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;margin:0 0 6px;color:var(--text);font-size:.95rem;border-bottom:1px solid var(--line)}
+.sw-row small{display:block;color:var(--muted);font-size:.82rem}
+.sw-row input{width:22px;height:22px;accent-color:var(--brand);flex-shrink:0}
+.cf-h{font-size:1rem;margin:18px 0 10px}
+.tk-prev{margin:6px 0 14px}
+.tk-prev b{display:block;font-size:.85rem;color:var(--brand);margin-bottom:6px}
+.tk-prev pre{background:#fffdf5;border:1px dashed var(--line);border-radius:8px;padding:10px;font-size:11px;line-height:1.35;overflow-x:auto;white-space:pre;font-family:ui-monospace,monospace}
+#impPrueba,#hechoPrint{display:flex;align-items:center;justify-content:center;gap:8px}
+#impPrueba svg,#hechoPrint svg{width:20px;height:20px;stroke:currentColor}
+
 /* Hoja inferior / teclado */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:440px;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -1581,7 +1597,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.19';
+const APP_VERSION = '0.20';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2341,6 +2357,7 @@ function registrarVenta(metodo, recibido){
   descontarInventario(t.lineas);
   guardarTicket({lineas:[]});
   ultimoRecibo = recibo;
+  if(impCfg().auto) setTimeout(()=> imprimirRecibo(recibo), 400);
   ventaVista = 'hecho'; renderVenta();
 }
 
@@ -2358,10 +2375,14 @@ function viewHecho(){
       ${r.metodo==='Crédito' ? `<dt>Saldo a crédito</dt><dd>${fmt(r.saldo)}</dd>` : ''}
     </dl>
     ${r.metodo==='Crédito' && !r.cliente ? '<div class="notice">Esta venta a crédito no tiene cliente asignado. Lo conectaremos cuando armemos Clientes y Créditos y cobranza.</div>' : ''}
+    <button class="btn ghost" id="hechoPrint">${svg('recibos')}Imprimir ticket</button>
     <button class="btn" id="nuevaVenta">Nueva venta</button>
   </div>`;
 }
-function bindHecho(){ document.getElementById('nuevaVenta').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); }; }
+function bindHecho(){
+  document.getElementById('nuevaVenta').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
+  document.getElementById('hechoPrint').onclick = ()=> imprimirRecibo(ultimoRecibo);
+}
 
 /* ================= Clientes (selector básico) ================= */
 const clientes = ()=> store.get('clientes', []);
@@ -3352,12 +3373,13 @@ function renderHeader(){
     const m = MENU.find(x=>x.id===current);
     const enCli = current==='clientes' && cliVista!=='inicio';
     const enTes = current==='turno' && turnoVista==='tesoreria' && !!turnoActual();
-    const detalle = (current==='recibos' && reciboSel) || enCli || enTes;
-    title.textContent = enTes ? 'Gestión de tesorería'
+    const enCfg = current==='config' && cfgVista!=='inicio';
+    const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg;
+    title.textContent = enTes ? 'Gestión de tesorería' : enCfg ? 'Impresoras'
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
-    pill.classList.toggle('hidden', ['recibos','clientes'].includes(current));
+    pill.classList.toggle('hidden', ['recibos','clientes','config'].includes(current));
     acts.innerHTML = current==='clientes' && (cliVista==='crear'||cliVista==='editar') ? '<button class="head-txt" id="hCliGuardar">GUARDAR</button>'
                    : current==='clientes' && cliVista==='lista' ? `<button class="icon-btn" id="hCliNuevo" aria-label="Crear cliente">${svg('userAdd')}</button>` : '';
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
@@ -3497,12 +3519,12 @@ function htmlTicket(r){
   }).join('');
   const quitados = d.flatMap(x=> x.lineas).map(l=> `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza', '−'+fmt(l.importe))}`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Recibo ${esc(r.folio)}</title><style>
-    @page{size:58mm auto;margin:3mm}
-    body{font-family:monospace,ui-monospace;font-size:11px;color:#000;margin:0;width:52mm}
+    @page{size:${impCfg().ancho}mm auto;margin:3mm}
+    body{font-family:monospace,ui-monospace;font-size:11px;color:#000;margin:0;width:${impCfg().ancho-6}mm}
     h1{font-size:14px;text-align:center;margin:0 0 2px} .c{text-align:center} .s{border-top:1px dashed #000;margin:5px 0}
     .f{display:flex;justify-content:space-between;gap:6px} .p{margin-top:3px} .t{font-size:13px;font-weight:bold} .b{font-weight:bold}
   </style></head><body>
-    <h1>MERKALIMENTOS</h1><div class="c">Venta al detalle y mayoreo<br>WhatsApp 961 108 0808</div><div class="s"></div>
+    <h1>${esc(impCfg().encabezado)}</h1><div class="c">${esc(impCfg().sub)}${impCfg().tel?'<br>WhatsApp '+esc(impCfg().tel):''}</div><div class="s"></div>
     ${fila('Recibo', '#'+esc(r.folio))}${r.version>1 ? fila('Versión', String(r.version)) : ''}
     ${fila('Fecha', new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'}))}
     ${fila('Vendedor', esc(r.vendedor||''))}${r.cliente ? fila('Cliente', esc(r.cliente.nombre||'')) : ''}
@@ -3515,15 +3537,173 @@ function htmlTicket(r){
     ${r.metodo==='Efectivo' ? fila('Cambio', fmt(r.cambio||0)) : ''}
     ${r.metodo==='Efectivo' && d.length && !r.cancelado ? fila('A devolver', fmt(r2(r.total-neto))) : ''}
     ${r.cancelado && r.metodo==='Efectivo' ? fila('A devolver', fmt(r.total)) : ''}
-    <div class="s"></div><div class="c">¡Gracias por su compra!</div>
+    <div class="s"></div><div class="c">${esc(impCfg().pie)}</div>
   </body></html>`;
 }
-function imprimirRecibo(r){
+function imprimirNavegador(r){
   const f = document.createElement('iframe');
   f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   document.body.appendChild(f);
   const doc = f.contentWindow.document; doc.open(); doc.write(htmlTicket(r)); doc.close();
   setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ toast('Este navegador no permite imprimir desde aquí'); } setTimeout(()=> f.remove(), 60000); }, 300);
+}
+
+/* ===== Impresoras: configuración y envío ===== */
+const IMP_DEFAULT = {metodo:'navegador', ancho:58, copias:1, auto:false, encabezado:'MERKALIMENTOS', sub:'Venta al detalle y mayoreo', tel:'961 108 0808', pie:'¡Gracias por su compra!'};
+const impCfg = ()=> ({...IMP_DEFAULT, ...(store.get('config').imp || {})});
+function guardarImpCfg(c){ const cfg = store.get('config'); cfg.imp = {...impCfg(), ...c}; store.set('config', cfg); }
+const METODOS_IMP = {
+  ticketprinter:{nombre:'App TicketPrinter', desc:'Imprime en la impresora Bluetooth predeterminada de tu app TicketPrinter. Las impresoras emparejadas se agregan en esa app.'},
+  rawbt:{nombre:'RawBT', desc:'Imprime en cualquier impresora Bluetooth emparejada usando la app gratuita RawBT (Play Store).'},
+  navegador:{nombre:'Ventana de impresión', desc:'Abre la ventana de impresión de Android. Requiere un servicio de impresión instalado para tu impresora.'}
+};
+
+/* Ticket en texto de ancho fijo (32 columnas en 58 mm, 48 en 80 mm) */
+function lineasTicket(r){
+  const c = impCfg(), W = c.ancho >= 80 ? 48 : 32;
+  const centro = t => { t = String(t).slice(0, W); const e = Math.floor((W - t.length)/2); return ' '.repeat(Math.max(0,e)) + t; };
+  const dos = (a, b) => { a = String(a); b = String(b); const esp = W - a.length - b.length; return esp >= 1 ? a + ' '.repeat(esp) + b : a.slice(0, W - b.length - 1) + ' ' + b; };
+  const envolver = t => { const out = []; let l = ''; String(t).split(/\s+/).forEach(w=>{ if((l + ' ' + w).trim().length > W){ if(l) out.push(l); l = w; } else l = (l + ' ' + w).trim(); }); if(l) out.push(l); return out; };
+  const sep = '-'.repeat(W), neto = totalNeto(r), d = r.descuentos || [];
+  const L = [];
+  L.push({t:centro(c.encabezado), b:true, g:true});
+  if(c.sub) L.push({t:centro(c.sub)});
+  if(c.tel) L.push({t:centro('WhatsApp ' + c.tel)});
+  L.push({t:sep});
+  L.push({t:dos('Recibo', '#' + r.folio)});
+  if(r.version > 1) L.push({t:dos('Version', String(r.version))});
+  L.push({t:dos('Fecha', new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'}))});
+  L.push({t:dos('Vendedor', (r.vendedor||'').slice(0, W-10))});
+  if(r.cliente) L.push({t:dos('Cliente', (r.cliente.nombre||'').slice(0, W-9))});
+  L.push({t:sep});
+  r.lineas.forEach(l=>{
+    const q = restante(r, l); if(q <= 0) return;
+    envolver(l.nombre).forEach(x=> L.push({t:x}));
+    L.push({t:dos('  ' + (l.porKilo ? fmtKg(q)+' kg' : q) + ' x ' + fmt(l.precio||0), fmt(r2((l.precio||0)*q)))});
+  });
+  if(d.length){
+    L.push({t:sep}); L.push({t:'DESCUENTO POR PEDIDO INCOMPLETO', b:true});
+    d.flatMap(x=>x.lineas).forEach(l=>{ envolver(l.nombre).forEach(x=> L.push({t:x})); L.push({t:dos('  ' + (l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza'), '-' + fmt(l.importe))}); });
+  }
+  L.push({t:sep});
+  if(d.length){ L.push({t:dos('Total original', fmt(r.total))}); L.push({t:dos('Descuento', '-' + fmt(r2(r.total - neto)))}); }
+  L.push({t:dos(r.cancelado ? 'CANCELADO' : 'TOTAL', fmt(neto)), b:true, g:true});
+  if(r.metodo==='Efectivo'){ L.push({t:dos('Efectivo', fmt(r.recibido||0))}); L.push({t:dos('Cambio', fmt(r.cambio||0))}); if(d.length) L.push({t:dos('A devolver', fmt(r.cancelado ? r.total : r2(r.total-neto)))}); }
+  else if(r.metodo==='Crédito') L.push({t:dos('Credito - saldo', fmt(r.saldo||0))});
+  else L.push({t:dos(r.metodo, fmt(neto))});
+  L.push({t:sep});
+  if(c.pie) envolver(c.pie).forEach(x=> L.push({t:centro(x)}));
+  return L;
+}
+const textoTicket = r => lineasTicket(r).map(l=> l.t).join('\n');
+
+/* ESC/POS con página de códigos 850 (acentos y ñ) */
+const CP850 = {'á':0xA0,'é':0x82,'í':0xA1,'ó':0xA2,'ú':0xA3,'ñ':0xA4,'Ñ':0xA5,'Á':0xB5,'É':0x90,'Í':0xD6,'Ó':0xE0,'Ú':0xE9,'ü':0x81,'Ü':0x9A,'¡':0xAD,'¿':0xA8,'°':0xF8};
+function escposTicket(r){
+  const B = [], push = (...x)=> B.push(...x);
+  const txt = t => { for(const ch of String(t)){ const c = ch.charCodeAt(0); push(c < 128 ? c : (CP850[ch] ?? 0x3F)); } };
+  push(0x1B,0x40, 0x1B,0x74,0x02);                       /* inicializar, CP850 */
+  lineasTicket(r).forEach(l=>{
+    if(l.b) push(0x1B,0x45,1); if(l.g) push(0x1D,0x21,0x01);
+    txt(l.t); push(0x0A);
+    if(l.g) push(0x1D,0x21,0x00); if(l.b) push(0x1B,0x45,0);
+  });
+  push(0x0A,0x0A,0x0A, 0x1D,0x56,0x42,0x00);             /* avance y corte */
+  return new Uint8Array(B);
+}
+const b64 = u8 => { let s = ''; u8.forEach(x=> s += String.fromCharCode(x)); return btoa(s); };
+const b64url = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+
+/* Datos estructurados para TicketPrinter (también incluye el texto listo) */
+function jsonTicketPrinter(r){
+  const c = impCfg(), neto = totalNeto(r);
+  return {
+    v:1, tipo: r.version > 1 ? 'venta_v'+r.version : 'venta', ancho:c.ancho, copias:c.copias,
+    negocio:{nombre:c.encabezado, sub:c.sub, telefono:c.tel}, pie:c.pie,
+    folio:r.folio, version:r.version||1, fecha:r.fecha, vendedor:r.vendedor||'', cliente:r.cliente?.nombre||'',
+    items:r.lineas.map(l=>({nombre:l.nombre, cantidad:restante(r,l), unidad:l.porKilo?'kg':'pza', precio:l.precio||0, importe:r2((l.precio||0)*restante(r,l))})).filter(i=>i.cantidad>0),
+    descuentos:(r.descuentos||[]).flatMap(d=> d.lineas.map(l=>({nombre:l.nombre, cantidad:l.cantidad, importe:l.importe}))),
+    total_original:r.total, total:neto, cancelado:!!r.cancelado,
+    pago:{metodo:r.metodo, recibido:r.recibido||0, cambio:r.cambio||0, saldo:r.saldo||0},
+    texto:textoTicket(r)
+  };
+}
+
+function imprimirRecibo(r, opciones = {}){
+  const c = impCfg(), metodo = opciones.metodo || c.metodo;
+  try{
+    if(metodo==='rawbt'){
+      const data = escposTicket(r); let todo = data;
+      if(c.copias > 1){ todo = new Uint8Array(data.length * c.copias); for(let i=0;i<c.copias;i++) todo.set(data, i*data.length); }
+      location.href = `intent:base64,${b64(todo)}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+      return;
+    }
+    if(metodo==='ticketprinter'){
+      location.href = `intent://print?d=${b64url(JSON.stringify(jsonTicketPrinter(r)))}#Intent;scheme=ticketprinter;package=com.ticketprinter;end;`;
+      return;
+    }
+  }catch(e){ toast('No se pudo enviar a la impresora'); return; }
+  imprimirNavegador(r);
+}
+function reciboDePrueba(){
+  return {folio:'PRUEBA', version:1, fecha:new Date().toISOString(), vendedor:session?.nombre||'', metodo:'Efectivo', recibido:100, cambio:13, total:87,
+    lineas:[{lid:'x1', pid:'p001', nombre:'FUD Jamón de pavo americano 170 g', precio:37, porKilo:false, cantidad:1},
+            {lid:'x2', pid:'p022k', nombre:'Cianca Tocineta A granel', precio:86, porKilo:true, cantidad:0.5},
+            {lid:'x3', pid:'p045', nombre:'Yoplait Yogurt bebible de fresa 330 g ñ á é í ó ú', precio:7, porKilo:false, cantidad:1}]};
+}
+
+/* ===== Configuración ===== */
+let cfgVista = 'inicio';
+function viewConfig(){
+  if(cfgVista==='impresoras') return viewImpresoras();
+  const c = impCfg();
+  return `<div class="cl-home">
+    <button class="cl-opt" id="optImp"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Impresoras</b><small>${esc(METODOS_IMP[c.metodo].nombre)} · ${c.ancho} mm${c.auto?' · imprime al cobrar':''}</small></span>${svg('chev')}</button>
+  </div>`;
+}
+function viewImpresoras(){
+  const c = impCfg();
+  return `<div class="gform cf">
+    <div class="gfield"><label>Forma de imprimir</label>
+      <div class="imp-ops">${Object.entries(METODOS_IMP).map(([k,m])=>`
+        <label class="imp-op${c.metodo===k?' on':''}"><input type="radio" name="impM" value="${k}" ${c.metodo===k?'checked':''}>
+          <span><b>${m.nombre}</b><small>${m.desc}</small></span></label>`).join('')}</div>
+    </div>
+    <div class="cf-row">
+      <div class="gfield"><label for="impAncho">Ancho de papel</label><select class="field" id="impAncho"><option value="58" ${c.ancho==58?'selected':''}>58 mm</option><option value="80" ${c.ancho==80?'selected':''}>80 mm</option></select></div>
+      <div class="gfield"><label for="impCop">Copias</label><select class="field" id="impCop">${[1,2,3].map(n=>`<option ${c.copias==n?'selected':''}>${n}</option>`).join('')}</select></div>
+    </div>
+    <label class="sw-row"><span><b>Imprimir al cobrar</b><small>Imprime el ticket automáticamente al registrar cada venta</small></span><input type="checkbox" id="impAuto" ${c.auto?'checked':''}></label>
+    <h3 class="cf-h">Datos del ticket</h3>
+    <div class="gfield"><label for="impEnc">Encabezado</label><input id="impEnc" maxlength="32" value="${esc(c.encabezado)}"></div>
+    <div class="gfield"><label for="impSub">Subtítulo</label><input id="impSub" maxlength="48" value="${esc(c.sub)}"></div>
+    <div class="gfield"><label for="impTel">WhatsApp</label><input id="impTel" maxlength="20" value="${esc(c.tel)}"></div>
+    <div class="gfield"><label for="impPie">Mensaje al pie</label><input id="impPie" maxlength="64" value="${esc(c.pie)}"></div>
+    <div class="tk-prev"><b>Vista previa</b><pre id="impPrev"></pre></div>
+    <button class="btn" id="impGuardar">Guardar configuración</button>
+    <button class="btn ghost" id="impPrueba">${svg('recibos')}Imprimir ticket de prueba</button>
+  </div>`;
+}
+function leerImpForm(){
+  const v = id => document.getElementById(id);
+  return {metodo:(document.querySelector('input[name="impM"]:checked')||{}).value || 'navegador', ancho:Number(v('impAncho').value), copias:Number(v('impCop').value),
+          auto:v('impAuto').checked, encabezado:v('impEnc').value.trim() || IMP_DEFAULT.encabezado, sub:v('impSub').value.trim(), tel:v('impTel').value.trim(), pie:v('impPie').value.trim()};
+}
+function renderConfig(){
+  const view = document.getElementById('view');
+  view.innerHTML = viewConfig(); renderHeader();
+  if(cfgVista==='inicio'){ document.getElementById('optImp').onclick = ()=>{ cfgVista='impresoras'; renderConfig(); }; return; }
+  const prev = ()=>{
+    const antes = store.get('config').imp; guardarImpCfg(leerImpForm());
+    document.getElementById('impPrev').textContent = textoTicket(reciboDePrueba());
+    const cfg = store.get('config'); cfg.imp = antes; store.set('config', cfg);
+  };
+  document.querySelectorAll('input[name="impM"]').forEach(x=> x.onchange = ()=>{ document.querySelectorAll('.imp-op').forEach(o=> o.classList.toggle('on', o.querySelector('input').checked)); });
+  ['impAncho','impEnc','impSub','impTel','impPie'].forEach(id=> document.getElementById(id).addEventListener('input', prev));
+  document.getElementById('impAncho').addEventListener('change', prev);
+  prev();
+  document.getElementById('impGuardar').onclick = ()=>{ guardarImpCfg(leerImpForm()); toast('Configuración guardada'); cfgVista='inicio'; renderConfig(); };
+  document.getElementById('impPrueba').onclick = ()=>{ guardarImpCfg(leerImpForm()); imprimirRecibo(reciboDePrueba()); };
 }
 
 function viewReciboDetalle(r){
@@ -3607,11 +3787,12 @@ function go(id){
   document.querySelector('main').classList.toggle('flush', esVenta);
   view.classList.toggle('wide', esVenta);
   document.querySelector('.popover')?.remove();
-  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes'].includes(id));
-  view.classList.toggle('wide', esVenta || ['recibos','clientes'].includes(id));
+  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config'].includes(id));
+  view.classList.toggle('wide', esVenta || ['recibos','clientes','config'].includes(id));
   if(id==='turno'){ if(!turnoActual()) turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
+  else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
   else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : 'grid'; renderVenta(); }
   else{
     view.innerHTML = viewPendiente(id);
@@ -3669,6 +3850,7 @@ document.getElementById('logoutBtn').onclick = ()=>{
 /* ================= Utilidades ================= */
 const drawer = document.getElementById('drawer'), scrim = document.getElementById('scrim');
 document.getElementById('menuBtn').onclick = ()=>{
+  if(current==='config' && cfgVista!=='inicio'){ cfgVista = 'inicio'; renderConfig(); return; }
   if(current==='turno' && turnoVista==='tesoreria'){ turnoVista = 'resumen'; go('turno'); return; }
   if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return; }
   if(current==='recibos' && reciboSel){ reciboSel = null; renderRecibos(); return; }
