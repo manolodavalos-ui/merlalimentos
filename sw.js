@@ -1,5 +1,5 @@
 /* Merkalimentos: funciona sin internet y se actualiza sola cuando hay conexión */
-const CACHE = 'merkalimentos-v17';
+const CACHE = 'merkalimentos-v18';
 const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));

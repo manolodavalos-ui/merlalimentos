@@ -1848,7 +1848,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.30';
+const APP_VERSION = '0.30.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2231,6 +2231,45 @@ function siguienteSku(cat, lista){
   ls.forEach(a=>{ if(!a.sku){ a.sku = siguienteSku(a.seccion, ls); cambio = true; } });
   if(cambio) store.set('articulos', ls);
 })();
+
+/* Proveedores y productos en revisión (lista de Manuel, 1 nov 2026). Se aplica una sola vez por celular */
+(function proveedoresNov2026(){
+  const CLAVE = 'prov-2026-11-01';
+  if(store.get('migraciones', []).includes(CLAVE)) return;
+  const PROV = {
+    'Sigma': ['p001','p002','p010','p004','p009','p007','p045','p046','p047','p057','p048','p049','p038','p039','p024','p023','p040','p028','p027','p056','p030','p018','p005'],
+    'Tienda Amiga': ['p044','p050','p051','p059','p060','p061','p062','p042','p029'],
+    'Capistrano': ['p003','p013','p006'],
+    'IASSA': ['p041','p014','p021','p012','p026'],
+    'Almacenes Chiapas': ['p025'],
+    'Caylac': ['p022','p022k','p020','p019'],
+    'Sra. Eda': ['p054','p055'],
+    'Don Toño': ['p015','p016'],
+    'Cremería Edgar': ['p031','p032','p033','p034','p035','p036','p037']
+  };
+  const ls = store.get('articulos', []), ahora = new Date().toISOString();
+  Object.entries(PROV).forEach(([prov, ids])=> ids.forEach(id=>{ const a = ls.find(x=> x.id===id); if(a){ a.proveedor = prov; a.editado = true; a.actualizado = ahora; } }));
+  ls.filter(a=> /pizza/i.test(a.nombre||'') && !a.borrado).forEach(a=>{ a.proveedor = 'Tienda Amiga'; a.editado = true; });
+  const crema = ls.find(a=> a.id==='p037'); if(crema){ crema.pres = '1 kg · 5 bolsitas de 200 g'; crema.editado = true; }
+  const nuevos = [
+    ['pr-manchego-regional','Lácteos regionales','Regional','Queso manchego','500 g','Cremería Edgar'],
+    ['pr-manchego-iassa','Quesos','IASSA','Queso tipo manchego empacado al vacío','500 g','IASSA'],
+    ['pr-queso-liquido','Quesos','Del Rancho','Queso líquido','500 g','Almacenes Chiapas'],
+    ['pr-media-crema-lala','Margarinas, mantequilla y queso crema','Lala','Media crema','chica','City Club'],
+    ['pr-yogurt-lala-220','Postres y probióticos','Lala','Yogurt bebible','220 g','City Club'],
+    ['pr-empapelado-250','Lácteos regionales','Regional','Queso empapelado','250 g','Cremería Edgar'],
+    ['pr-empapelado-500','Lácteos regionales','Regional','Queso empapelado','500 g','Cremería Edgar'],
+    ['pr-maiz-pozolero','Carnes','','Maíz pozolero','','Caylac'],
+    ['pr-chuleta-pavo','Carnes','','Chuleta de pavo','','Caylac']
+  ];
+  nuevos.forEach(([id, seccion, marca, nombre, pres, proveedor])=>{
+    if(ls.some(a=> a.id===id)) return;
+    ls.push({id, seccion, marca, nombre, pres, proveedor, precio:null, costo:null, porKilo:false, precios:[], activo:false, revision:true, propio:true, editado:true,
+             sku: siguienteSku(seccion, ls), creado: ahora});
+  });
+  store.set('articulos', ls);
+  store.set('migraciones', [...store.get('migraciones', []), CLAVE]);
+})();
 const fotoSrc = p => p.foto ? (FOTOS[p.foto] || p.foto) : '';
 const presCorta = p => (p.pres||'').split('·')[0].trim();
 const nombreTile = p => [p.nombre, presCorta(p)].filter(Boolean).join(' ');
@@ -2423,7 +2462,7 @@ function tileHTML(p){
   const precio = p.precio == null ? '<span class="pp" style="font-size:1rem">Sin precio</span>' : `<span class="pp">${fmt(p.precio)}</span>`;
   const chip = promoActiva(p) ? `<span class="chip-kg chip-et chip-promo">PROMO</span>` : p.etiqueta ? `<span class="chip-kg chip-et">${esc(p.etiqueta.toUpperCase())}</span>` : '';
   return `<div class="tile${foto?' has-photo':''}${p.activo===false?' inactivo':''}" data-pid="${p.id}" role="button" aria-label="${esc(nombreTicket(p))}">
-    <span class="chip-price">${p.precio!=null?fmt(p.precio):'Sin precio'}${p.porKilo?'/kg':''}</span>${current==='articulos' && p.activo===false?'<span class="chip-off">Oculto</span>':''}
+    <span class="chip-price">${p.precio!=null?fmt(p.precio):'Sin precio'}${p.porKilo?'/kg':''}</span>${current==='articulos' && p.activo===false?`<span class="chip-off">${p.revision?'En revisión':'Oculto'}</span>`:''}
     <div class="price-face">
       <span class="pb">${esc(p.marca||'')}</span>
       <span class="pn">${esc(nombreTile(p))}</span>
@@ -4612,6 +4651,7 @@ function guardarArticulo(){
     delete d.nombreForm;
     if(!cambioNombre) delete d.nombre;   /* conserva marca y presentación del catálogo */
     Object.assign(x, d, {foto, editado:true, actualizado:new Date().toISOString()});
+    if(x.activo !== false) x.revision = false;
     if(cambioNombre){ x.marca = ''; x.pres = ''; }
     store.set('articulos', ls); toast('Cambios guardados');
   } else {
