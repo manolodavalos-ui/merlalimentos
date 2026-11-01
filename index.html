@@ -346,6 +346,52 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .map-loc.denegado svg,.map-loc.error svg{stroke:var(--warn)}
 .ub-aqui{margin-top:8px;width:100%;justify-content:center}
 
+.turno-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.turno-acts .btn{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.92rem;padding:13px 8px;background:#fff}
+.turno-acts svg{width:20px;height:20px;stroke:currentColor;flex-shrink:0}
+.btn.danger-o{color:var(--danger);border-color:var(--danger)}
+.card + .card{margin-top:12px}
+.t-head{padding:14px 18px}
+.cajon h3{font-size:1.05rem;margin-bottom:8px}
+.cj-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+.cj-row b{font-weight:600;white-space:nowrap}
+.cj-row.fuerte{font-weight:700}
+.cj-row.fuerte b{font-weight:800}
+.cj-row.sub{color:var(--muted);font-size:.88rem}
+.cj-teo{display:flex;justify-content:space-between;gap:10px;margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--brand-soft);font-weight:700;color:var(--brand)}
+.cj-teo b{font-size:1.25rem;color:var(--text)}
+.cj-met{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.cj-met span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:10px;background:var(--bg);font-size:.78rem;color:var(--muted)}
+.cj-met svg{width:18px;height:18px;stroke:var(--brand)}
+.cj-met b{color:var(--text);font-size:.92rem}
+.cj-mov{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.cj-mov small{display:block;color:var(--muted);font-size:.82rem}
+.pos{color:var(--brand)} .neg{color:var(--danger);font-style:normal}
+.ts-b{margin-top:14px;letter-spacing:.04em}
+.ts-b:disabled{opacity:.45}
+.head-txt.sm{font-size:.78rem;padding:8px 4px;letter-spacing:.02em}
+.tachado{text-decoration:line-through;color:var(--muted)}
+.tag-c,.tag-v{font-style:normal;font-size:.7rem;font-weight:700;padding:2px 6px;border-radius:999px;vertical-align:2px}
+.tag-c{background:#fdecea;color:var(--danger)} .tag-v{background:var(--brand-soft);color:var(--brand)}
+.dsc{padding-bottom:90px}
+.dsc-ayuda{padding:14px 16px;color:var(--muted);font-size:.9rem;border-bottom:1px solid var(--line)}
+.dsc-row{display:flex;align-items:center;gap:14px;padding:15px 16px;border-bottom:1px solid var(--line);margin:0;color:var(--text);font-size:1rem}
+.dsc-row input{width:22px;height:22px;accent-color:var(--brand);flex-shrink:0}
+.dsc-row span{flex:1}
+.dsc-row i{font-style:normal;color:var(--muted)}
+.dsc-row:has(input:checked){background:#fdf3f2}
+.dsc-tot{display:flex;justify-content:space-between;padding:16px;font-weight:800;font-size:1.05rem}
+.dsc-foot{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);z-index:20}
+.dsc-foot .btn{margin:0;max-width:640px;display:block;margin-inline:auto}
+.dsc-foot .btn:disabled{opacity:.5}
+.rd-desc{margin-top:6px;padding:10px 12px;border-radius:12px;background:#fdf3f2}
+.rd-desc-h b{display:block;color:var(--danger);font-size:.92rem}
+.rd-desc-h span{color:var(--muted);font-size:.8rem}
+.rd-tot.fuerte{font-weight:800;font-size:1.15rem}
+#rdPrint{margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px}
+#rdPrint svg{width:20px;height:20px;stroke:currentColor}
+@media (min-width:900px){.dsc-foot{left:290px}}
+
 /* Hoja inferior / teclado */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:440px;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -1535,7 +1581,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.18';
+const APP_VERSION = '0.19';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1671,18 +1717,107 @@ function viewTurno(){
       <button class="btn" id="openShift">Abrir turno</button>
     </div>`;
   }
+  if(turnoVista==='tesoreria') return viewTesoreria(t);
+  const c = calcCajon(t);
+  const fila = (lbl, v, signo, cls='')=> `<div class="cj-row ${cls}"><span>${lbl}</span><b>${signo==='-' && v ? '−' : ''}${fmt(v)}</b></div>`;
+  const movs = (t.movimientos||[]).slice().reverse();
+  return `<div class="turno-acts">
+      <button class="btn ghost" id="tTes">${svg('cash')}Gestión de tesorería</button>
+      <button class="btn ghost danger-o" id="closeShift">${svg('turno')}Cerrar turno</button>
+    </div>
+    <div class="card t-head">
+      <div class="status-open"><span class="dot"></span>Turno ${esc(t.folio || t.numero)}</div>
+      <p class="sub" style="margin:0">${esc(t.nombre)} · ${esc(t.dispositivo)} · desde ${fecha(t.abierto)}</p>
+    </div>
+    <div class="card cajon">
+      <h3>Cajón de dinero</h3>
+      ${fila('Fondo inicial de caja', c.fondo)}
+      ${fila('Cobros en efectivo', c.cobrosEf)}
+      ${fila('Descuento por pedido incompleto', c.descEf, '-')}
+      ${fila('Cancelaciones', c.cancEf, '-')}
+      ${fila('Depositado', c.depositado)}
+      ${fila('Pagos o salidas', c.salidas, '-')}
+      <div class="cj-teo"><span>Efectivo teórico en caja</span><b>${fmt(c.teorico)}</b></div>
+    </div>
+    <div class="card cajon">
+      <h3>Resumen</h3>
+      ${fila('Ventas brutas', c.brutas, '', 'fuerte')}
+      ${fila('Descuentos por pedido incompleto', c.descTotal, '-', 'sub')}
+      ${fila('Cancelaciones', c.cancTotal, '-', 'sub')}
+      ${fila('Ventas netas', c.netas, '', 'fuerte')}
+      <div class="cj-met">${['Efectivo','Tarjeta','Crédito'].map(m=>`<span>${svg(ICON_PAGO[m])}${m}<b>${fmt(c.porMetodo[m]||0)}</b></span>`).join('')}</div>
+      <p class="sub" style="margin:8px 0 0">${c.nRecibos} ${c.nRecibos===1?'recibo':'recibos'} en este turno · importes netos por forma de pago</p>
+    </div>
+    ${movs.length ? `<div class="card cajon"><h3>Movimientos de caja</h3>${movs.map(m=>`<div class="cj-mov"><span><b>${m.tipo==='deposito'?'Depósito':'Pago / salida'}</b><small>${hora(m.fecha)}${m.comentario?' · '+esc(m.comentario):''}</small></span><b class="${m.tipo==='deposito'?'pos':'neg'}">${m.tipo==='deposito'?'+':'−'}${fmt(m.monto)}</b></div>`).join('')}</div>` : ''}
+    <button class="btn" id="goSell">Ir a Venta</button>`;
+}
+
+/* ================= Cajón de dinero ================= */
+let turnoVista = 'resumen';
+const sumar = (arr, f)=> r2(arr.reduce((s,x)=> s + (Number(f(x))||0), 0));
+function descuentosDeTurno(folio){
+  const out = [];
+  DB.recibos.forEach(r=> (r.descuentos||[]).forEach(d=>{ if(d.turno===folio) out.push({...d, recibo:r}); }));
+  return out;
+}
+function calcCajon(t){
+  const recs = DB.recibos.filter(r=> r.turno===t.folio);
+  const descs = descuentosDeTurno(t.folio);
+  const esCanc = d => d.cancelacion;
+  const ef = d => d.recibo.metodo==='Efectivo';
+  const movs = t.movimientos || [];
+  const c = {
+    fondo: Number(t.efectivoInicial)||0,
+    cobrosEf: sumar(recs.filter(r=>r.metodo==='Efectivo'), r=>r.total),
+    descEf: sumar(descs.filter(d=> ef(d) && !esCanc(d)), d=>d.monto),
+    cancEf: sumar(descs.filter(d=> ef(d) && esCanc(d)), d=>d.monto),
+    depositado: sumar(movs.filter(m=>m.tipo==='deposito'), m=>m.monto),
+    salidas: sumar(movs.filter(m=>m.tipo==='salida'), m=>m.monto),
+    brutas: sumar(recs, r=>r.total),
+    descTotal: sumar(descs.filter(d=>!esCanc(d)), d=>d.monto),
+    cancTotal: sumar(descs.filter(esCanc), d=>d.monto),
+    nRecibos: recs.length, porMetodo:{}
+  };
+  c.teorico = r2(c.fondo + c.cobrosEf - c.descEf - c.cancEf + c.depositado - c.salidas);
+  c.netas = r2(c.brutas - c.descTotal - c.cancTotal);
+  ['Efectivo','Tarjeta','Crédito'].forEach(m=>{
+    c.porMetodo[m] = r2(sumar(recs.filter(r=>r.metodo===m), r=>r.total) - sumar(descs.filter(d=>d.recibo.metodo===m), d=>d.monto));
+  });
+  return c;
+}
+function viewTesoreria(t){
+  const c = calcCajon(t);
   return `<div class="card">
-    <div class="status-open"><span class="dot"></span>Turno abierto</div>
-    <h2>Turno ${t.folio || t.numero}</h2>
-    <dl class="meta">
-      <dt>Abierto por</dt><dd>${esc(t.nombre)}</dd>
-      <dt>Inicio</dt><dd>${fecha(t.abierto)}</dd>
-      <dt>Dispositivo</dt><dd>${esc(t.dispositivo)}</dd>
-      <dt>Efectivo inicial</dt><dd>${fmt(t.efectivoInicial)}</dd>
-    </dl>
-    <button class="btn" id="goSell">Ir a Venta</button>
-    <button class="btn ghost" id="closeShift">Cerrar turno</button>
+    <p class="sub">Efectivo teórico en caja: <b>${fmt(c.teorico)}</b></p>
+    <label for="tsMonto">Cantidad</label>
+    <div class="money"><span>$</span><input class="field" id="tsMonto" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+    <label for="tsCom">Comentario</label>
+    <input class="field" id="tsCom" maxlength="120" placeholder="Ej. Pago a proveedor, cambio para caja…" autocomplete="off">
+    <button class="btn ghost ts-b" id="tsDep" disabled>DEPOSITAR</button>
+    <button class="btn ghost ts-b" id="tsSal" disabled>PAGOS / SALIDAS</button>
   </div>`;
+}
+function bindTesoreria(){
+  const m = document.getElementById('tsMonto'), dep = document.getElementById('tsDep'), sal = document.getElementById('tsSal');
+  const leer = ()=> r2(parseFloat(m.value)||0);
+  m.oninput = ()=>{ const ok = leer() > 0; dep.disabled = !ok; sal.disabled = !ok; };
+  setTimeout(()=>{ try{ m.focus(); }catch(_){} }, 50);
+  const registrar = tipo=>{
+    const monto = leer(); if(!(monto > 0)) return;
+    const t = turnoActual(); if(!t) return;
+    const hacer = ()=>{
+      t.movimientos = [...(t.movimientos||[]), {id:'M'+Date.now(), tipo, monto, comentario:document.getElementById('tsCom').value.trim(), fecha:new Date().toISOString(), usuario:session.usuario}];
+      store.set('turno', t);
+      turnoVista = 'resumen'; go('turno');
+      toast(tipo==='deposito' ? `Depósito de ${fmt(monto)} registrado` : `Salida de ${fmt(monto)} registrada`);
+    };
+    const teo = calcCajon(t).teorico;
+    if(tipo==='salida' && monto > teo){
+      confirmar({titulo:'La salida supera el efectivo', texto:`El efectivo teórico en caja es ${fmt(teo)} y la salida es de ${fmt(monto)}. ¿Registrarla de todos modos?`, ok:'Registrar', alAceptar:hacer});
+    } else hacer();
+  };
+  dep.onclick = ()=> registrar('deposito');
+  sal.onclick = ()=> registrar('salida');
 }
 
 function bindTurno(){
@@ -1702,23 +1837,26 @@ function bindTurno(){
     });
     updateShiftPill(); toast('Turno abierto'); go('venta');
   };
+  if(turnoVista==='tesoreria' && turnoActual()){ bindTesoreria(); return; }
   const sell = document.getElementById('goSell');
   if(sell) sell.onclick = ()=> go('venta');
+  const tes = document.getElementById('tTes');
+  if(tes) tes.onclick = ()=>{ turnoVista = 'tesoreria'; go('turno'); };
   const close = document.getElementById('closeShift');
   if(close) close.onclick = ()=>{
-    if(!close.dataset.confirm){
-      close.dataset.confirm = '1';
-      close.textContent = 'Toca otra vez para confirmar el cierre';
-      close.style.borderColor = 'var(--danger)'; close.style.color = 'var(--danger)';
-      setTimeout(()=>{ if(close.isConnected){ delete close.dataset.confirm; close.textContent = 'Cerrar turno'; close.style.borderColor=''; close.style.color=''; } }, 4000);
-      return;
-    }
-    const t = turnoActual();
-    const hist = store.get('turnos', []);
-    hist.push({...t, cerrado:new Date().toISOString(), cerradoPor:session.usuario});
-    store.set('turnos', hist);
-    store.del('turno');
-    updateShiftPill(); toast('Turno cerrado'); go('turno');
+    const t = turnoActual(), c = calcCajon(t);
+    confirmar({
+      titulo:`Cerrar turno ${esc(t.folio)}`, peligro:true, ok:'Cerrar turno',
+      texto:`Efectivo teórico en caja: <b>${fmt(c.teorico)}</b><br>Ventas netas: <b>${fmt(c.netas)}</b> en ${c.nRecibos} ${c.nRecibos===1?'recibo':'recibos'}.`,
+      alAceptar:()=>{
+        const hist = store.get('turnos', []);
+        hist.push({...t, cerrado:new Date().toISOString(), cerradoPor:session.usuario, resumen:calcCajon(t)});
+        store.set('turnos', hist);
+        store.del('turno');
+        turnoVista = 'resumen';
+        updateShiftPill(); toast('Turno cerrado'); go('turno');
+      }
+    });
   };
 }
 
@@ -3213,8 +3351,10 @@ function renderHeader(){
   } else {
     const m = MENU.find(x=>x.id===current);
     const enCli = current==='clientes' && cliVista!=='inicio';
-    const detalle = (current==='recibos' && reciboSel) || enCli;
-    title.textContent = current==='recibos' && reciboSel ? 'Recibo'
+    const enTes = current==='turno' && turnoVista==='tesoreria' && !!turnoActual();
+    const detalle = (current==='recibos' && reciboSel) || enCli || enTes;
+    title.textContent = enTes ? 'Gestión de tesorería'
+      : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
     pill.classList.toggle('hidden', ['recibos','clientes'].includes(current));
@@ -3222,6 +3362,10 @@ function renderHeader(){
                    : current==='clientes' && cliVista==='lista' ? `<button class="icon-btn" id="hCliNuevo" aria-label="Crear cliente">${svg('userAdd')}</button>` : '';
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
     const hn = document.getElementById('hCliNuevo'); if(hn) hn.onclick = ()=>{ cliVista='crear'; cliSel=null; renderClientes(); };
+    if(current==='recibos' && reciboSel && reciboVista==='detalle'){
+      const r = DB.recibos.find(x=>x.id===reciboSel);
+      if(r && !r.cancelado){ acts.innerHTML = '<button class="head-txt sm" id="hDesc">REALIZAR DESCUENTO</button>'; document.getElementById('hDesc').onclick = iniciarDescuento; }
+    }
     mb.innerHTML = svg(detalle ? 'back' : 'menu');
     mb.classList.toggle('keep', !!detalle);
   }
@@ -3268,7 +3412,7 @@ function listaRecibosHTML(){
     if(clave !== dia){ dia = clave; html += `<div class="rc-day">${fechaLarga(d)}</div>`; }
     html += `<button class="rc-row" data-id="${r.id}">
       <span class="rc-ic${r.metodo==='Crédito'?' cred':''}">${svg(ICON_PAGO[r.metodo]||'cash')}</span>
-      <span class="rc-main"><b>${fmt(r.total)}</b><small>${hora(r.fecha)}${r.metodo!=='Efectivo'?' · '+esc(r.metodo):''}${r.cliente?' · '+esc(r.cliente.nombre||''):''}</small></span>
+      <span class="rc-main"><b class="${r.cancelado?'tachado':''}">${fmt(totalNeto(r))}${r.cancelado?' <i class="tag-c">Cancelado</i>':(r.version>1?` <i class="tag-v">v${r.version}</i>`:'')}</b><small>${hora(r.fecha)}${r.metodo!=='Efectivo'?' · '+esc(r.metodo):''}${r.cliente?' · '+esc(r.cliente.nombre||''):''}</small></span>
       <span class="rc-folio">#${esc(r.folio)}</span>
     </button>`;
   });
@@ -3282,16 +3426,122 @@ function viewRecibos(){
   </div>`;
 }
 
+/* ===== Descuentos por pedido incompleto ===== */
+let reciboVista = 'detalle';
+const totalNeto = r => r2((r.total||0) - (r.descuentos||[]).reduce((s,d)=> s + d.monto, 0));
+const descontado = (r, lid) => r3((r.descuentos||[]).reduce((s,d)=> s + d.lineas.filter(x=>x.lid===lid).reduce((a,x)=> a + x.cantidad, 0), 0));
+const restante = (r, l) => r3(l.cantidad - descontado(r, l.lid));
+function unidadesDescontables(r){
+  const out = [];
+  r.lineas.forEach(l=>{
+    const resta = restante(r, l);
+    if(resta <= 0) return;
+    if(l.porKilo) out.push({lid:l.lid, cantidad:resta, l});
+    else for(let i=0;i<Math.round(resta);i++) out.push({lid:l.lid, cantidad:1, l});
+  });
+  return out;
+}
+function iniciarDescuento(){
+  if(!turnoActual()){ toast('Abre un turno para registrar descuentos'); return; }
+  reciboVista = 'descuento'; renderRecibos();
+}
+function viewDescuento(r){
+  const us = unidadesDescontables(r);
+  return `<div class="rc-wrap dsc">
+    <p class="dsc-ayuda">Marca los productos que no se entregaron. Se generará la <b>versión ${(r.version||1)+1}</b> del recibo #${esc(r.folio)}.</p>
+    ${us.map((u,i)=>`<label class="dsc-row"><input type="checkbox" data-i="${i}">
+      <span>${esc(u.l.nombre)} <i>${u.l.porKilo ? fmtKg(u.cantidad)+' kg' : 'x 1'}</i></span><b>${fmt(r2((u.l.precio||0)*u.cantidad))}</b></label>`).join('')}
+    <div class="dsc-tot"><span>Total actual</span><b>${fmt(totalNeto(r))}</b></div>
+    <div class="dsc-foot"><button class="btn" id="dscOk" disabled>DESCONTAR $0.00</button></div>
+  </div>`;
+}
+function bindDescuento(r){
+  const us = unidadesDescontables(r), ok = document.getElementById('dscOk');
+  const sel = ()=> [...document.querySelectorAll('.dsc-row input:checked')].map(c=> us[Number(c.dataset.i)]);
+  const monto = ()=> r2(sel().reduce((s,u)=> s + (u.l.precio||0)*u.cantidad, 0));
+  document.querySelectorAll('.dsc-row input').forEach(c=> c.onchange = ()=>{ const m = monto(); ok.disabled = !sel().length; ok.textContent = `DESCONTAR ${fmt(m)}`; });
+  ok.onclick = ()=>{
+    const elegidos = sel(); if(!elegidos.length) return;
+    const m = monto(), queda = r2(totalNeto(r) - m), cancela = queda <= 0.004;
+    confirmar({
+      titulo: cancela ? 'Cancelar el recibo completo' : 'Aplicar descuento', peligro: cancela, ok: cancela ? 'Cancelar recibo' : 'Aplicar descuento',
+      texto: `Se descontarán <b>${fmt(m)}</b> por pedido incompleto (${elegidos.length} ${elegidos.length===1?'producto':'productos'}). ${cancela ? 'No queda ningún producto, así que el recibo quedará <b>cancelado</b>.' : `Nuevo total: <b>${fmt(queda)}</b>.`} Los productos regresan al inventario.`,
+      alAceptar:()=> aplicarDescuento(r, elegidos, m, cancela)
+    });
+  };
+}
+function aplicarDescuento(r, elegidos, monto, cancela){
+  const agrup = {};
+  elegidos.forEach(u=>{ const a = agrup[u.lid] || (agrup[u.lid] = {lid:u.lid, pid:u.l.pid, nombre:u.l.nombre, precio:u.l.precio, porKilo:u.l.porKilo, cantidad:0}); a.cantidad = r3(a.cantidad + u.cantidad); });
+  const lineas = Object.values(agrup).map(a=> ({...a, importe:r2((a.precio||0)*a.cantidad)}));
+  const version = (r.version||1) + 1;
+  r.descuentos = [...(r.descuentos||[]), {id:'D'+Date.now(), version, fecha:new Date().toISOString(), usuario:session.usuario, vendedor:session.nombre,
+    turno:turnoActual()?.folio || null, lineas, monto, cancelacion:cancela, motivo:'Pedido incompleto'}];
+  r.version = version;
+  if(cancela) r.cancelado = true;
+  if(r.metodo==='Crédito') r.saldo = r2(Math.max(0, (r.saldo||0) - monto));
+  r.sincronizado = false;
+  DB.guardarRecibo(r);
+  const inv = inventario(); lineas.forEach(l=>{ inv[l.pid] = r3(Number(inv[l.pid] ?? 0) + l.cantidad); }); store.set('inventario', inv);
+  reciboVista = 'detalle'; renderRecibos();
+  toast(cancela ? 'Recibo cancelado' : `Versión ${version} generada · descuento ${fmt(monto)}`);
+}
+
+/* ===== Impresión de ticket (58 mm) ===== */
+function htmlTicket(r){
+  const d = r.descuentos || [], neto = totalNeto(r);
+  const fila = (a,b)=> `<div class="f"><span>${a}</span><span>${b}</span></div>`;
+  const lineas = r.lineas.map(l=>{
+    const q = restante(r, l);
+    return q > 0 ? `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(q)+' kg x '+fmt(l.precio||0) : q+' x '+fmt(l.precio||0), fmt(r2((l.precio||0)*q)))}` : '';
+  }).join('');
+  const quitados = d.flatMap(x=> x.lineas).map(l=> `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza', '−'+fmt(l.importe))}`).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Recibo ${esc(r.folio)}</title><style>
+    @page{size:58mm auto;margin:3mm}
+    body{font-family:monospace,ui-monospace;font-size:11px;color:#000;margin:0;width:52mm}
+    h1{font-size:14px;text-align:center;margin:0 0 2px} .c{text-align:center} .s{border-top:1px dashed #000;margin:5px 0}
+    .f{display:flex;justify-content:space-between;gap:6px} .p{margin-top:3px} .t{font-size:13px;font-weight:bold} .b{font-weight:bold}
+  </style></head><body>
+    <h1>MERKALIMENTOS</h1><div class="c">Venta al detalle y mayoreo<br>WhatsApp 961 108 0808</div><div class="s"></div>
+    ${fila('Recibo', '#'+esc(r.folio))}${r.version>1 ? fila('Versión', String(r.version)) : ''}
+    ${fila('Fecha', new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'}))}
+    ${fila('Vendedor', esc(r.vendedor||''))}${r.cliente ? fila('Cliente', esc(r.cliente.nombre||'')) : ''}
+    <div class="s"></div>${lineas || '<div class="c">Sin productos</div>'}
+    ${d.length ? `<div class="s"></div><div class="b">Descuento por pedido incompleto</div>${quitados}` : ''}
+    <div class="s"></div>
+    ${d.length ? fila('Total original', fmt(r.total)) + fila('Descuento', '−'+fmt(r2(r.total-neto))) : ''}
+    <div class="f t"><span>${r.cancelado ? 'CANCELADO' : 'TOTAL'}</span><span>${fmt(neto)}</span></div>
+    ${fila(esc(r.metodo), r.metodo==='Crédito' ? 'Saldo '+fmt(r.saldo||0) : fmt(r.metodo==='Efectivo' ? r.recibido : r.total))}
+    ${r.metodo==='Efectivo' ? fila('Cambio', fmt(r.cambio||0)) : ''}
+    ${r.metodo==='Efectivo' && d.length && !r.cancelado ? fila('A devolver', fmt(r2(r.total-neto))) : ''}
+    ${r.cancelado && r.metodo==='Efectivo' ? fila('A devolver', fmt(r.total)) : ''}
+    <div class="s"></div><div class="c">¡Gracias por su compra!</div>
+  </body></html>`;
+}
+function imprimirRecibo(r){
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  const doc = f.contentWindow.document; doc.open(); doc.write(htmlTicket(r)); doc.close();
+  setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ toast('Este navegador no permite imprimir desde aquí'); } setTimeout(()=> f.remove(), 60000); }, 300);
+}
+
 function viewReciboDetalle(r){
-  const lineas = (r.lineas||[]).map(l=>`
-    <div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}</small></div><span>${fmt(importeLinea(l))}</span></div>`).join('');
+  if(reciboVista==='descuento') return viewDescuento(r);
+  const neto = totalNeto(r), d = r.descuentos || [];
+  const lineas = (r.lineas||[]).map(l=>{
+    const q = restante(r, l), quit = r3(l.cantidad - q);
+    return `<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}${quit>0 ? ` · <i class="neg">${l.porKilo ? fmtKg(quit)+' kg' : quit} descontado${!l.porKilo && quit>1?'s':''}</i>` : ''}</small></div><span>${fmt(importeLinea(l))}</span></div>`;
+  }).join('');
+  const bloqueDesc = d.map(x=>`<div class="rd-desc"><div class="rd-desc-h"><b>Versión ${x.version} · ${x.cancelacion?'Cancelación':'Descuento por pedido incompleto'}</b><span>${fecha(x.fecha)} · ${esc(x.vendedor||x.usuario)}</span></div>
+      ${x.lineas.map(l=>`<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}</small></div><span class="neg">−${fmt(l.importe)}</span></div>`).join('')}</div>`).join('');
   return `<div class="rc-wrap rd">
     <div class="rd-head">
-      <span class="big">${fmt(r.total)}</span>
-      <span class="lbl">Total</span>
+      <span class="big ${r.cancelado?'tachado':''}">${fmt(neto)}</span>
+      <span class="lbl">${r.cancelado ? 'Recibo cancelado' : d.length ? `Total versión ${r.version} (original ${fmt(r.total)})` : 'Total'}</span>
     </div>
     <dl class="meta rd-meta">
-      <dt>Recibo</dt><dd>#${esc(r.folio)}</dd>
+      <dt>Recibo</dt><dd>#${esc(r.folio)}${r.version>1?` · v${r.version}`:''}</dd>
       <dt>Fecha</dt><dd>${fecha(r.fecha)}</dd>
       <dt>Vendedor</dt><dd>${esc(r.vendedor||r.usuario)}</dd>
       <dt>Dispositivo</dt><dd>${esc(r.dispositivo||'')}</dd>
@@ -3299,12 +3549,16 @@ function viewReciboDetalle(r){
       ${r.cliente ? `<dt>Cliente</dt><dd>${esc(r.cliente.nombre||r.cliente)}</dd>` : ''}
     </dl>
     <div class="rd-lines">${lineas}</div>
-    <div class="rd-tot"><span>Total</span><b>${fmt(r.total)}</b></div>
+    <div class="rd-tot"><span>${d.length ? 'Total original' : 'Total'}</span><b>${fmt(r.total)}</b></div>
+    ${bloqueDesc}
+    ${d.length ? `<div class="rd-tot fuerte"><span>${r.cancelado ? 'Total (cancelado)' : 'Total versión '+r.version}</span><b>${fmt(neto)}</b></div>` : ''}
     <dl class="meta rd-meta">
       <dt>${esc(r.metodo)}</dt><dd>${fmt(r.metodo==='Crédito' ? r.saldo : (r.metodo==='Efectivo' ? r.recibido : r.total))}</dd>
       ${r.metodo==='Efectivo' ? `<dt>Cambio</dt><dd>${fmt(r.cambio)}</dd>` : ''}
+      ${r.metodo==='Efectivo' && d.length ? `<dt>A devolver al cliente</dt><dd class="neg">${fmt(r2(r.total-neto))}</dd>` : ''}
       ${r.metodo==='Crédito' ? `<dt>Saldo pendiente</dt><dd>${fmt(r.saldo)}</dd>` : ''}
     </dl>
+    <button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir ${r.version>1 ? 'versión '+r.version : 'recibo'}</button>
   </div>`;
 }
 
@@ -3312,15 +3566,20 @@ function renderRecibos(){
   const view = document.getElementById('view');
   const r = reciboSel && DB.recibos.find(x=>x.id===reciboSel);
   if(!r) reciboSel = null;
+  if(!r) reciboVista = 'detalle';
   view.innerHTML = r ? viewReciboDetalle(r) : viewRecibos();
   renderHeader();
-  if(r){ window.scrollTo(0,0); return; }
+  if(r){
+    if(reciboVista==='descuento') bindDescuento(r);
+    else { const pb = document.getElementById('rdPrint'); if(pb) pb.onclick = ()=> imprimirRecibo(r); }
+    window.scrollTo(0,0); return;
+  }
   const q = document.getElementById('rcQ');
   q.oninput = ()=>{ reciboQ = q.value; document.getElementById('rcList').innerHTML = listaRecibosHTML(); bindFilas(); };
   bindFilas();
 }
 function bindFilas(){
-  document.querySelectorAll('.rc-row').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.id; renderRecibos(); });
+  document.querySelectorAll('.rc-row').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.id; reciboVista = 'detalle'; renderRecibos(); });
 }
 
 /* ================= Navegación ================= */
@@ -3350,7 +3609,7 @@ function go(id){
   document.querySelector('.popover')?.remove();
   document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes'].includes(id));
   view.classList.toggle('wide', esVenta || ['recibos','clientes'].includes(id));
-  if(id==='turno'){ view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
+  if(id==='turno'){ if(!turnoActual()) turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
   else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : 'grid'; renderVenta(); }
@@ -3410,6 +3669,8 @@ document.getElementById('logoutBtn').onclick = ()=>{
 /* ================= Utilidades ================= */
 const drawer = document.getElementById('drawer'), scrim = document.getElementById('scrim');
 document.getElementById('menuBtn').onclick = ()=>{
+  if(current==='turno' && turnoVista==='tesoreria'){ turnoVista = 'resumen'; go('turno'); return; }
+  if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return; }
   if(current==='recibos' && reciboSel){ reciboSel = null; renderRecibos(); return; }
   if(current==='clientes' && cliVista!=='inicio'){ cliVista = cliVista==='editar' ? 'lista' : 'inicio'; cliSel = null; cliBorrador = null; renderClientes(); return; }
   if(enVenta() && ventaVista==='cotizacion'){ ventaVista = 'ticket'; renderVenta(); return; }
