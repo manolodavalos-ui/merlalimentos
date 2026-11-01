@@ -415,7 +415,8 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .chip-price{position:absolute;left:5px;top:5px;z-index:4;background:rgba(255,255,255,.95);color:var(--text);font-size:.7rem;font-weight:800;padding:2px 6px;border-radius:999px;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .chip-off{position:absolute;right:5px;top:5px;z-index:4;background:var(--text);color:#fff;font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:999px}
 .tile.inactivo{opacity:.45}
-.art-mode .chip-kg{display:none}
+.chip-et{top:27px}
+.tile.flip .chip-price,.tile.flip .chip-et{opacity:0;transition:opacity .15s}
 .art-form .sub,.sub.margen{color:var(--muted);font-size:.86rem}
 .sub.margen b{color:var(--text)}
 .art-foto{display:flex;align-items:center;gap:14px;margin-bottom:18px}
@@ -1632,7 +1633,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.21';
+const APP_VERSION = '0.21.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2076,10 +2077,9 @@ function tileHTML(p){
       <div class="face" style="top:-${i*100}%;height:${SLATS*100}%">${cara}</div></div>`;
   }
   const precio = p.precio == null ? '<span class="pp" style="font-size:1rem">Sin precio</span>' : `<span class="pp">${fmt(p.precio)}</span>`;
-  const chip = p.porKilo ? '<span class="chip-kg">KG</span>'
-             : p.etiqueta ? `<span class="chip-kg chip-et">${esc(p.etiqueta.toUpperCase())}</span>` : '';
+  const chip = p.etiqueta ? `<span class="chip-kg chip-et">${esc(p.etiqueta.toUpperCase())}</span>` : '';
   return `<div class="tile${foto?' has-photo':''}${p.activo===false?' inactivo':''}" data-pid="${p.id}" role="button" aria-label="${esc(nombreTicket(p))}">
-    ${current==='articulos' ? `<span class="chip-price">${p.precio!=null?fmt(p.precio):'Sin precio'}${p.porKilo?'/kg':''}</span>${p.activo===false?'<span class="chip-off">Oculto</span>':''}` : ''}
+    <span class="chip-price">${p.precio!=null?fmt(p.precio):'Sin precio'}${p.porKilo?'/kg':''}</span>${current==='articulos' && p.activo===false?'<span class="chip-off">Oculto</span>':''}
     <div class="price-face">
       <span class="pb">${esc(p.marca||'')}</span>
       <span class="pn">${esc(nombreTile(p))}</span>
