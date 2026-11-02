@@ -143,6 +143,8 @@ main.flush{padding:0}
 .tline:active{background:#f0f3f2}
 .tline .q{color:var(--muted);margin-left:4px}
 .tline .np{color:var(--warn);font-size:.8rem;display:block;margin-top:3px}
+.tsub{display:flex;justify-content:space-between;padding:10px 2px 0;font-size:.98rem;color:var(--muted)}
+.tsub.neg{color:var(--danger)}
 .ttotal{display:flex;justify-content:space-between;padding:18px 2px;font-weight:800;font-size:1.12rem}
 .ticket-empty{text-align:center;color:var(--muted);padding:60px 20px}
 .ticket-wrap{min-height:calc(100vh - 64px);display:flex;flex-direction:column;background:#fff}
@@ -1905,7 +1907,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.34.6';
+const APP_VERSION = '0.34.7';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2594,7 +2596,7 @@ function viewTicket(){
     ${t.nombre ? `<div class="tk-name">${svg('recibos')}<div><b>${esc(t.nombre)}</b>${t.comentario?`<small>${esc(t.comentario)}</small>`:''}</div></div>` : ''}
     <div class="tk-cli">${barraCliente()}</div>
     <div class="ticket-list">
-      ${(t.lineas.length || (t.devoluciones||[]).length) ? filas + bloqueDevTicket(t) + `<div class="ttotal"><span>${totalTicket(t) < 0 ? 'A devolver' : 'Total'}</span><span>${fmt(totalTicket(t))}</span></div>${ahorroTicket(t) > 0 ? `<div class="tahorro">${svg('articulos')}Ahorro por promociones: ${fmt(ahorroTicket(t))}</div>` : ''}`
+      ${(t.lineas.length || (t.devoluciones||[]).length) ? filas + bloqueDevTicket(t) + ((t.devoluciones||[]).length ? `<div class="tsub"><span>Total de productos</span><span>${fmt(r2(totalTicket(t) + totalDev(t)))}</span></div><div class="tsub neg"><span>Devoluciones</span><span>−${fmt(totalDev(t))}</span></div>` : '') + `<div class="ttotal"><span>${totalTicket(t) < 0 ? 'A devolver' : (t.devoluciones||[]).length ? 'Total a pagar' : 'Total'}</span><span>${fmt(totalTicket(t))}</span></div>${ahorroTicket(t) > 0 ? `<div class="tahorro">${svg('articulos')}Ahorro por promociones: ${fmt(ahorroTicket(t))}</div>` : ''}`
                         : `<div class="ticket-empty">${txtModo('El ticket está vacío','El pedido está vacío','La cotización está vacía')}.<br>Toca un producto para agregarlo.</div>`}
       ${botonDevolucion()}
     </div>
@@ -2826,8 +2828,9 @@ function viewCobro(){
   if((ticket().devoluciones||[]).length && total <= 0) return viewCobroDevolucion(total);
   return `<div class="cobro">
     <div class="cobro-total">
-      <span class="lbl">Importe total</span>
+      <span class="lbl">${(ticket().devoluciones||[]).length ? 'Total a pagar' : 'Importe total'}</span>
       <span class="big">${fmt(total)}</span>
+      ${(ticket().devoluciones||[]).length ? `<span class="sub">Productos ${fmt(r2(total + totalDev(ticket())))} − devolución ${fmt(totalDev(ticket()))}</span>` : ''}
       <span class="sub">${cuentaTicket(ticket())} ${cuentaTicket(ticket())===1?'producto':'productos'}</span>
     </div>
     <label for="recibido">Efectivo recibido</label>
@@ -2946,8 +2949,8 @@ function viewHecho(){
     ${r.metodo==='Efectivo' && r.cambio > 0 ? `<div class="cobro-total"><span class="lbl">${r.total < 0 ? 'Devuelve al cliente' : 'Cambio'}</span><span class="big">${fmt(r.cambio)}</span></div>` : ''}
     <dl class="meta">
       <dt>Forma de pago</dt><dd>${esc(r.metodo)}</dd>
-      <dt>${r.total < 0 ? 'Total a devolver' : 'Importe total'}</dt><dd>${fmt(Math.abs(r.total))}</dd>
-      ${totalDev(r) ? `<dt>Devoluciones</dt><dd class="neg">−${fmt(totalDev(r))}</dd>` : ''}
+      ${totalDev(r) ? `<dt>Total de productos</dt><dd>${fmt(r2(r.total + totalDev(r)))}</dd><dt>Devoluciones</dt><dd class="neg">−${fmt(totalDev(r))}</dd>` : ''}
+      <dt>${r.total < 0 ? 'Total a devolver' : totalDev(r) ? 'Total a pagar' : 'Importe total'}</dt><dd>${fmt(Math.abs(r.total))}</dd>
       ${r.devAbonada ? `<dt>Abonado a su crédito</dt><dd>${fmt(r.devAbonada)}</dd>` : ''}
       ${r.metodo==='Efectivo' && r.total >= 0 ? `<dt>Efectivo recibido</dt><dd>${fmt(r.recibido)}</dd>` : ''}
       ${r.metodo==='Crédito' && r.credito?.anticipo ? `<dt>Anticipo</dt><dd>${fmt(r.credito.anticipo)}</dd>` : ''}
@@ -4289,7 +4292,8 @@ function htmlTicket(r){
     ${d.length ? `<div class="s"></div><div class="b">Descuento por pedido incompleto</div>${quitados}` : ''}
     <div class="s"></div>
     ${d.length ? fila('Total anterior (v'+(r.version-1)+')', fmt(d[0].totalAnterior)) + fila('Descuento', '−'+fmt(d[0].monto)) : ''}
-    <div class="f t"><span>${anulado(r) ? 'CANCELADO' : 'TOTAL'}</span><span>${fmt(neto)}</span></div>
+    ${totalDev(r) && !anulado(r) ? fila('Total de productos', fmt(r2(neto + totalDev(r)))) + fila('Devoluciones', '−' + fmt(totalDev(r))) : ''}
+    <div class="f t"><span>${anulado(r) ? 'CANCELADO' : neto < 0 ? 'A DEVOLVER' : totalDev(r) ? 'TOTAL A PAGAR' : 'TOTAL'}</span><span>${fmt(Math.abs(neto))}</span></div>
     ${r.metodo==='Crédito' && r.credito?.anticipo ? fila('Anticipo', fmt(r.credito.anticipo)) : ''}
     ${fila(esc(r.metodo), r.metodo==='Crédito' ? 'Saldo '+fmt(r.saldo||0) : fmt(r.metodo==='Efectivo' ? r.recibido : r.total))}
     ${r.metodo==='Crédito' && r.credito?.fechaPago ? fila('Fecha de pago', r.credito.fechaPago.split('-').reverse().join('/')) : ''}
@@ -4369,7 +4373,8 @@ function lineasTicket(r){
   }
   L.push({t:sep});
   if(d.length){ L.push({t:dos('Total anterior (v'+(r.version-1)+')', fmt(d[0].totalAnterior))}); L.push({t:dos('Descuento', '-' + fmt(d[0].monto))}); }
-  L.push({t:dos(anulado(r) ? 'CANCELADO' : neto < 0 ? 'A DEVOLVER' : 'TOTAL', fmt(Math.abs(neto))), b:true, g:true});
+  if(totalDev(r) && !anulado(r)){ L.push({t:dos('Total de productos', fmt(r2(neto + totalDev(r))))}); L.push({t:dos('Devoluciones', '-' + fmt(totalDev(r)))}); }
+  L.push({t:dos(anulado(r) ? 'CANCELADO' : neto < 0 ? 'A DEVOLVER' : totalDev(r) ? 'TOTAL A PAGAR' : 'TOTAL', fmt(Math.abs(neto))), b:true, g:true});
   if(r.metodo==='Efectivo' && neto < 0){ if(r.devAbonada) L.push({t:dos('Abonado a credito', fmt(r.devAbonada))}); L.push({t:dos('Devuelto en efectivo', fmt(r.cambio||0))}); }
   else if(r.metodo==='Efectivo'){ L.push({t:dos('Efectivo', fmt(r.recibido||0))}); L.push({t:dos('Cambio', fmt(r.cambio||0))}); if(r.cancelado) L.push({t:dos('A devolver', fmt(r.total))}); else if(d.length) L.push({t:dos('A devolver', fmt(d[0].monto))}); }
   else if(r.metodo==='Crédito'){
@@ -4728,7 +4733,8 @@ function viewReciboDetalle(r){
     </dl>
     <div class="rd-lines">${lineas}</div>${lineasDevHTML(r)}
     ${d.length ? `<div class="rd-tot"><span>Total anterior (v${r.version-1})</span><b>${fmt(d[0].totalAnterior)}</b></div>${bloqueDesc}` : ''}
-    <div class="rd-tot fuerte"><span>${anulado(r) ? 'Total (cancelado)' : r.version>1 ? 'Total versión '+r.version : 'Total'}</span><b>${fmt(r.total)}</b></div>
+    ${totalDev(r) ? `<div class="rd-tot"><span>Total de productos</span><b>${fmt(r2(r.total + totalDev(r)))}</b></div><div class="rd-tot"><span>Devoluciones</span><b class="neg">−${fmt(totalDev(r))}</b></div>` : ''}
+    <div class="rd-tot fuerte"><span>${anulado(r) ? 'Total (cancelado)' : r.total < 0 ? 'Total a devolver' : totalDev(r) ? 'Total a pagar' : r.version>1 ? 'Total versión '+r.version : 'Total'}</span><b>${fmt(Math.abs(r.total))}</b></div>
     <dl class="meta rd-meta">
       <dt>${esc(r.metodo)}</dt><dd>${fmt(r.metodo==='Crédito' ? r.saldo : (r.metodo==='Efectivo' ? r.recibido : r.total))}</dd>
       ${r.metodo==='Efectivo' ? `<dt>Cambio</dt><dd>${fmt(r.cambio)}</dd>` : ''}
