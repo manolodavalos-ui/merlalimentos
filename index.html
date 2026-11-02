@@ -1897,7 +1897,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.34';
+const APP_VERSION = '0.34.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4067,7 +4067,7 @@ function renderHeader(){
     const enInv = current==='inventario' && invVista!=='inicio';
     const enCat = current==='catalogo' && catVista!=='ver';
     const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt || enCred || enInv || enCat;
-    title.textContent = enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
+    title.textContent = enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea', datos:'Datos y respaldo', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
@@ -4632,10 +4632,12 @@ function viewConfig(){
   if(cfgVista==='promos') return viewPromos();
   if(cfgVista==='devol') return viewDevolCfg();
   if(cfgVista==='gh') return viewGhCfg();
+  if(cfgVista==='datos') return viewDatosCfg();
   const c = impCfg();
   return `<div class="cl-home">
     <button class="cl-opt" id="optPromo"><span class="cl-opt-ic">${svg('articulos')}</span><span><b>Promociones</b><small>${store.get('articulos',[]).filter(a=>!a.borrado && a.promo).length} configuradas · ${articulos().filter(promoActiva).length} vigentes</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optDev"><span class="cl-opt-ic">${svg('back')}</span><span><b>Devoluciones</b><small>${devCfg().proveedores.join(', ') || 'Ningún proveedor'} · hasta ${devCfg().dias} días de caducado</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optDatos"><span class="cl-opt-ic">${svg('download')}</span><span><b>Datos y respaldo</b><small>${store.get('ultimoRespaldo', null) ? 'Último respaldo ' + new Date(store.get('ultimoRespaldo')).toLocaleDateString('es-MX',{day:'numeric', month:'short'}) : 'Sin respaldos'} · borrar datos de prueba</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optGh"><span class="cl-opt-ic">${svg('catalogo')}</span><span><b>Catálogo en línea</b><small>${ghCfg().token ? 'Clave de GitHub guardada' + (ghCfg().publicado ? ' · publicado ' + new Date(ghCfg().publicado).toLocaleDateString('es-MX',{day:'numeric',month:'short'}) : '') : 'Falta la clave para publicar'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optImp"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Impresoras</b><small>${impSel() ? esc(impSel().nombre) + ' · ' + esc(CONEXIONES[impSel().conexion].nombre) + ' · ' + resumenImp(impSel()) : 'Ninguna configurada'}${impresoras().length > 1 ? ' · ' + impresoras().length + ' impresoras' : ''}</small></span>${svg('chev')}</button>
   </div>`;
@@ -4664,10 +4666,12 @@ function renderConfig(conservar){
     document.getElementById('optPromo').onclick = ()=>{ cfgVista='promos'; renderConfig(); };
     document.getElementById('optDev').onclick = ()=>{ cfgVista='devol'; renderConfig(); };
     document.getElementById('optGh').onclick = ()=>{ cfgVista='gh'; renderConfig(); };
+    document.getElementById('optDatos').onclick = ()=>{ cfgVista='datos'; renderConfig(); };
     return;
   }
   if(cfgVista==='devol'){ document.getElementById('dvGuardar').onclick = guardarDevolCfg; return; }
   if(cfgVista==='gh'){ document.getElementById('ghGuardar').onclick = guardarGhForm; return; }
+  if(cfgVista==='datos'){ document.getElementById('dtResp').onclick = ()=> descargarRespaldo(); document.getElementById('dtRest').onchange = e=>{ const f = e.target.files[0]; if(f) restaurarRespaldo(f); }; const l = document.getElementById('dtLimpiar'); if(l) l.onclick = limpiarDatosPrueba; return; }
   if(cfgVista==='promos'){
     document.querySelectorAll('.pm-sw').forEach(sw=> sw.onchange = ()=>{
       const ls = store.get('articulos',[]), a = ls.find(x=> x.id===sw.dataset.id); if(!a || !a.promo) return;
@@ -6383,6 +6387,89 @@ function gastosRango(a, b){
   const ls = egresosVivos().filter(e=> e.dia >= a && e.dia <= b && e.tipo!=='productos'), g = {};
   ls.forEach(e=>{ const k = e.tipo + '|' + e.concepto; g[k] = r2((g[k]||0) + e.total); });
   return {insumo: sumar(ls.filter(e=> e.tipo==='insumo'), e=> e.total), operacion: sumar(ls.filter(e=> e.tipo==='operacion'), e=> e.total), personal: sumar(ls.filter(e=> e.tipo==='personal'), e=> e.total), detalle:g};
+}
+
+/* ================= Datos: respaldo, restauración y limpieza ================= */
+function datosRespaldo(){
+  const ls = {};
+  try{ for(let i=0;i<localStorage.length;i++){ const k = localStorage.key(i); if(k.startsWith('mk_')) ls[k.slice(3)] = JSON.parse(localStorage.getItem(k)); } }catch(_){ Object.assign(ls, mem); }
+  delete ls.session;
+  const db = {}; DB.TABLAS.forEach(n=> db[n] = DB[n]);
+  return {app:'merkalimentos', version:APP_VERSION, creado:new Date().toISOString(), dispositivo:store.get('config').dispositivo, store:ls, db};
+}
+async function descargarRespaldo(sufijo = ''){
+  const d = new Date(), nombre = `Respaldo Merkalimentos ${store.get('config').dispositivo || ''} ${hoyClave(d)} ${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${sufijo}.json`.replace(/\s+/g,' ');
+  const blob = new Blob([JSON.stringify(datosRespaldo())], {type:'application/json'});
+  const file = new File([blob], nombre, {type:'application/json'});
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:nombre}); store.set('ultimoRespaldo', new Date().toISOString()); return true; } }catch(e){ if(e && e.name==='AbortError') return false; }
+  descargarBlob(blob, nombre); store.set('ultimoRespaldo', new Date().toISOString()); toast('Respaldo descargado'); return true;
+}
+function vaciarTabla(n, conservar){
+  DB[n] = DB[n].filter(conservar);
+  if(DB.idb){ try{ const os = DB.idb.transaction(n,'readwrite').objectStore(n); os.clear().onsuccess = ()=> DB[n].forEach(r=> DB._put(n, r)); }catch(e){} } else store.set(n, DB[n]);
+}
+function planLimpieza(){
+  const t = turnoActual(), f = t?.folio, hoy = hoyClave();
+  const delTurno = x => f && x.turno===f;
+  const egOk = e => delTurno(e) || e.dia===hoy;
+  const n = (tb, ok) => ({quita: DB[tb].filter(x=> !ok(x)).length, queda: DB[tb].filter(ok).length});
+  return {t, f, egOk, delTurno, resumen:{
+    ventas:n('recibos', delTurno), pedidos:n('pedidos', delTurno), abonos:n('abonos', delTurno), compras:n('egresos', egOk),
+    conteos:DB.conteos.length, ordenes:DB.compras.length, turnos:(store.get('turnos', [])).length, movimientos:DB.movimientos.length}};
+}
+function limpiarDatosPrueba(){
+  const p = planLimpieza(), r = p.resumen;
+  confirmar({titulo:'Borrar datos de prueba', peligro:true, ok:'Respaldar y borrar',
+    texto:`Primero se descarga un respaldo. Después se borra:<br>• ${r.ventas.quita} ventas, ${r.pedidos.quita} pedidos y ${r.abonos.quita} abonos<br>• ${r.compras.quita} compras y gastos de otros días<br>• ${r.turnos} turnos cerrados, ${r.conteos} conteos, ${r.ordenes} órdenes de compra, cotizaciones, devoluciones y pedidos recibidos<br>• Existencias: quedan solo las de las compras que se conservan<br><br><b>Se conserva:</b> ${p.t ? `el turno abierto ${esc(p.f)} (fondo, movimientos de caja, ${r.ventas.queda} ventas y ${r.compras.queda} compras/gastos)` : 'nada de turnos (no hay turno abierto)'}, clientes, productos, precios, costos, proveedores, impresoras y configuración.`,
+    alAceptar: async ()=>{
+      await descargarRespaldo(' antes de limpiar');
+      const {delTurno, egOk} = p;
+      const egs = DB.egresos.filter(egOk), recs = DB.recibos.filter(delTurno);
+      vaciarTabla('recibos', delTurno); vaciarTabla('pedidos', delTurno); vaciarTabla('abonos', delTurno); vaciarTabla('egresos', egOk);
+      vaciarTabla('cotizaciones', ()=> false); vaciarTabla('conteos', ()=> false); vaciarTabla('compras', ()=> false);
+      /* existencias: se reconstruyen solo con lo que se conserva */
+      const movOk = m => egs.some(e=> e.tipo==='productos' && m.ref && m.ref.startsWith(e.folio)) || recs.some(r=> m.ref && m.ref.includes(r.folio));
+      vaciarTabla('movimientos', movOk);
+      const inv = {almacen:{}, camioneta:{}, devoluciones:{}};
+      DB.movimientos.forEach(m=>{ inv[m.ub] = inv[m.ub] || {}; inv[m.ub][m.pid] = r3(Number(inv[m.ub][m.pid] || 0) + m.cant); });
+      store.set('inv2', inv); store.del('inventario');
+      ['turnos','promesas','pedidosRecibidos','devProv','lotes','ticket','ticketPre','ticketCot','ticketsGuardados','ticketsGuardadosPre','cotizacionesGuardadas','abrirPedidoRec'].forEach(k=> store.del(k));
+      const t = turnoActual();
+      if(t){ t.recibos = recs.length ? t.recibos : 0; t.pedidos = DB.pedidos.length ? t.pedidos : 0; t.abonos = DB.abonos.length ? t.abonos : 0; if(!DB.movimientos.some(m=> m.ub==='camioneta')){ t.camioneta = false; delete t.cargas; } delete t.liquidacion; store.set('turno', t); }
+      renderMenu(); cfgVista = 'inicio'; renderConfig(); toast('Listo: datos de prueba borrados');
+    }});
+}
+function restaurarRespaldo(file){
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    let d; try{ d = JSON.parse(rd.result); }catch(_){ toast('El archivo no es un respaldo válido'); return; }
+    if(d.app!=='merkalimentos' || !d.store || !d.db){ toast('El archivo no es un respaldo de Merkalimentos'); return; }
+    confirmar({titulo:'Restaurar respaldo', peligro:true, ok:'Restaurar',
+      texto:`Respaldo del ${new Date(d.creado).toLocaleString('es-MX',{dateStyle:'medium', timeStyle:'short'})} (${esc(d.dispositivo||'')}, versión ${esc(d.version||'')}).<br>Reemplaza <b>todos</b> los datos de este celular.`,
+      alAceptar:()=>{
+        const ses = store.get('session', null);
+        try{ Object.keys(localStorage).filter(k=> k.startsWith('mk_')).forEach(k=> localStorage.removeItem(k)); }catch(_){}
+        Object.keys(mem).forEach(k=> delete mem[k]);
+        Object.entries(d.store).forEach(([k,v])=> store.set(k, v)); if(ses) store.set('session', ses);
+        DB.TABLAS.forEach(n=> vaciarTabla(n, ()=> false));
+        DB.TABLAS.forEach(n=> (d.db[n]||[]).forEach(r=> DB.guardar(n, r)));
+        toast('Respaldo restaurado'); setTimeout(()=> location.reload(), 900);
+      }});
+  };
+  rd.readAsText(file);
+}
+function viewDatosCfg(){
+  const u = store.get('ultimoRespaldo', null), p = planLimpieza().resumen, adm = session.rol==='admin';
+  return `<div class="gform cf">
+    <p class="sub">Mientras no haya sincronización en la nube, los datos viven solo en este celular. Haz un respaldo al cerrar cada día y guárdalo en Drive o mándatelo por WhatsApp.</p>
+    <p class="note-sm" style="text-align:left">${u ? 'Último respaldo: ' + new Date(u).toLocaleString('es-MX',{dateStyle:'medium', timeStyle:'short'}) : '<b class="warn">Aún no hay respaldos</b>'}</p>
+    <button class="btn" id="dtResp">${svg('download')}Hacer respaldo ahora</button>
+    <label class="btn ghost" style="display:flex;align-items:center;justify-content:center;gap:8px">${svg('share')}Restaurar un respaldo<input type="file" accept="application/json,.json" id="dtRest" hidden></label>
+    ${adm ? `<h3 class="cf-h">Arranque en producción</h3>
+    <p class="sub">Borra ventas, turnos, abonos, conteos y compras de prueba. Conserva el turno abierto con lo que registraste en él, y las compras/gastos de hoy.</p>
+    <p class="note-sm" style="text-align:left">Hoy hay ${p.ventas.quita + p.ventas.queda} ventas, ${p.abonos.quita + p.abonos.queda} abonos, ${p.compras.quita + p.compras.queda} compras/gastos, ${p.turnos} turnos cerrados y ${p.movimientos} movimientos de inventario.</p>
+    <button class="btn danger" id="dtLimpiar">Borrar datos de prueba</button>` : ''}
+  </div>`;
 }
 
 /* ================= Informes ================= */
