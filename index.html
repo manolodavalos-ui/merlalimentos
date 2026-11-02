@@ -687,6 +687,9 @@ dd.pos{color:var(--brand)}
 .inv-mov.tap{cursor:pointer}.inv-mov.tap:active{background:var(--bg)}
 .inv-mov.anulado b,.inv-mov.anulado > b{color:var(--muted);text-decoration:line-through}
 .inv-mov.anulado .tag-c{text-decoration:none}
+.dia.fs{border-color:#b9a3e6;color:#5b3fa8;font-weight:800}
+.dia.fs.on{background:#5b3fa8;border-color:#5b3fa8;color:#fff}
+.tag-fs{font-style:normal;font-size:.68rem;font-weight:800;padding:2px 6px;border-radius:999px;background:#ece5fb;color:#5b3fa8;vertical-align:2px}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1902,7 +1905,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.34.5';
+const APP_VERSION = '0.34.6';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3210,7 +3213,8 @@ function formClienteHTML(c){
   const tieneUb = c.lat != null && c.lng != null && c.lat !== '' ;
   return `<div class="gform cf">
     <div class="gfield"><label>Día de visita</label>
-      <div class="dias" id="fDias">${DIAS.map(([k,t])=>`<button type="button" class="dia${dias.includes(k)?' on':''}" data-d="${k}">${t}</button>`).join('')}</div>
+      <div class="dias" id="fDias">${DIAS.map(([k,t])=>`<button type="button" class="dia${dias.includes(k) && c.canal!=='FS'?' on':''}" data-d="${k}">${t}</button>`).join('')}<button type="button" class="dia fs${c.canal==='FS'?' on':''}" data-d="FS" title="Foodservice">FS</button></div>
+      <p class="note-sm" style="text-align:left;margin-top:6px">FS = foodservice: se atiende solo cuando hace pedido, sin día de visita.</p>
     </div>
     <div class="cf-row">
       <div class="gfield"><label for="fNum">Número de cliente</label><input id="fNum" inputmode="numeric" maxlength="10" value="${esc(c.numero||'')}"></div>
@@ -3242,7 +3246,8 @@ function formClienteHTML(c){
 function leerFormCliente(){
   const v = id => document.getElementById(id).value.trim();
   return {
-    diasVisita:[...document.querySelectorAll('#fDias .dia.on')].map(b=>b.dataset.d),
+    diasVisita:[...document.querySelectorAll('#fDias .dia.on')].map(b=>b.dataset.d).filter(d=> d!=='FS'),
+    canal: document.querySelector('#fDias .dia.fs.on') ? 'FS' : '',
     numero:soloDigitos(v('fNum')), telefono:soloDigitos(v('fTel')), nombre:v('fNom'), tienda:v('fTien'),
     direccion:v('fDir'), colonia:v('fCol'), ciudad:v('fCiu'), estado:v('fEdo'), cp:soloDigitos(v('fCp')), referencia:v('fRef'),
     lat:cliBorrador.lat ?? null, lng:cliBorrador.lng ?? null,
@@ -3250,7 +3255,11 @@ function leerFormCliente(){
   };
 }
 function bindFormCliente(){
-  document.querySelectorAll('#fDias .dia').forEach(b=> b.onclick = ()=> b.classList.toggle('on'));
+  document.querySelectorAll('#fDias .dia').forEach(b=> b.onclick = ()=>{
+    b.classList.toggle('on');
+    if(b.dataset.d==='FS'){ if(b.classList.contains('on')) document.querySelectorAll('#fDias .dia:not(.fs)').forEach(x=> x.classList.remove('on')); }
+    else if(b.classList.contains('on')) document.querySelector('#fDias .dia.fs')?.classList.remove('on');
+  });
   const mapa = document.getElementById('ubMapa');
   if(mapa) mapa.onclick = ()=>{
     Object.assign(cliBorrador, leerFormCliente());
@@ -3300,7 +3309,7 @@ function guardarClienteForm(){
 function filtrarClientes(){
   const q = cliQ.trim().toLowerCase(), qd = soloDigitos(q);
   return clientes().filter(c=>{
-    if(cliDia && !(c.diasVisita||[]).includes(cliDia)) return false;
+    if(cliDia==='FS'){ if(c.canal!=='FS') return false; } else if(cliDia && !(c.diasVisita||[]).includes(cliDia)) return false;
     if(!q) return true;
     return textoCliente(c).includes(q) || (qd.length >= 3 && soloDigitos(c.telefono).includes(qd));
   }).sort((a,b)=> cliDia
@@ -3311,10 +3320,10 @@ function filasClientesHTML(){
   const ls = filtrarClientes();
   if(!clientes().length) return `<div class="rc-empty">${svg('clientes')}<p>Aún no hay clientes registrados.</p><button class="btn" id="vacioCrear" style="max-width:240px">Crear cliente</button></div>`;
   if(!ls.length) return `<div class="rc-empty"><p>No hay clientes que coincidan.</p></div>`;
-  return `<div class="cl-count">${ls.length} ${ls.length===1?'cliente':'clientes'}${cliDia?' · en orden de visita':''}</div>` + ls.map(c=>`
+  return `<div class="cl-count">${ls.length} ${ls.length===1?'cliente':'clientes'}${cliDia==='FS' ? ' foodservice · se atienden por pedido' : cliDia ? ' · en orden de visita' : ''}</div>` + ls.map(c=>`
     <button class="cl-row cg" data-id="${c.id}">
       ${cliDia && c.orden ? `<span class="cl-ord">${c.orden}</span>` : ''}<span class="cl-av num">${esc(c.numero||'—')}</span>
-      <span class="cg-main"><b>${esc(c.nombre)}${c.tienda?` <i>· ${esc(c.tienda)}</i>`:''}</b>
+      <span class="cg-main"><b>${esc(c.nombre)}${c.tienda?` <i>· ${esc(c.tienda)}</i>`:''}${c.canal==='FS' ? ' <i class="tag-fs">FS</i>' : ''}</b>
         <small>${esc([c.colonia, (c.diasVisita||[]).map(d=>DIAS.find(x=>x[0]===d)?.[1]).join(', ')].filter(Boolean).join(' · ') || c.direccion || 'Sin dirección')}</small></span>
       <span class="cg-ic">${c.telefono?svg('whatsapp'):''}${c.lat!=null?svg('geocerca'):''}</span>
     </button>`).join('');
@@ -3322,7 +3331,7 @@ function filasClientesHTML(){
 function viewClientesLista(){
   return `<div class="rc-wrap">
     <div class="rc-search cg-search">${svg('search')}<input id="cgQ" placeholder="Buscar nombre, tienda, número, teléfono o colonia" value="${esc(cliQ)}" autocomplete="off"></div>
-    <div class="dias filtro" id="cgDias"><button class="dia${!cliDia?' on':''}" data-d="">Todos</button>${DIAS.map(([k,t])=>`<button class="dia${cliDia===k?' on':''}" data-d="${k}">${t}</button>`).join('')}</div>
+    <div class="dias filtro" id="cgDias"><button class="dia${!cliDia?' on':''}" data-d="">Todos</button>${DIAS.map(([k,t])=>`<button class="dia${cliDia===k?' on':''}" data-d="${k}">${t}</button>`).join('')}<button class="dia fs${cliDia==='FS'?' on':''}" data-d="FS">FS</button></div>
     <div id="cgList">${filasClientesHTML()}</div>
   </div>`;
 }
