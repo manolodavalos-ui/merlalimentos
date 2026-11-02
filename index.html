@@ -1900,7 +1900,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.34.3';
+const APP_VERSION = '0.34.4';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4270,7 +4270,7 @@ function htmlTicket(r){
     <h1>${esc(impCfg().encabezado)}</h1><div class="c">${esc(impCfg().sub)}${impCfg().tel?'<br>WhatsApp '+esc(impCfg().tel):''}</div><div class="s"></div>
     ${fila('Recibo', '#'+esc(r.folio))}${r.version>1 ? fila('Versión', String(r.version)) : ''}
     ${fila('Fecha', new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'}))}
-    ${fila('Vendedor', esc(r.vendedor||''))}${r.cliente ? fila('Cliente', esc(r.cliente.nombre||'')) : ''}
+    ${fila('Vendedor', esc(r.vendedor||''))}${r.cliente ? fila('Cliente', esc(r.cliente.nombre||'')) + (tiendaDe(r.cliente) ? fila('Tienda', esc(tiendaDe(r.cliente))) : '') : ''}
     <div class="s"></div>${lineas || '<div class="c">Sin productos</div>'}
     ${(r.devoluciones||[]).length ? `<div class="s"></div><div class="b">Devoluciones</div>${r.devoluciones.map(x=> `<div class="p">${esc(x.nombre)}</div>${fila((x.porKilo ? fmtKg(x.cantidad)+' kg' : x.cantidad) + ' x ' + fmt(x.precio||0) + ' ' + esc(x.motivo), '−'+fmt(importeDev(x)))}`).join('')}` : ''}
     ${d.length ? `<div class="s"></div><div class="b">Descuento por pedido incompleto</div>${quitados}` : ''}
@@ -4338,7 +4338,7 @@ function lineasTicket(r){
   if(r.version > 1) L.push({t:dos('Version', String(r.version))});
   L.push({t:dos('Fecha', new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'}))});
   L.push({t:dos('Vendedor', (r.vendedor||'').slice(0, W-10))});
-  if(r.cliente) L.push({t:dos('Cliente', (r.cliente.nombre||'').slice(0, W-9))});
+  if(r.cliente){ L.push({t:dos('Cliente', (r.cliente.nombre||'').slice(0, W-9))}); const ti = tiendaDe(r.cliente); if(ti) L.push({t:dos('Tienda', ti.slice(0, W-8))}); }
   L.push({t:sep});
   r.lineas.forEach(l=>{
     const q = restante(r, l); if(q <= 0) return;
@@ -4370,6 +4370,7 @@ function lineasTicket(r){
   if(c.pie) envolver(c.pie).forEach(x=> L.push({t:centro(x)}));
   return L;
 }
+const tiendaDe = c => c ? (c.tienda || (c.id && clientes().find(x=> x.id===c.id)?.tienda) || '') : '';
 const textoTicket = r => lineasTicket(r).map(l=> l.t).join('\n');
 
 /* ESC/POS: tablas de caracteres, modo texto o gráfico, corte y cajón */
@@ -7329,7 +7330,7 @@ function lineasAbono(a){
   L.push({t:centro(c.encabezado), b:true, g:true}); if(c.sub) L.push({t:centro(c.sub)}); if(c.tel) L.push({t:centro('WhatsApp ' + c.tel)});
   L.push({t:sep}); L.push({t:centro(a.tipo==='ajuste' ? 'AJUSTE DE SALDO' : 'COMPROBANTE DE ABONO'), b:true});
   L.push({t:dos('Folio', '#' + a.folio)}); L.push({t:dos('Fecha', new Date(a.fecha).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'}))});
-  L.push({t:dos('Atendio', (a.vendedor||'').slice(0, W-9))}); L.push({t:dos('Cliente', (a.cliente?.nombre||'').slice(0, W-9))});
+  L.push({t:dos('Atendio', (a.vendedor||'').slice(0, W-9))}); L.push({t:dos('Cliente', (a.cliente?.nombre||'').slice(0, W-9))}); if(tiendaDe(a.cliente)) L.push({t:dos('Tienda', tiendaDe(a.cliente).slice(0, W-8))});
   if(a.cancelado) L.push({t:centro('*** CANCELADO ***'), b:true});
   L.push({t:sep});
   a.aplicaciones.forEach(x=>{ L.push({t:'Ticket #' + x.folio}); L.push({t:dos('  Saldo anterior', fmt(x.saldoAntes))}); L.push({t:dos('  Abono', '-' + fmt(x.monto))}); L.push({t:dos('  Saldo', fmt(x.saldoDespues))}); });
