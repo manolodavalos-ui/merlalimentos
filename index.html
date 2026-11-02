@@ -360,6 +360,8 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .cj-row.sub{color:var(--muted);font-size:.88rem}
 .cj-teo{display:flex;justify-content:space-between;gap:10px;margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--brand-soft);font-weight:700;color:var(--brand)}
 .cj-teo b{font-size:1.25rem;color:var(--text)}
+.cj-teo.cj-ven{margin-top:8px;background:#eef4fb;color:#1a5fb4;align-items:center}
+.cj-teo.cj-ven small{display:block;font-weight:500;font-size:.74rem;color:var(--muted);margin-top:2px}
 .cj-met{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
 .cj-met span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:10px;background:var(--bg);font-size:.78rem;color:var(--muted)}
 .cj-met svg{width:18px;height:18px;stroke:var(--brand)}
@@ -1900,7 +1902,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.34.4';
+const APP_VERSION = '0.34.5';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2064,6 +2066,7 @@ function viewTurno(){
       ${fila('Pagos o salidas', c.salidas, '-')}
       ${c.gastosCaj ? fila('Compras y gastos pagados del cajón', c.gastosCaj, '-') : ''}
       <div class="cj-teo"><span>Efectivo teórico en caja</span><b>${fmt(c.teorico)}</b></div>
+      <div class="cj-teo cj-ven"><span>Efectivo teórico de ventas<small>Cobros en efectivo − descuentos − cancelaciones. Sin fondo, abonos, depósitos ni salidas</small></span><b>${fmt(c.efVentas)}</b></div>
     </div>
     <div class="card cajon">
       <h3>Resumen</h3>
@@ -2155,6 +2158,7 @@ function calcCajon(t){
     devol: sumar(recs, r=> totalDev(r)),
     gastosCaj: r2(sumar(DB.egresos.filter(e=> !e.cancelado && e.delCajon && e.turno===t.folio), e=> e.total) + sumar(DB.egresos.filter(e=> !e.cancelado).flatMap(e=> (e.pagos||[]).filter(p=> p.delCajon && p.turno===t.folio)), p=> p.monto))
   };
+  c.efVentas = r2(c.cobrosEf - c.descEf - c.cancEf);
   c.teorico = r2(c.fondo + c.cobrosEf + c.abonosEf - (c.gastosCaj||0) - c.descEf - c.cancEf + c.depositado - c.salidas);
   c.netas = r2(c.brutas - c.promo - c.descTotal - c.cancTotal - c.devol);
   ['Efectivo','Tarjeta','Crédito'].forEach(m=>{
