@@ -682,6 +682,9 @@ dd.pos{color:var(--brand)}
 .comp-g{min-height:0;padding-bottom:6px}
 .comp-kpi{margin:12px 16px;padding:12px 14px;border-radius:14px;background:#fdecea;display:flex;flex-direction:column}
 .comp-kpi small{color:var(--muted);font-size:.8rem}.comp-kpi b{font-size:1.4rem}.comp-kpi span{font-size:.82rem;color:var(--muted)}
+.inv-mov.tap{cursor:pointer}.inv-mov.tap:active{background:var(--bg)}
+.inv-mov.anulado b,.inv-mov.anulado > b{color:var(--muted);text-decoration:line-through}
+.inv-mov.anulado .tag-c{text-decoration:none}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1897,7 +1900,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.34.2';
+const APP_VERSION = '0.34.3';
 
 /* ================= Íconos ================= */
 const I = {
@@ -5336,7 +5339,8 @@ function viewKardex(){
         <dt>Te alcanza para</dt><dd>${dias==null ? '—' : dias + ' días'}</dd>
         ${a.proveedor ? `<dt>Proveedor</dt><dd>${esc(a.proveedor)}</dd>` : ''}
       </dl>
-      ${adm ? `<div class="cr-2" style="margin:4px 0 14px"><button class="btn" id="kAgregar" style="margin:0">+ Agregar existencia</button><button class="btn ghost" id="kFijar" style="margin:0">Fijar lo contado</button></div>` : ''}
+      ${adm ? `<div class="cr-2" style="margin:4px 0 8px"><button class="btn" id="kAgregar" style="margin:0">+ Agregar existencia</button><button class="btn ghost" id="kFijar" style="margin:0">Fijar lo contado</button></div>
+      <button class="btn ghost" id="kAjuste" style="margin:0 0 14px">${svg('config')}Ajuste de inventario (merma, caducidad, corrección…)</button>` : ''}
       ${adm ? `<div class="inv-param">
         <div class="gfield"><label for="kMin">Mínimo</label><input id="kMin" type="number" inputmode="decimal" min="0" value="${p.min||''}" placeholder="0"></div>
         <div class="gfield"><label for="kMax">Máximo</label><input id="kMax" type="number" inputmode="decimal" min="0" value="${p.max||''}" placeholder="0"></div>
@@ -5346,13 +5350,30 @@ function viewKardex(){
     </div>
     ${lv.length ? `<div class="rc-day">Caducidades</div>${lv.map(l=>`<div class="inv-mov"><span><b>Caduca ${dm(l.caducidad)}/${l.caducidad.slice(2,4)}</b><small>entró ${new Date(l.fecha).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</small></span><b class="${l.caducidad < hoyClave() ? 'neg' : l.caducidad <= masDias(7) ? 'warn' : ''}">${fmtCant(a.id, l.queda)}</b></div>`).join('')}` : ''}
     <div class="rc-day">Movimientos (kardex)</div>
-    ${ms.length ? ms.map(m=>`<div class="inv-mov"><span><b>${esc(TIPOS_MOV[m.tipo] || m.tipo)}</b><small>${new Date(m.fecha).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${UBS[m.ub]}${m.ref?' · '+esc(m.ref):''}${m.nota?' · '+esc(m.nota):''}</small></span><b class="${m.cant<0?'neg':'pos'}">${m.cant>0?'+':''}${fmtCant(a.id, m.cant)}</b></div>`).join('') : `<p class="note-sm" style="padding:0 16px 16px">Sin movimientos todavía.</p>`}
+    ${ms.length ? `<p class="note-sm" style="text-align:left;padding:0 16px">${adm ? 'Toca un movimiento para deshacerlo si lo capturaste por error.' : ''}</p>` : ''}
+    ${ms.length ? ms.map(m=>`<div class="inv-mov${m.anulado ? ' anulado' : ''}${adm && puedeDeshacer(m) ? ' tap' : ''}" data-mov="${m.id}"><span><b>${esc(TIPOS_MOV[m.tipo] || m.tipo)}${m.anulado ? ' <i class="tag-c">Deshecho</i>' : ''}</b><small>${new Date(m.fecha).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${UBS[m.ub]}${m.ref?' · '+esc(m.ref):''}${m.nota?' · '+esc(m.nota):''}</small></span><b class="${m.cant<0?'neg':'pos'}">${m.cant>0?'+':''}${fmtCant(a.id, m.cant)}</b></div>`).join('') : `<p class="note-sm" style="padding:0 16px 16px">Sin movimientos todavía.</p>`}
   </div>`;
 }
 const TIPOS_MOV = {venta:'Venta', devolucion:'Regresa por descuento/cancelación', compra:'Compra', carga:'Carga a camioneta', descarga:'Regreso de camioneta', faltante:'Diferencia en liquidación',
   conteo:'Ajuste por conteo', devProveedor:'Entregado al proveedor', entrada:'Entrada', merma:'Merma', caducidad:'Caducidad', consumo:'Consumo propio', devCliente:'Devolución de cliente', ajuste:'Ajuste'};
 
 
+
+/* Deshacer un movimiento manual capturado por error (se registra el contrario) */
+const MOV_MANUALES = ['entrada','conteo','merma','caducidad','consumo','devCliente','ajuste'];
+const puedeDeshacer = m => !!m && !m.anulado && !m.anulaA && MOV_MANUALES.includes(m.tipo);
+function deshacerMovimiento(m){
+  if(!m || !puedeDeshacer(m)) return;
+  const a = artPorId(m.pid);
+  confirmar({titulo:'Deshacer movimiento', peligro:true, ok:'Deshacer',
+    texto:`${esc(TIPOS_MOV[m.tipo] || m.tipo)} de <b>${m.cant>0?'+':''}${fmtCant(m.pid, m.cant)}</b> en ${UBS[m.ub].toLowerCase()} (${new Date(m.fecha).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}).<br>${esc(nombreTicket(a||{nombre:m.pid}))} quedará en <b>${fmtCant(m.pid, r3(stockEn(m.ub, m.pid) - m.cant))}</b>.`,
+    alAceptar:()=>{
+      moverStock([{ub:m.ub, pid:m.pid, cant:-m.cant}], 'ajuste', 'Deshace ' + (TIPOS_MOV[m.tipo] || m.tipo).toLowerCase(), 'Corrección por error de captura');
+      const ult = DB.movimientos[DB.movimientos.length - 1]; if(ult){ ult.anulaA = m.id; DB.guardar('movimientos', ult); }
+      m.anulado = {fecha:new Date().toISOString(), usuario:session.usuario}; m.sincronizado = false; DB.guardar('movimientos', m);
+      renderInventario(); toast('Movimiento deshecho');
+    }});
+}
 /* Captura rápida de existencia desde el producto */
 function dialogoExistencia(pid, modo){
   const a = artPorId(pid); let ub = 'almacen';
@@ -5724,7 +5745,9 @@ function renderInventario(){
     document.querySelectorAll('.inv-row').forEach(b=> b.onclick = ()=>{ invSel = b.dataset.pid; invVista = 'articulo'; renderInventario(); });
     on('ivCarga', ir('carga')); on('ivLiq', ir('liquidacion')); on('ivConteo', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivConteo2', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivCompras', ir('compras')); on('ivAjuste', ir('ajuste')); on('ivRep', ir('reportes')); on('ivConteos', ir('conteos')); on('ivDev', ir('devoluciones'));
   }
-  if(invVista==='articulo'){ on('kAgregar', ()=> dialogoExistencia(invSel, 'sumar')); on('kFijar', ()=> dialogoExistencia(invSel, 'fijar')); }
+  if(invVista==='articulo'){ on('kAgregar', ()=> dialogoExistencia(invSel, 'sumar')); on('kFijar', ()=> dialogoExistencia(invSel, 'fijar'));
+    on('kAjuste', ()=>{ invBorr = {tipo:'ajuste', ub:'almacen', signo:-1, pid:invSel}; invVista = 'ajuste'; renderInventario(); });
+    if(session.rol==='admin') document.querySelectorAll('.inv-mov.tap').forEach(el=> el.onclick = ()=> deshacerMovimiento(DB.movimientos.find(m=> m.id===el.dataset.mov))); }
   if(invVista==='articulo') on('kGuardar', ()=>{
     const n = id => Math.max(0, Number($(id).value)||0);
     guardarParam(invSel, {min:n('kMin'), max:n('kMax'), uc:$('kUc').value.trim(), factor:Math.max(1, n('kFac')||1)}); toast('Guardado'); renderInventario(); });
