@@ -1897,7 +1897,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.34.1';
+const APP_VERSION = '0.34.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -5312,6 +5312,8 @@ function viewInventario(){
       <button class="ub-b" id="ivDev">${svg('back')}Devoluciones${(n=> n ? ' · '+n : '')(Object.values(inv2().devoluciones).filter(q=> q > 0.0005).length)}</button>
       <button class="ub-b" id="ivRep">${svg('informes')}Reportes</button>
     </div>
+    ${adm ? `<div class="cr-pad" style="padding:10px 16px 2px"><button class="btn" id="ivConteo2" style="margin:0">${svg('inventario')}Capturar conteo (existencias)</button>
+      <p class="note-sm" style="text-align:left;margin-top:6px">También puedes tocar un producto y usar "Agregar existencia".</p></div>` : ''}
     <div class="dias filtro">${chip('todos','Todos',arts.length)}${chip('bajo','Bajo mínimo',bajo.length)}${chip('sin','Sin existencia',sin.length)}${chip('cad','Por caducar',new Set(cad.map(l=>l.pid)).size)}</div>
     <div class="rc-search">${svg('search')}<input id="ivQ" placeholder="Buscar producto, código o proveedor" value="${esc(invQ)}" autocomplete="off"></div>
     ${html || `<div class="rc-empty"><p>No hay productos en este filtro.</p></div>`}
@@ -5334,6 +5336,7 @@ function viewKardex(){
         <dt>Te alcanza para</dt><dd>${dias==null ? '—' : dias + ' días'}</dd>
         ${a.proveedor ? `<dt>Proveedor</dt><dd>${esc(a.proveedor)}</dd>` : ''}
       </dl>
+      ${adm ? `<div class="cr-2" style="margin:4px 0 14px"><button class="btn" id="kAgregar" style="margin:0">+ Agregar existencia</button><button class="btn ghost" id="kFijar" style="margin:0">Fijar lo contado</button></div>` : ''}
       ${adm ? `<div class="inv-param">
         <div class="gfield"><label for="kMin">Mínimo</label><input id="kMin" type="number" inputmode="decimal" min="0" value="${p.min||''}" placeholder="0"></div>
         <div class="gfield"><label for="kMax">Máximo</label><input id="kMax" type="number" inputmode="decimal" min="0" value="${p.max||''}" placeholder="0"></div>
@@ -5349,6 +5352,37 @@ function viewKardex(){
 const TIPOS_MOV = {venta:'Venta', devolucion:'Regresa por descuento/cancelación', compra:'Compra', carga:'Carga a camioneta', descarga:'Regreso de camioneta', faltante:'Diferencia en liquidación',
   conteo:'Ajuste por conteo', devProveedor:'Entregado al proveedor', entrada:'Entrada', merma:'Merma', caducidad:'Caducidad', consumo:'Consumo propio', devCliente:'Devolución de cliente', ajuste:'Ajuste'};
 
+
+/* Captura rápida de existencia desde el producto */
+function dialogoExistencia(pid, modo){
+  const a = artPorId(pid); let ub = 'almacen';
+  const bg = dialogo(`<div class="ex-dlg"></div>`), box = bg.querySelector('.ex-dlg');
+  const pintar = ()=>{
+    const hay = stockEn(ub, pid);
+    box.innerHTML = `<h3>${modo==='sumar' ? 'Agregar existencia' : 'Fijar lo contado'}</h3><p class="sub">${esc(nombreTicket(a))}</p>
+      <div class="dias" id="exUb">${['almacen','camioneta'].map(k=>`<button class="dia${ub===k?' on':''}" data-u="${k}">${UBS[k]}</button>`).join('')}</div>
+      <p class="sub" style="margin:10px 0 0">Hay en ${UBS[ub].toLowerCase()}: <b>${fmtCant(pid, hay)}</b></p>
+      <label for="exCant">${modo==='sumar' ? 'Cantidad que se agrega' : 'Cantidad contada (lo que hay físicamente)'}</label>
+      <input class="field" id="exCant" type="number" inputmode="decimal" min="0" step="${a.porKilo?'0.001':'1'}">
+      <p class="note-sm" id="exRes" style="text-align:left"></p>
+      <label for="exNota">Nota (opcional)</label><input class="field" id="exNota" maxlength="80" autocomplete="off" placeholder="${modo==='sumar' ? 'Ej. Inventario inicial' : 'Ej. Conteo del lunes'}">
+      <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">Guardar</button></div>`;
+    const inp = box.querySelector('#exCant'), res = box.querySelector('#exRes');
+    inp.oninput = ()=>{ const q = r3(Number(inp.value)||0); res.innerHTML = inp.value==='' ? '' : modo==='sumar' ? `Quedarán <b>${fmtCant(pid, r3(hay + q))}</b>` : `Diferencia: <b class="${q-hay<0?'neg':''}">${q-hay>0?'+':''}${fmtCant(pid, r3(q - hay))}</b>`; };
+    box.querySelectorAll('#exUb .dia').forEach(b=> b.onclick = ()=>{ ub = b.dataset.u; pintar(); });
+    box.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+    box.querySelector('[data-a="si"]').onclick = ()=>{
+      if(inp.value===''){ toast('Escribe la cantidad'); inp.focus(); return; }
+      const q = r3(Number(inp.value)||0), nota = box.querySelector('#exNota').value.trim();
+      if(q < 0 || (!a.porKilo && !Number.isInteger(q))){ toast(a.porKilo ? 'Cantidad no válida' : 'Usa piezas enteras'); return; }
+      const cant = modo==='sumar' ? q : r3(q - hay);
+      if(cant) moverStock([{ub, pid, cant}], modo==='sumar' ? 'entrada' : 'conteo', modo==='sumar' ? null : 'Conteo por producto', nota || (modo==='sumar' ? 'Agregar existencia' : ''));
+      bg.remove(); renderInventario(); toast(`${UBS[ub]}: ${fmtCant(pid, stockEn(ub, pid))}`);
+    };
+    setTimeout(()=> inp.focus(), 50);
+  };
+  pintar();
+}
 /* ----- Carga de camioneta ----- */
 function sugeridoPedidos(){
   const out = {}, hoy = hoyClave();
@@ -5688,8 +5722,9 @@ function renderInventario(){
     document.querySelectorAll('.inv .dias.filtro .dia').forEach(b=> b.onclick = ()=>{ invFiltro = b.dataset.f; renderInventario(); });
     buscar();
     document.querySelectorAll('.inv-row').forEach(b=> b.onclick = ()=>{ invSel = b.dataset.pid; invVista = 'articulo'; renderInventario(); });
-    on('ivCarga', ir('carga')); on('ivLiq', ir('liquidacion')); on('ivConteo', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivCompras', ir('compras')); on('ivAjuste', ir('ajuste')); on('ivRep', ir('reportes')); on('ivConteos', ir('conteos')); on('ivDev', ir('devoluciones'));
+    on('ivCarga', ir('carga')); on('ivLiq', ir('liquidacion')); on('ivConteo', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivConteo2', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivCompras', ir('compras')); on('ivAjuste', ir('ajuste')); on('ivRep', ir('reportes')); on('ivConteos', ir('conteos')); on('ivDev', ir('devoluciones'));
   }
+  if(invVista==='articulo'){ on('kAgregar', ()=> dialogoExistencia(invSel, 'sumar')); on('kFijar', ()=> dialogoExistencia(invSel, 'fijar')); }
   if(invVista==='articulo') on('kGuardar', ()=>{
     const n = id => Math.max(0, Number($(id).value)||0);
     guardarParam(invSel, {min:n('kMin'), max:n('kMax'), uc:$('kUc').value.trim(), factor:Math.max(1, n('kFac')||1)}); toast('Guardado'); renderInventario(); });
