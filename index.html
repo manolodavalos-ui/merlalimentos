@@ -665,6 +665,23 @@ dd.pos{color:var(--brand)}
 .imp-fab{position:fixed;right:18px;bottom:22px;z-index:15;padding:16px 22px;border-radius:18px;background:var(--brand);color:#fff;font-weight:700;font-size:1.05rem;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .imp-chips .dia{border-radius:10px}
 .imp-bt svg{width:18px;height:18px;stroke:var(--brand);vertical-align:-3px}
+.comp-fecha{display:flex;align-items:center;gap:6px;padding:12px 12px 6px}
+.comp-fecha .icon-btn{font-size:1.6rem;width:40px;height:44px;color:var(--brand)}
+.comp-fecha .icon-btn:disabled{opacity:.3}
+.comp-dia{flex:1;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--brand);border-radius:14px;background:var(--brand-soft);text-align:left}
+.comp-dia svg{width:22px;height:22px;stroke:var(--brand);flex-shrink:0}.comp-dia b{display:block}.comp-dia small{display:block;color:var(--muted);font-size:.8rem}
+.comp-res{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:6px;padding:4px 16px 8px}
+.comp-res span{background:var(--bg);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column}
+.comp-res small{font-size:.68rem;color:var(--muted)}.comp-res b{font-size:.9rem}
+.comp-ctl{display:flex;gap:8px;padding:10px 16px 6px}.comp-ctl select{flex:1;padding:10px;font-size:.92rem}.comp-ctl .ub-b{flex-shrink:0}
+.cp-h,.cp-row{display:grid;grid-template-columns:1fr 64px 76px;gap:8px;align-items:center;padding:8px 16px}
+.cp-h{font-size:.72rem;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)}
+.cp-row{border-bottom:1px solid var(--line)}.cp-row.on{background:var(--brand-soft)}
+.cp-row b{display:block;font-size:.9rem;font-weight:600}.cp-row small{display:block;color:var(--muted);font-size:.76rem}
+.cp-row input{width:100%;padding:9px 6px;border:1.5px solid var(--line);border-radius:10px;font:inherit;text-align:right;background:#fff}
+.comp-g{min-height:0;padding-bottom:6px}
+.comp-kpi{margin:12px 16px;padding:12px 14px;border-radius:14px;background:#fdecea;display:flex;flex-direction:column}
+.comp-kpi small{color:var(--muted);font-size:.8rem}.comp-kpi b{font-size:1.4rem}.comp-kpi span{font-size:.82rem;color:var(--muted)}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1880,7 +1897,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.33';
+const APP_VERSION = '0.34';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1955,7 +1972,7 @@ const MENU = [
 ];
 const PERMISOS = {
   admin:    MENU.filter(m=>m.id).map(m=>m.id),
-  vendedor: ['venta','preventa','cotizar','recibos','turno','articulos','catalogo','clientes','mapa','creditos','inventario']
+  vendedor: ['venta','preventa','cotizar','recibos','turno','articulos','catalogo','clientes','mapa','creditos','inventario','compras']
 };
 const NECESITA_TURNO = ['venta','preventa'];
 
@@ -2042,6 +2059,7 @@ function viewTurno(){
       ${fila('Cancelaciones', c.cancEf, '-')}
       ${fila('Depositado', c.depositado)}
       ${fila('Pagos o salidas', c.salidas, '-')}
+      ${c.gastosCaj ? fila('Compras y gastos pagados del cajón', c.gastosCaj, '-') : ''}
       <div class="cj-teo"><span>Efectivo teórico en caja</span><b>${fmt(c.teorico)}</b></div>
     </div>
     <div class="card cajon">
@@ -2131,9 +2149,10 @@ function calcCajon(t){
     nRecibos: recs.length, porMetodo:{},
     abonosEf: sumar(DB.abonos.filter(a=> a.turno===t.folio && a.tipo==='abono' && a.metodo==='Efectivo' && !a.cancelado), a=>a.monto),
     cobranza: sumar(DB.abonos.filter(a=> a.turno===t.folio && a.tipo==='abono' && !a.cancelado), a=>a.monto),
-    devol: sumar(recs, r=> totalDev(r))
+    devol: sumar(recs, r=> totalDev(r)),
+    gastosCaj: r2(sumar(DB.egresos.filter(e=> !e.cancelado && e.delCajon && e.turno===t.folio), e=> e.total) + sumar(DB.egresos.filter(e=> !e.cancelado).flatMap(e=> (e.pagos||[]).filter(p=> p.delCajon && p.turno===t.folio)), p=> p.monto))
   };
-  c.teorico = r2(c.fondo + c.cobrosEf + c.abonosEf - c.descEf - c.cancEf + c.depositado - c.salidas);
+  c.teorico = r2(c.fondo + c.cobrosEf + c.abonosEf - (c.gastosCaj||0) - c.descEf - c.cancEf + c.depositado - c.salidas);
   c.netas = r2(c.brutas - c.promo - c.descTotal - c.cancTotal - c.devol);
   ['Efectivo','Tarjeta','Crédito'].forEach(m=>{
     c.porMetodo[m] = r2(sumar(recs.filter(r=>r.metodo===m), r=>r.total) - sumar(descs.filter(d=>d.recibo.metodo===m), d=>d.monto));
@@ -2326,13 +2345,13 @@ const articulos = ()=> store.get('articulos', []).filter(a=> a.activo !== false 
 /* ================= Base de datos local (IndexedDB) ================= */
 /* Los recibos se guardan en IndexedDB; si el navegador no lo permite, se usa el almacenamiento simple */
 const DB = {
-  idb:null, recibos:[], pedidos:[], cotizaciones:[], abonos:[], movimientos:[], compras:[], conteos:[],
-  TABLAS:['recibos','pedidos','cotizaciones','abonos','movimientos','compras','conteos'],
+  idb:null, recibos:[], pedidos:[], cotizaciones:[], abonos:[], movimientos:[], compras:[], conteos:[], egresos:[],
+  TABLAS:['recibos','pedidos','cotizaciones','abonos','movimientos','compras','conteos','egresos'],
   init(){
     return new Promise(resolve=>{
       const fallback = ()=>{ this.idb = null; this.TABLAS.forEach(n=> this[n] = store.get(n, [])); resolve(); };
       let req;
-      try{ req = indexedDB.open('merkalimentos', 5); }catch(e){ return fallback(); }
+      try{ req = indexedDB.open('merkalimentos', 6); }catch(e){ return fallback(); }
       const t = setTimeout(fallback, 2500);
       req.onupgradeneeded = ()=>{
         const db = req.result;
@@ -4052,7 +4071,7 @@ function renderHeader(){
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
-    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes'].includes(current));
+    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(current));
     acts.innerHTML = current==='clientes' && (cliVista==='crear'||cliVista==='editar') ? '<button class="head-txt" id="hCliGuardar">GUARDAR</button>'
                    : current==='clientes' && cliVista==='lista' ? `<button class="icon-btn" id="hCliNuevo" aria-label="Crear cliente">${svg('userAdd')}</button>` : '';
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
@@ -4926,7 +4945,9 @@ function guardarArticulo(){
     ls.push({id:'a'+Date.now(), ...d, marca:'', pres:'', foto, propio:true, creado:new Date().toISOString(), creadoPor:session.usuario});
     store.set('articulos', ls); toast('Producto agregado');
   }
-  artVista = 'lista'; artSel = null; artBorrador = null; renderArticulos();
+  artVista = 'lista'; artSel = null; artBorrador = null;
+  if(volverACompras){ volverACompras = false; go('compras'); return; }
+  renderArticulos();
 }
 function reducirImagen(file, lado){
   return new Promise((ok, mal)=>{
@@ -6135,6 +6156,235 @@ function entregarDevoluciones(prov){
   };
 }
 
+/* ================= Compras y gastos ================= */
+let compDia = null, compTab = 'productos', compProv = '', compQ = '', compBorr = {}, volverACompras = false;
+const TIPOS_EG = {productos:'Productos', insumo:'Insumos', operacion:'Gastos de operación', personal:'Gastos personales'};
+const CONCEPTOS_DEF = {insumo:['Rollos de ticket','Empaque','Bolsas'], operacion:['Gasolina','Comida del vendedor','Tiempo aire','Mantenimiento'], personal:['Retiro personal']};
+const conceptos = t => [...new Set([...(CONCEPTOS_DEF[t]||[]), ...((store.get('config').conceptos||{})[t]||[])])];
+function agregarConcepto(t, c){ const cfg = store.get('config'); cfg.conceptos = cfg.conceptos || {}; const ls = cfg.conceptos[t] || []; if(!conceptos(t).includes(c)){ ls.push(c); cfg.conceptos[t] = ls; store.set('config', cfg); } }
+const METODOS_PAGO = ['Efectivo','Transferencia','Tarjeta','Crédito'];
+const egresosVivos = ()=> DB.egresos.filter(e=> !e.cancelado);
+const saldoEgreso = e => e.metodo==='Crédito' ? r2(e.total - (e.pagos||[]).reduce((s,p)=> s + p.monto, 0)) : 0;
+const fDia = k => (t=> t.charAt(0).toUpperCase()+t.slice(1))(kDate(k).toLocaleDateString('es-MX',{weekday:'long', day:'numeric', month:'long'}));
+
+function viewCompras2(){
+  if(!compDia) compDia = hoyClave();
+  const adm = session.rol==='admin', del = egresosVivos().filter(e=> e.dia===compDia && (adm || e.tipo!=='personal'));
+  const suma = t => sumar(del.filter(e=> e.tipo===t), e=> e.total);
+  const tabs = [['productos','Productos'],['insumo','Insumos'],['operacion','Operación'], ...(adm ? [['personal','Personal'],['porpagar','Por pagar']] : [])];
+  const pend = egresosVivos().filter(e=> saldoEgreso(e) > 0.004);
+  const cuerpo = compTab==='productos' ? viewCompraProductos() : compTab==='porpagar' ? viewPorPagar() : viewFormGasto(compTab);
+  return `<div class="rc-wrap comp">
+    ${compTab!=='porpagar' ? `<div class="comp-fecha">
+      <button class="icon-btn" id="cfAnt" aria-label="Día anterior">‹</button>
+      <button class="comp-dia" id="cfCal">${svg('turno')}<span><b>${fDia(compDia)}</b><small>${compDia===hoyClave() ? 'Hoy' : kDate(compDia).getFullYear()} · ${del.length} ${del.length===1?'registro':'registros'} · ${fmt(sumar(del, e=> e.total))}</small></span></button>
+      <button class="icon-btn" id="cfSig" aria-label="Día siguiente" ${compDia >= hoyClave() ? 'disabled' : ''}>›</button>
+    </div>
+    <div class="comp-res">${Object.entries(TIPOS_EG).filter(([k])=> adm || k!=='personal').map(([k,t])=> `<span><small>${({productos:'Productos', insumo:'Insumos', operacion:'Operación', personal:'Personal'})[k]}</small><b>${fmt(suma(k))}</b></span>`).join('')}</div>` : ''}
+    <div class="dias filtro">${tabs.map(([k,t])=>`<button class="dia${compTab===k?' on':''}" data-t="${k}">${t}${k==='porpagar' && pend.length ? ' · ' + pend.length : ''}</button>`).join('')}</div>
+    ${cuerpo}
+    ${compTab!=='porpagar' ? listaEgresosDia(del.filter(e=> e.tipo===compTab)) : ''}
+  </div>`;
+}
+function listaEgresosDia(ls){
+  if(!ls.length) return '';
+  return `<div class="rc-day">Registrado este día · ${fmt(sumar(ls, e=> e.total))}</div>` + ls.slice().sort((a,b)=> b.fecha.localeCompare(a.fecha)).map(e=>`<button class="rc-row eg-row" data-id="${e.id}">
+    <span class="rc-ic">${svg(e.tipo==='productos' ? 'compras' : e.metodo==='Efectivo' ? 'cash' : 'card')}</span>
+    <span class="rc-main"><b>${esc(e.tipo==='productos' ? (e.proveedor || 'Compra') : e.concepto)}${saldoEgreso(e) > 0 ? ' <i class="tag-c">Por pagar</i>' : ''}</b><small>${hora(e.fecha)} · ${esc(e.metodo)}${e.delCajon ? ' · del cajón' : ''}${e.tipo==='productos' ? ' · ' + e.lineas.length + ' productos' : ''}${e.nota ? ' · ' + esc(e.nota) : ''}</small></span>
+    <span class="rc-folio">${fmt(e.total)}</span></button>`).join('');
+}
+
+/* ----- Productos ----- */
+function viewCompraProductos(){
+  const provs = [...new Set(store.get('articulos',[]).filter(a=> !a.borrado).map(a=> a.proveedor).filter(Boolean))].sort();
+  const arts = store.get('articulos',[]).filter(a=> !a.borrado && (!compProv || a.proveedor===compProv) && coincideBusqueda([nombreTicket(a), a.sku, a.codigo, a.proveedor].filter(Boolean).join(' '), compQ))
+    .sort((a,b)=> (!!compBorr[b.id] - !!compBorr[a.id]) || (a.proveedor||'zz').localeCompare(b.proveedor||'zz') || nombreTicket(a).localeCompare(nombreTicket(b),'es'));
+  return `<div class="comp-ctl">
+      <select class="field" id="cpProv"><option value="">Todos los proveedores</option>${provs.map(p=>`<option ${p===compProv?'selected':''}>${esc(p)}</option>`).join('')}</select>
+      <button class="ub-b" id="cpNuevo">+ Nuevo producto</button>
+    </div>
+    <div class="rc-search">${svg('search')}<input id="cpQ" placeholder="Buscar producto" value="${esc(compQ)}" autocomplete="off"></div>
+    <div class="cp-h"><span>Producto</span><span>Cantidad</span><span>Costo c/u</span></div>
+    ${arts.map(a=>{ const b = compBorr[a.id] || {};
+      return `<div class="cp-row${b.cant > 0 ? ' on' : ''}" data-pid="${a.id}"><span><b>${esc(nombreTicket(a))}</b><small>${esc(a.proveedor || 'sin proveedor')} · actual ${a.costo ? fmt(a.costo) : 'sin costo'} · hay ${fmtCant(a.id, totalStock(a.id))}${a.activo===false ? ' · oculto' : ''}</small></span>
+        <input class="cp-c" type="number" inputmode="decimal" min="0" step="${a.porKilo?'0.001':'1'}" value="${b.cant || ''}" placeholder="0">
+        <input class="cp-p" type="number" inputmode="decimal" min="0" step="0.01" value="${b.costo ?? (a.costo || '')}" placeholder="$"></div>`; }).join('') || '<div class="rc-empty"><p>Sin productos.</p></div>'}
+    <div class="inv-foot"><span id="cpRes"></span><button class="btn" id="cpOk">Registrar compra</button></div>`;
+}
+const lineasCompra = ()=> Object.entries(compBorr).filter(([k,b])=> !k.startsWith('__') && b && b.cant > 0).map(([pid,b])=> ({pid, nombre:nombreTicket(artPorId(pid)||{nombre:pid}), cant:r3(b.cant), costo:r2(b.costo ?? artPorId(pid)?.costo ?? 0)}));
+function dialogoPago(titulo, total, prov, alGuardar, opts = {}){
+  const t = turnoActual(); let met = opts.metodo || 'Efectivo';
+  const bg = dialogo(`<div class="pg-dlg"></div>`), box = bg.querySelector('.pg-dlg');
+  let foto = null, dias = 7;
+  const pintar = ()=>{
+    box.innerHTML = `<h3>${titulo}</h3><p class="sub">${fmtDiaCorto(compDia)} · <b>${fmt(total)}</b></p>
+      ${opts.pideProveedor ? `<label for="pgProv">Proveedor</label><input class="field" id="pgProv" list="pgProvL" value="${esc(prov||'')}" autocomplete="off"><datalist id="pgProvL">${[...new Set(store.get('articulos',[]).map(a=>a.proveedor).filter(Boolean))].map(p=>`<option value="${esc(p)}">`).join('')}</datalist>` : ''}
+      <label>Forma de pago</label><div class="dias" id="pgMet">${(opts.sinCredito ? METODOS_PAGO.filter(m=> m!=='Crédito') : METODOS_PAGO).map(m=>`<button class="dia${m===met?' on':''}" data-m="${m}">${m==='Crédito'?'A crédito':m}</button>`).join('')}</div>
+      ${met==='Efectivo' ? `<label class="sw-row"><span><b>Pagado con dinero del cajón</b><small>${t ? 'Se resta del efectivo del turno ' + esc(t.folio) : 'No hay turno abierto'}</small></span><input type="checkbox" id="pgCaj" ${t ? 'checked' : 'disabled'}></label>` : ''}
+      ${met==='Crédito' ? `<label>Días de crédito</label><div class="dias" id="pgDias">${[5,7,15,30].map(n=>`<button class="dia${n===dias?' on':''}" data-n="${n}">${n} días</button>`).join('')}</div><p class="note-sm" style="text-align:left">Vence el ${fechaCorta(sumaDias(compDia, dias))}. Queda en "Por pagar".</p>` : ''}
+      <label for="pgNota">Nota (opcional)</label><input class="field" id="pgNota" maxlength="120" autocomplete="off">
+      ${opts.conFoto !== false ? `<label class="ub-b" style="margin-top:10px">${svg('scan')}<span id="pgFotoTx">${foto ? 'Foto lista ✓' : 'Foto del ticket o factura (opcional)'}</span><input type="file" accept="image/*" capture="environment" id="pgFoto" hidden></label>` : ''}
+      <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">Guardar</button></div>`;
+    box.querySelectorAll('#pgMet .dia').forEach(b=> b.onclick = ()=>{ guardaCampos(); met = b.dataset.m; pintar(); });
+    box.querySelectorAll('#pgDias .dia').forEach(b=> b.onclick = ()=>{ guardaCampos(); dias = Number(b.dataset.n); pintar(); });
+    const f = box.querySelector('#pgFoto'); if(f) f.onchange = async e=>{ const x = e.target.files[0]; if(!x) return; try{ foto = await reducirImagen(x, 1000); box.querySelector('#pgFotoTx').textContent = 'Foto lista ✓'; }catch(_){ toast('No se pudo leer la foto'); } };
+    box.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+    box.querySelector('[data-a="si"]').onclick = ()=>{
+      guardaCampos();
+      const pv = opts.pideProveedor ? (prov || '').trim() : prov;
+      if(met==='Crédito' && !pv){ toast('Para comprar a crédito indica el proveedor'); return; }
+      bg.remove();
+      alGuardar({metodo:met, delCajon: met==='Efectivo' && !!box.querySelector('#pgCaj')?.checked && !!t, vence: met==='Crédito' ? sumaDias(compDia, dias) : null, nota, foto, proveedor:pv});
+    };
+  };
+  let nota = '';
+  const guardaCampos = ()=>{ const n = box.querySelector('#pgNota'); if(n) nota = n.value.trim(); const p = box.querySelector('#pgProv'); if(p) prov = p.value; };
+  pintar();
+}
+const fmtDiaCorto = k => kDate(k).toLocaleDateString('es-MX',{weekday:'short', day:'numeric', month:'short'});
+function fechaRegistro(){ const d = kDate(compDia), ahora = new Date(); d.setHours(ahora.getHours(), ahora.getMinutes(), ahora.getSeconds()); return d.toISOString(); }
+function nuevoEgreso(tipo, total, pago, extra){
+  const t = turnoActual(), n = store.get('egresoSeq', 0) + 1; store.set('egresoSeq', n);
+  const e = {id:'E'+Date.now(), folio:`G${store.get('config').numDispositivo||1}-${String(n).padStart(4,'0')}`, tipo, dia:compDia, fecha:fechaRegistro(), total:r2(total),
+    metodo:pago.metodo, delCajon:pago.delCajon, turno: pago.delCajon ? t.folio : (t?.folio || null), nota:pago.nota || '', foto:pago.foto || null, proveedor:pago.proveedor || extra.proveedor || '',
+    credito: pago.metodo==='Crédito' ? {vence:pago.vence} : null, pagos:[], usuario:session.usuario, vendedor:session.nombre, sincronizado:false, ...extra};
+  DB.guardar('egresos', e);
+  return e;
+}
+function registrarCompraProductos(){
+  const ls = lineasCompra();
+  if(!ls.length){ toast('Escribe la cantidad de al menos un producto'); return; }
+  if(ls.some(l=> !(l.costo > 0))){ toast('Falta el costo de algún producto'); return; }
+  const total = r2(ls.reduce((s,l)=> s + l.cant*l.costo, 0)), provs = [...new Set(ls.map(l=> artPorId(l.pid)?.proveedor).filter(Boolean))];
+  dialogoPago(`Compra de ${ls.length} ${ls.length===1?'producto':'productos'}`, total, compProv || (provs.length===1 ? provs[0] : ''), pago=>{
+    const e = nuevoEgreso('productos', total, pago, {lineas:ls});
+    const arts = store.get('articulos', []), ahora = new Date().toISOString();
+    ls.forEach(l=>{ const a = arts.find(x=> x.id===l.pid); if(a && a.costo !== l.costo){ a.costo = l.costo; a.editado = true; a.actualizado = ahora; } });
+    store.set('articulos', arts);
+    moverStock(ls.map(l=> ({ub:'almacen', pid:l.pid, cant:l.cant})), 'compra', e.folio + (e.proveedor ? ' · ' + e.proveedor : ''));
+    compBorr = {}; renderCompras(); toast(`Compra registrada · ${fmt(total)} · entró al almacén`);
+  }, {pideProveedor:true});
+}
+
+/* ----- Insumos, operación y personales ----- */
+function viewFormGasto(tipo){
+  const b = compBorr.__g && compBorr.__g.tipo===tipo ? compBorr.__g : (compBorr.__g = {tipo, concepto:conceptos(tipo)[0] || '', monto:'', otro:''});
+  return `<div class="gform comp-g">
+    ${tipo==='personal' ? `<p class="sub">Salidas de efectivo para uso personal. Se registran aparte y no cuentan como gasto del negocio.</p>` : ''}
+    <div class="gfield"><label>Concepto</label><div class="dias" id="gCon">${conceptos(tipo).map(c=>`<button class="dia${c===b.concepto?' on':''}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}<button class="dia${b.concepto==='__otro'?' on':''}" data-c="__otro">+ Otro</button></div>
+      ${b.concepto==='__otro' ? `<input id="gOtro" maxlength="40" placeholder="Escribe el concepto" value="${esc(b.otro)}" style="margin-top:10px">` : ''}</div>
+    <div class="gfield"><label for="gMonto">Importe</label><input id="gMonto" type="number" inputmode="decimal" min="0" step="0.01" value="${b.monto}" placeholder="0.00"></div>
+    <button class="btn" id="gOk">Registrar ${tipo==='personal' ? 'salida' : 'gasto'}</button>
+  </div>`;
+}
+function registrarGasto(tipo){
+  const b = compBorr.__g; b.monto = document.getElementById('gMonto').value; const o = document.getElementById('gOtro'); if(o) b.otro = o.value.trim();
+  const concepto = b.concepto==='__otro' ? b.otro : b.concepto, m = r2(Number(b.monto)||0);
+  if(!concepto){ toast('Escribe el concepto'); return; }
+  if(!(m > 0)){ toast('Escribe el importe'); document.getElementById('gMonto').focus(); return; }
+  dialogoPago(`${TIPOS_EG[tipo]} · ${concepto}`, m, '', pago=>{
+    if(b.concepto==='__otro') agregarConcepto(tipo, concepto);
+    nuevoEgreso(tipo, m, pago, {concepto});
+    compBorr.__g = null; renderCompras(); toast(`${tipo==='personal' ? 'Salida' : 'Gasto'} registrado · ${fmt(m)}`);
+  }, {pideProveedor: tipo==='insumo', sinCredito: tipo==='personal', metodo: tipo==='personal' ? 'Efectivo' : undefined});
+}
+
+/* ----- Por pagar ----- */
+function viewPorPagar(){
+  const ls = egresosVivos().filter(e=> saldoEgreso(e) > 0.004).sort((a,b)=> (a.credito?.vence||'').localeCompare(b.credito?.vence||''));
+  if(!ls.length) return `<div class="rc-empty">${svg('check')}<p>No hay compras pendientes de pago.</p></div>`;
+  const g = {}; ls.forEach(e=> (g[e.proveedor || 'Sin proveedor'] ||= []).push(e));
+  const hoy = hoyClave();
+  return `<div class="comp-kpi"><small>Total por pagar</small><b>${fmt(sumar(ls, saldoEgreso))}</b><span>${sumar(ls.filter(e=> e.credito?.vence < hoy), saldoEgreso) ? `<b class="neg">${fmt(sumar(ls.filter(e=> e.credito?.vence < hoy), saldoEgreso))} vencido</b>` : 'nada vencido'}</span></div>` +
+    Object.entries(g).map(([p, xs])=> `<div class="rc-day">${esc(p)} · ${fmt(sumar(xs, saldoEgreso))}</div>` + xs.map(e=>{ const v = e.credito?.vence, d = v ? diasEntre(hoy, v) : null;
+      return `<button class="rc-row pp-row" data-id="${e.id}"><span class="cr-dot" style="background:${d < 0 ? COLOR_EST.venc : d <= 2 ? COLOR_EST.prox : COLOR_EST.ok}"></span>
+        <span class="rc-main"><b>${esc(e.folio)} · ${fmtDiaCorto(e.dia)}</b><small>total ${fmt(e.total)}${(e.pagos||[]).length ? ' · pagado ' + fmt(r2(e.total - saldoEgreso(e))) : ''} · ${v ? (d < 0 ? `<b class="neg">venció hace ${-d} días</b>` : d === 0 ? '<b class="warn">vence hoy</b>' : 'vence ' + dm(v)) : ''}</small></span>
+        <span class="cr-amt"><b>${fmt(saldoEgreso(e))}</b></span></button>`; }).join('')).join('');
+}
+function pagarEgreso(e){
+  const saldo = saldoEgreso(e), t = turnoActual();
+  const bg = dialogo(`<h3>Pagar a ${esc(e.proveedor || 'proveedor')}</h3><p class="sub">${esc(e.folio)} · saldo ${fmt(saldo)}</p>
+    <label for="peM">Importe</label><div class="money"><span>$</span><input class="field" id="peM" type="number" inputmode="decimal" min="0" step="0.01" value="${saldo}"></div>
+    <label>Forma de pago</label><div class="dias" id="peMet">${['Efectivo','Transferencia','Tarjeta'].map((m,i)=>`<button class="dia${i===0?' on':''}" data-m="${m}">${m}</button>`).join('')}</div>
+    <label class="sw-row"><span><b>Pagado con dinero del cajón</b><small>${t ? 'Turno ' + esc(t.folio) : 'No hay turno abierto'}</small></span><input type="checkbox" id="peCaj" ${t ? 'checked' : 'disabled'}></label>
+    <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">Registrar pago</button></div>`);
+  let met = 'Efectivo';
+  bg.querySelectorAll('#peMet .dia').forEach(b=> b.onclick = ()=>{ met = b.dataset.m; bg.querySelectorAll('#peMet .dia').forEach(x=> x.classList.toggle('on', x===b)); bg.querySelector('#peCaj').closest('.sw-row').style.display = met==='Efectivo' ? '' : 'none'; });
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  bg.querySelector('[data-a="si"]').onclick = ()=>{
+    const m = r2(Number(bg.querySelector('#peM').value)||0);
+    if(!(m > 0) || m > saldo + 0.004){ toast(`El pago debe ser de $0.01 a ${fmt(saldo)}`); return; }
+    const caj = met==='Efectivo' && bg.querySelector('#peCaj').checked && !!t;
+    e.pagos = [...(e.pagos||[]), {fecha:new Date().toISOString(), monto:m, metodo:met, delCajon:caj, turno: caj ? t.folio : null, usuario:session.usuario}];
+    e.sincronizado = false; DB.guardar('egresos', e); bg.remove(); renderCompras(); toast(saldoEgreso(e) > 0.004 ? `Abono registrado · resta ${fmt(saldoEgreso(e))}` : 'Compra liquidada');
+  };
+}
+function detalleEgreso(e){
+  const adm = session.rol==='admin';
+  const bg = dialogo(`<h3>${esc(TIPOS_EG[e.tipo])}</h3><p class="sub">${esc(e.folio)} · ${new Date(e.fecha).toLocaleString('es-MX',{dateStyle:'medium', timeStyle:'short'})} · ${esc(e.vendedor||'')}</p>
+    <dl class="meta">${e.proveedor ? `<dt>Proveedor</dt><dd>${esc(e.proveedor)}</dd>` : ''}${e.concepto ? `<dt>Concepto</dt><dd>${esc(e.concepto)}</dd>` : ''}
+      <dt>Total</dt><dd>${fmt(e.total)}</dd><dt>Pago</dt><dd>${esc(e.metodo)}${e.delCajon ? ' · del cajón' : ''}</dd>
+      ${e.credito ? `<dt>Vence</dt><dd>${fechaCorta(e.credito.vence)}</dd><dt>Saldo</dt><dd class="${saldoEgreso(e) ? 'neg' : 'pos'}">${saldoEgreso(e) ? fmt(saldoEgreso(e)) : 'Pagado'}</dd>` : ''}
+      ${e.nota ? `<dt>Nota</dt><dd>${esc(e.nota)}</dd>` : ''}</dl>
+    ${e.lineas ? `<div class="deuda">${e.lineas.map(l=>`<div class="deuda-r"><span>${esc(l.nombre)}<small>${fmtExist(l.cant)} × ${fmt(l.costo)}</small></span><b>${fmt(r2(l.cant*l.costo))}</b></div>`).join('')}</div>` : ''}
+    ${e.foto ? `<img src="${e.foto}" style="width:100%;border-radius:10px;margin-top:8px">` : ''}
+    <div class="cd-acts">${saldoEgreso(e) > 0 && adm ? `<button class="btn" data-a="pagar">Registrar pago</button>` : ''}${adm ? `<button class="btn ghost danger-o" data-a="canc">Cancelar registro</button>` : ''}<button class="btn ghost" data-a="x">Cerrar</button></div>`);
+  bg.querySelector('[data-a="x"]').onclick = ()=> bg.remove();
+  const pg = bg.querySelector('[data-a="pagar"]'); if(pg) pg.onclick = ()=>{ bg.remove(); pagarEgreso(e); };
+  const cc = bg.querySelector('[data-a="canc"]');
+  if(cc) cc.onclick = ()=>{ bg.remove(); confirmar({titulo:'Cancelar registro', peligro:true, ok:'Cancelar registro',
+    texto:`${esc(e.folio)} por ${fmt(e.total)}.${e.tipo==='productos' ? ' Los productos se restan del almacén.' : ''}${e.delCajon ? ' El efectivo vuelve a contar en el cajón.' : ''}`,
+    alAceptar:()=>{ e.cancelado = {fecha:new Date().toISOString(), usuario:session.usuario}; e.sincronizado = false; DB.guardar('egresos', e);
+      if(e.tipo==='productos') moverStock(e.lineas.map(l=> ({ub:'almacen', pid:l.pid, cant:-l.cant})), 'compra', e.folio + ' cancelada');
+      renderCompras(); toast('Registro cancelado'); }}); };
+}
+function elegirDia(actual, cb){
+  let mes = kDate(actual); mes.setDate(1); const hoy = hoyClave(), con = new Set(egresosVivos().map(e=> e.dia));
+  const bg = dialogo(`<div class="cal"></div>`), box = bg.querySelector('.cal');
+  const pintar = ()=>{
+    const y = mes.getFullYear(), m = mes.getMonth(), primero = (new Date(y,m,1).getDay()+6)%7, dimes = new Date(y,m+1,0).getDate();
+    let c = ''; for(let i=0;i<primero;i++) c += '<span></span>';
+    for(let d=1; d<=dimes; d++){ const k = hoyClave(new Date(y,m,d)); c += `<button class="cal-d${k===actual?' ext':''}${k===hoy?' hoy':''}" data-k="${k}" ${k > hoy ? 'disabled' : ''}>${d}${con.has(k)?'<i></i>':''}</button>`; }
+    box.innerHTML = `<h3>Elegir fecha</h3><div class="cal-nav"><button class="icon-btn" data-m="-1">‹</button><b>${(t=> t.charAt(0).toUpperCase()+t.slice(1))(mes.toLocaleDateString('es-MX',{month:'long', year:'numeric'}))}</b><button class="icon-btn" data-m="1">›</button></div>
+      <div class="cal-g">${['L','M','M','J','V','S','D'].map(x=>`<em>${x}</em>`).join('')}${c}</div>
+      <div class="sheet-actions"><button class="btn ghost" data-a="hoy">Hoy</button><button class="btn ghost" data-a="no">Cancelar</button></div>`;
+    box.querySelectorAll('[data-m]').forEach(b=> b.onclick = ()=>{ mes.setMonth(mes.getMonth() + Number(b.dataset.m)); pintar(); });
+    box.querySelectorAll('.cal-d').forEach(b=> b.onclick = ()=>{ bg.remove(); cb(b.dataset.k); });
+    box.querySelector('[data-a="hoy"]').onclick = ()=>{ bg.remove(); cb(hoy); };
+    box.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  };
+  pintar();
+}
+function renderCompras(){
+  const view = document.getElementById('view'), y = window.scrollY;
+  view.innerHTML = viewCompras2(); renderHeader(); window.scrollTo(0, y);
+  const $ = id => document.getElementById(id), on = (id, f)=>{ const e = $(id); if(e) e.onclick = f; };
+  document.querySelectorAll('.comp > .dias.filtro .dia').forEach(b=> b.onclick = ()=>{ compTab = b.dataset.t; compBorr.__g = null; renderCompras(); window.scrollTo(0,0); });
+  on('cfCal', ()=> elegirDia(compDia, k=>{ compDia = k; renderCompras(); }));
+  on('cfAnt', ()=>{ compDia = sumaDias(compDia, -1); renderCompras(); });
+  on('cfSig', ()=>{ compDia = sumaDias(compDia, 1); renderCompras(); });
+  document.querySelectorAll('.eg-row').forEach(b=> b.onclick = ()=> detalleEgreso(DB.egresos.find(e=> e.id===b.dataset.id)));
+  document.querySelectorAll('.pp-row').forEach(b=> b.onclick = ()=> detalleEgreso(DB.egresos.find(e=> e.id===b.dataset.id)));
+  if(compTab==='productos'){
+    const leer = ()=> document.querySelectorAll('.cp-row').forEach(r=>{ const c = Number(r.querySelector('.cp-c').value)||0, p = r.querySelector('.cp-p').value; if(c > 0 || compBorr[r.dataset.pid]) compBorr[r.dataset.pid] = {cant:c, costo: p==='' ? null : Number(p)}; if(!(c > 0)) delete compBorr[r.dataset.pid]; });
+    const pinta = ()=>{ const ls = lineasCompra(); $('cpRes').innerHTML = ls.length ? `${ls.length} productos · <b>${fmt(r2(ls.reduce((s,l)=> s + l.cant*l.costo, 0)))}</b>` : 'Escribe cantidades'; };
+    document.querySelectorAll('.cp-row input').forEach(i=> i.oninput = ()=>{ leer(); i.closest('.cp-row').classList.toggle('on', Number(i.closest('.cp-row').querySelector('.cp-c').value) > 0); pinta(); });
+    $('cpProv').onchange = e=>{ leer(); compProv = e.target.value; renderCompras(); };
+    const q = $('cpQ'); q.oninput = ()=>{ leer(); compQ = q.value; const pos = q.selectionStart; renderCompras(); const n = $('cpQ'); n.focus(); n.setSelectionRange(pos,pos); };
+    on('cpNuevo', ()=>{ leer(); volverACompras = true; go('articulos'); artSel = null; artBorrador = null; artVista = 'editar'; renderArticulos(); if(compProv){ const p = document.getElementById('aProv'); if(p) p.value = compProv; } });
+    on('cpOk', ()=>{ leer(); registrarCompraProductos(); }); pinta();
+  } else if(compTab!=='porpagar'){
+    document.querySelectorAll('#gCon .dia').forEach(b=> b.onclick = ()=>{ const g = compBorr.__g; g.monto = $('gMonto').value; const o = $('gOtro'); if(o) g.otro = o.value; g.concepto = b.dataset.c; renderCompras(); if(g.concepto==='__otro') $('gOtro').focus(); });
+    on('gOk', ()=> registrarGasto(compTab));
+  }
+}
+/* Gastos del periodo para Informes */
+function gastosRango(a, b){
+  const ls = egresosVivos().filter(e=> e.dia >= a && e.dia <= b && e.tipo!=='productos'), g = {};
+  ls.forEach(e=>{ const k = e.tipo + '|' + e.concepto; g[k] = r2((g[k]||0) + e.total); });
+  return {insumo: sumar(ls.filter(e=> e.tipo==='insumo'), e=> e.total), operacion: sumar(ls.filter(e=> e.tipo==='operacion'), e=> e.total), personal: sumar(ls.filter(e=> e.tipo==='personal'), e=> e.total), detalle:g};
+}
+
 /* ================= Informes ================= */
 let infDesde = null, infHasta = null, infComp = 'anterior', infTab = 'resumen', infOrden = 'ventas', infCat = '', infCliF = 'todos', infAnio = new Date().getFullYear(), infAbierto = null;
 const infTips = {};
@@ -6264,6 +6514,15 @@ function infResumen(comp){
     </div>
     ${A.devol > 0 ? `<p class="note-sm" style="text-align:left">Devoluciones de clientes descontadas: <b>${fmt(A.devol)}</b>${B && B.devol ? ' (comparación '+fmt(B.devol)+')' : ''}.</p>` : ''}
     ${A.ahorro > 0 ? `<p class="note-sm" style="text-align:left">Descuento por promociones en el periodo: <b>${fmt(A.ahorro)}</b>${B && B.ahorro ? ' (comparación '+fmt(B.ahorro)+')' : ''}.</p>` : ''}
+    ${(G => (G.insumo || G.operacion || G.personal || util(A)) ? `<div class="card cajon inf-card"><h3>Utilidad neta</h3>
+      ${filaCj('Utilidad bruta (ventas − costo)', util(A))}
+      ${filaCj('Insumos', G.insumo, '-', 'sub')}
+      ${filaCj('Gastos de operación', G.operacion, '-', 'sub')}
+      ${Object.entries(G.detalle).filter(([k])=> !k.startsWith('personal')).sort((a,b)=> b[1]-a[1]).slice(0,6).map(([k,v])=> `<div class="cj-row sub"><span>· ${esc(k.split('|')[1])}</span><b>${fmt(v)}</b></div>`).join('')}
+      <div class="cj-teo"><span>Utilidad neta</span><b>${fmt(r2(util(A) - G.insumo - G.operacion))}</b></div>
+      ${G.personal ? `<p class="note-sm" style="text-align:left">Gastos personales en el periodo (aparte): <b>${fmt(G.personal)}</b></p>` : ''}
+      ${incompleto(A) ? '<p class="note-sm" style="text-align:left">Hay ventas sin costo capturado: la utilidad puede ser mayor a la real.</p>' : ''}
+    </div>` : '')(gastosRango(infDesde, infHasta))}
     <div class="card cajon inf-card"><h3>Ventas ${nombreModo}</h3>${leyenda(comp)}${barras('tiempo', sA.labels, sA.val, sB ? sB.val : null, {cada:sA.cada, tips:tipsT})}</div>
     <div class="card cajon inf-card"><h3>Por día de la semana</h3><p class="sub" style="margin:0 0 6px">Total vendido cada día de visita en el periodo</p>${leyenda(comp)}${barras('semana', DIAS_CORTOS, semA, rB ? semB : null)}</div>
     <div class="card cajon inf-card"><h3>Forma de pago</h3>${['Efectivo','Tarjeta','Crédito'].map(m=>`<div class="cj-row"><span>${m}</span><b>${fmt(A.met[m]||0)} ${B ? delta(A.met[m]||0, B.met[m]||0) : ''}</b></div>`).join('')}</div>
@@ -6966,8 +7225,8 @@ function go(id){
   document.querySelector('main').classList.toggle('flush', esVenta);
   view.classList.toggle('wide', esVenta);
   document.querySelector('.popover')?.remove();
-  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes'].includes(id));
-  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes'].includes(id));
+  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
+  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
   if(id==='turno'){ if(!turnoActual()) turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
@@ -6975,6 +7234,7 @@ function go(id){
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
   else if(id==='catalogo'){ catVista = 'ver'; renderCatalogo(); }
   else if(id==='mapa'){ mapaDia = null; renderMapa(); }
+  else if(id==='compras'){ compDia = compDia || hoyClave(); renderCompras(); }
   else if(id==='informes'){ infTab = 'resumen'; infAbierto = null; renderInformes(); }
   else if(id==='inventario'){ invVista = 'inicio'; invBorr = null; invQ = ''; invFiltro = 'todos'; renderInventario(); }
   else if(id==='creditos'){ credVista = 'inicio'; credCli = null; credFiltro = 'todos'; credQ = ''; renderCreditos(); }
@@ -7037,7 +7297,7 @@ document.getElementById('logoutBtn').onclick = ()=>{
 /* ================= Utilidades ================= */
 const drawer = document.getElementById('drawer'), scrim = document.getElementById('scrim');
 document.getElementById('menuBtn').onclick = ()=>{
-  if(current==='articulos' && artVista==='editar'){ artVista = 'lista'; artSel = null; artBorrador = null; renderArticulos(); return; }
+  if(current==='articulos' && artVista==='editar'){ artVista = 'lista'; artSel = null; artBorrador = null; if(volverACompras){ volverACompras = false; go('compras'); return; } renderArticulos(); return; }
   if(current==='config' && cfgVista!=='inicio'){ cfgVista = (cfgVista==='impEdit' || cfgVista==='ticketDatos') ? 'impresoras' : 'inicio'; renderConfig(); return; }
   if(current==='creditos' && credVista!=='inicio'){ atrasCreditos(); return; }
   if(current==='inventario' && invVista!=='inicio'){ atrasInv(); return; }
