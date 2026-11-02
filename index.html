@@ -1867,7 +1867,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.32';
+const APP_VERSION = '0.32.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2568,8 +2568,8 @@ function renderVenta(){
   if(ventaVista==='cotizacion'){
     view.innerHTML = viewCotizacion(); renderHeader(); bindCotizacion(); window.scrollTo(0,0); return;
   }
-  if(['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet'].includes(ventaVista)){
-    view.innerHTML = {programar:viewProgramar, programado:viewProgramado, pedidos:viewPedidos, inicioPre:viewInicioPre, pedidoDet:viewPedidoDet,
+  if(['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet','recibidos'].includes(ventaVista)){
+    view.innerHTML = {recibidos:viewPedidosRec, programar:viewProgramar, programado:viewProgramado, pedidos:viewPedidos, inicioPre:viewInicioPre, pedidoDet:viewPedidoDet,
                       inicioCot:viewInicioCot, cotHist:viewCotHist, cotDet:viewCotDet}[ventaVista]();
     renderHeader();
     if(ventaVista==='inicioCot') bindInicioCot();
@@ -2578,6 +2578,7 @@ function renderVenta(){
     else if(ventaVista==='programar') bindProgramar();
     else if(ventaVista==='programado') bindProgramado();
     else if(ventaVista==='inicioPre') bindInicioPre();
+    else if(ventaVista==='recibidos'){ document.querySelectorAll('.pr-row').forEach(b=> b.onclick = ()=> detallePedidoRec(b.dataset.id)); document.getElementById('prPegar').onclick = pegarPedido; }
     else if(ventaVista==='pedidos'){
       document.querySelectorAll('[data-ped]').forEach(el=> el.onclick = ()=>{ pedidoSel = el.dataset.ped; ventaVista = 'pedidoDet'; renderVenta(); });
       const vp = document.getElementById('vacioProg'); if(vp) vp.onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
@@ -3822,11 +3823,14 @@ function viewInicioPre(){
       <small>${n ? `Tienes un pedido en curso${t.cliente?' de '+esc(t.cliente.nombre):''} con ${n} ${n===1?'producto':'productos'}` : 'Elegir cliente y productos para programar su entrega'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optProgramadas"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Ventas programadas</b>
       <small>${prox.length ? `${prox.length} por entregar${deHoy?` · ${deHoy} hoy`:''}${deManana?` · ${deManana} mañana`:''}` : 'No hay ventas programadas'}</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optRecibidos"><span class="cl-opt-ic">${svg('catalogo')}</span><span><b>Pedidos recibidos${nuevosRecibidos() ? ` <i class="cat-badge">${nuevosRecibidos()}</i>` : ''}</b>
+      <small>${pedidosRecibidos().length ? `${nuevosRecibidos()} nuevos · ${pedidosRecibidos().length} en total` : 'Pedidos que envían tus clientes desde Cliente consentido'}</small></span>${svg('chev')}</button>
   </div>`;
 }
 function bindInicioPre(){
   document.getElementById('optProgramar').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
   document.getElementById('optProgramadas').onclick = ()=>{ ventaVista = 'pedidos'; renderVenta(); };
+  document.getElementById('optRecibidos').onclick = ()=>{ ventaVista = 'recibidos'; renderVenta(); };
 }
 let pedidoSel = null;
 function viewPedidoDet(){
@@ -3982,8 +3986,8 @@ function renderHeader(){
   const pill = document.getElementById('shiftPill');
   const acts = document.getElementById('headActions');
   const mb = document.getElementById('menuBtn');
-  if(enVenta() && ['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet'].includes(ventaVista)){
-    title.textContent = {programar:'Programar entrega', programado:'Entrega programada', pedidos:'Ventas programadas', inicioPre:'Preventa', pedidoDet:'Venta programada',
+  if(enVenta() && ['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet','recibidos'].includes(ventaVista)){
+    title.textContent = {recibidos:'Pedidos recibidos', programar:'Programar entrega', programado:'Entrega programada', pedidos:'Ventas programadas', inicioPre:'Preventa', pedidoDet:'Venta programada',
                          inicioCot:'Cotizar', cotHist:'Cotizaciones realizadas', cotDet:'Cotización'}[ventaVista];
     pill.classList.add('hidden');
     acts.innerHTML = '';
@@ -4822,7 +4826,7 @@ function viewCatalogo(){
 }
 function renderCatalogo(){
   document.getElementById('view').innerHTML = viewCatalogo(); renderHeader();
-  if(catVista==='pedidos'){ document.querySelectorAll('.pr-row').forEach(b=> b.onclick = ()=> detallePedidoRec(b.dataset.id)); return; }
+  if(catVista==='pedidos'){ document.querySelectorAll('.pr-row').forEach(b=> b.onclick = ()=> detallePedidoRec(b.dataset.id)); document.getElementById('prPegar').onclick = pegarPedido; return; }
   document.getElementById('catEnviar').onclick = ()=> elegirClienteSimple(enviarCatalogo);
   document.getElementById('catPed').onclick = ()=>{ catVista = 'pedidos'; renderCatalogo(); window.scrollTo(0,0); };
   const pub = document.getElementById('catPub'); if(pub) pub.onclick = ()=> publicarConAviso();
@@ -5679,31 +5683,53 @@ function decodificarPedido(txt){
   const b = txt.replace(/-/g,'+').replace(/_/g,'/'), json = decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4))));
   return JSON.parse(json);
 }
+function importarPedido(raw){
+  const o = decodificarPedido(raw);
+  if(!o || !o.id || !Array.isArray(o.l)) return null;
+  const ls = pedidosRecibidos();
+  if(ls.some(p=> p.id===o.id)) return {id:o.id, repetido:true};
+  const c = o.c ? clientes().find(x=> x.catalogo===o.c) : null;
+  ls.push({id:o.id, fecha:o.f || new Date().toISOString(), recibido:new Date().toISOString(), token:o.c || null, clienteId:c?.id || null,
+    cliente:{nombre:o.cli?.n || c?.nombre || 'Cliente', tienda:o.cli?.t || c?.tienda || '', telefono:o.cli?.tel || c?.telefono || ''},
+    lineas:o.l.map(([pid, cant, precio, nombre])=> ({pid, cantidad:Number(cant), precio:Number(precio), nombre: nombre || nombreTicket(artPorId(pid) || {nombre:pid}), porKilo: !!artPorId(pid)?.porKilo})),
+    nota:o.nota || '', estado:'Nuevo'});
+  store.set('pedidosRecibidos', ls);
+  return {id:o.id, repetido:false};
+}
 (function recibirPedidoDeLink(){
   try{
-    const q = new URLSearchParams(location.search), raw = q.get('pedido'); if(!raw) return;
-    const o = decodificarPedido(raw);
-    if(o && o.id && Array.isArray(o.l)){
-      const ls = pedidosRecibidos();
-      if(!ls.some(p=> p.id===o.id)){
-        const c = o.c ? clientes().find(x=> x.catalogo===o.c) : null;
-        ls.push({id:o.id, fecha:o.f || new Date().toISOString(), recibido:new Date().toISOString(), token:o.c || null, clienteId:c?.id || null,
-          cliente:{nombre:o.cli?.n || c?.nombre || 'Cliente', tienda:o.cli?.t || c?.tienda || '', telefono:o.cli?.tel || c?.telefono || ''},
-          lineas:o.l.map(([pid, cant, precio, nombre])=> ({pid, cantidad:Number(cant), precio:Number(precio), nombre: nombre || nombreTicket(artPorId(pid) || {nombre:pid}), porKilo: !!artPorId(pid)?.porKilo})),
-          nota:o.nota || '', estado:'Nuevo'});
-        store.set('pedidosRecibidos', ls);
-      }
-      store.set('abrirPedidoRec', o.id);
-    }
-    history.replaceState(null, '', location.pathname);
-  }catch(_){ try{ history.replaceState(null, '', location.pathname); }catch(__){} }
+    const raw = new URLSearchParams(location.search).get('pedido'); if(!raw) return;
+    const r = importarPedido(raw); if(r) store.set('abrirPedidoRec', r.id);
+  }catch(_){}
+  try{ if(location.search.includes('pedido=')) history.replaceState(null, '', location.pathname); }catch(_){}
 })();
+/* Pegar el mensaje de WhatsApp cuando el link se abrió en otro navegador */
+function procesarTextoPedido(txt){
+  const m = String(txt||'').match(/pedido=([A-Za-z0-9_\-]+)/);
+  if(!m){ toast('No encontré un pedido en ese texto. Copia el mensaje completo del cliente'); return false; }
+  let r = null; try{ r = importarPedido(m[1]); }catch(_){}
+  if(!r){ toast('El pedido está incompleto. Pide al cliente que lo envíe de nuevo'); return false; }
+  toast(r.repetido ? 'Ese pedido ya estaba registrado' : 'Pedido agregado'); renderMenu();
+  current==='catalogo' ? renderCatalogo() : renderVenta(); setTimeout(()=> detallePedidoRec(r.id), 80);
+  return true;
+}
+async function pegarPedido(){
+  try{ const t = await navigator.clipboard.readText(); if(t && /pedido=/.test(t)) return procesarTextoPedido(t); }catch(_){}
+  const bg = dialogo(`<h3>Pegar pedido</h3><p class="sub">En WhatsApp mantén presionado el mensaje del cliente → Copiar. Luego pégalo aquí.</p>
+    <textarea class="field" id="ppTxt" rows="5" placeholder="Pega aquí el mensaje"></textarea>
+    <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">Agregar pedido</button></div>`);
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  bg.querySelector('[data-a="si"]').onclick = ()=>{ if(procesarTextoPedido(bg.querySelector('#ppTxt').value)) bg.remove(); };
+  setTimeout(()=> bg.querySelector('#ppTxt').focus(), 50);
+}
 const totalPedRec = p => r2(p.lineas.reduce((s,l)=> s + l.precio*l.cantidad, 0));
 function viewPedidosRec(){
   const ls = pedidosRecibidos().slice().sort((a,b)=> b.recibido.localeCompare(a.recibido));
-  if(!ls.length) return `<div class="rc-wrap"><div class="rc-empty">${svg('catalogo')}<p>Aún no llegan pedidos del catálogo.<br>Cuando un cliente envíe su pedido por WhatsApp, toca el link del mensaje y aparecerá aquí.</p></div></div>`;
+  const pegar = `<div class="cr-pad" style="padding-top:12px"><button class="btn" id="prPegar" style="margin-top:0">${svg('copy')}Pegar pedido de WhatsApp</button>
+    <p class="note-sm" style="text-align:left">Copia el mensaje del cliente en WhatsApp y toca este botón. Si al tocar el link del mensaje se abre tu app, el pedido entra solo.</p></div>`;
+  if(!ls.length) return `<div class="rc-wrap">${pegar}<div class="rc-empty">${svg('catalogo')}<p>Aún no hay pedidos registrados.</p></div></div>`;
   const col = {Nuevo:'tag-v', Atendido:'tag-v', Descartado:'tag-c'};
-  return `<div class="rc-wrap">${ls.map(p=>`<button class="rc-row pr-row" data-id="${p.id}">
+  return `<div class="rc-wrap">${pegar}${ls.map(p=>`<button class="rc-row pr-row" data-id="${p.id}">
     <span class="rc-ic">${svg(p.estado==='Nuevo' ? 'alert' : 'check')}</span>
     <span class="rc-main"><b>${esc(p.cliente.tienda || p.cliente.nombre)} <i class="${col[p.estado]}">${p.estado}</i></b><small>${new Date(p.fecha).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${p.lineas.length} productos${p.clienteId ? '' : ' · cliente no registrado'}</small></span>
     <span class="rc-folio">${fmt(totalPedRec(p))}</span></button>`).join('')}</div>`;
@@ -5723,7 +5749,7 @@ function detallePedidoRec(id){
     </div>`);
   const act = (a, f)=>{ const b = bg.querySelector(`[data-a="${a}"]`); if(b) b.onclick = ()=>{ bg.remove(); f(); }; };
   act('x', ()=>{}); act('wa', ()=> window.open(urlWa(p.cliente.telefono, `Hola ${p.cliente.nombre}, recibimos tu pedido por ${fmt(totalPedRec(p))}. ¡Gracias!`), '_blank'));
-  act('desc', ()=>{ marcarPedRec(p.id, 'Descartado'); renderCatalogo(); });
+  act('desc', ()=>{ marcarPedRec(p.id, 'Descartado'); current==='catalogo' ? renderCatalogo() : renderVenta(); });
   act('pre', ()=> cargarPedidoRec(p, 'preventa')); act('venta', ()=> cargarPedidoRec(p, 'venta'));
 }
 function marcarPedRec(id, estado){ store.set('pedidosRecibidos', pedidosRecibidos().map(x=> x.id===id ? {...x, estado, atendido: new Date().toISOString()} : x)); renderMenu(); }
@@ -6832,6 +6858,7 @@ document.getElementById('menuBtn').onclick = ()=>{
   if(enVenta() && ventaVista==='cotizacion'){ ventaVista = 'ticket'; renderVenta(); return; }
   if(enVenta() && ventaVista==='programar'){ ventaVista = 'ticket'; renderVenta(); return; }
   if(enVenta() && ventaVista==='pedidoDet'){ ventaVista = 'pedidos'; renderVenta(); return; }
+  if(enVenta() && ventaVista==='recibidos'){ ventaVista = 'inicioPre'; renderVenta(); return; }
   if(enVenta() && ventaVista==='pedidos'){ ventaVista = esPre() ? 'inicioPre' : 'grid'; renderVenta(); return; }
   if(enVenta() && esPre() && ventaVista==='grid'){ ventaVista = 'inicioPre'; renderVenta(); return; }
   if(enVenta() && esCot() && ventaVista==='grid'){ ventaVista = 'inicioCot'; renderVenta(); return; }

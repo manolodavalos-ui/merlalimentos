@@ -72,6 +72,7 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 .vacio{text-align:center;color:var(--muted);padding:30px 10px}
 .aviso{background:#fff7e6;color:#8a5a00;border-radius:12px;padding:10px 12px;font-size:.86rem;margin:12px 0 0}
 .ok{width:64px;height:64px;border-radius:50%;background:var(--soft);display:grid;place-items:center;margin:4px auto 10px;font-size:2rem;color:var(--brand)}
+.vg-x{display:flex;align-items:center;gap:6px;margin:-4px 0 10px auto;padding:8px 12px;border-radius:999px;background:var(--bg);font-weight:700;font-size:.9rem;color:var(--text)}
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#1c2321;color:#fff;padding:10px 16px;border-radius:12px;font-size:.9rem;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
 .pie{text-align:center;color:var(--muted);font-size:.78rem;padding:10px 0 30px}
@@ -520,7 +521,7 @@ async function cargar(){
   /* quita del carrito lo que ya no está */
   Object.keys(carrito).forEach(id=>{ if(!prodPorId(id)) delete carrito[id]; }); guardarCarrito();
   $('sub').textContent = 'Merkalimentos · actualizado ' + new Date(D.publicado).toLocaleDateString('es-MX',{day:'numeric', month:'long', year:'numeric'});
-  $('hola').innerHTML = CLI ? `<span class="hola">Hola, ${esc(CLI.t || CLI.n)}${Object.keys(CLI.precios||{}).length ? ' · con tus precios' : ''}</span>` : '';
+  $('hola').innerHTML = CLI ? `<span class="hola">Hola, ${esc(CLI.n)}, aquí podrás encontrar nuestros productos con tus precios</span>` : '';
   pintar();
 }
 function pintar(){
@@ -575,11 +576,13 @@ function pedirKg(p){
 }
 function verGrande(id){
   const p = prodPorId(id), f = foto(p), pe = precio(p);
-  hoja(`${f ? `<img src="${f}" style="width:100%;border-radius:12px;background:#f6f8f7">` : ''}
+  const h = hoja(`<button class="vg-x" id="vgX" aria-label="Cerrar">✕ Cerrar</button>
+    ${f ? `<img src="${f}" style="width:100%;border-radius:12px;background:#f6f8f7">` : ''}
     <h3 style="margin-top:10px">${esc(nombre(p))}</h3><p class="sub">${esc(p.pr || '')}</p>
     <div class="tot"><span>${pe !== p.p ? 'Tu precio' : 'Precio'}</span><span>${fmt(pe)}${p.kg ? ' /kg' : ''}</span></div>
-    ${p.may ? `<p class="sub">${esc(p.may)}</p>` : ''}
-    <div class="acts"><button class="btn" id="vgAdd">Agregar al pedido</button></div>`, true).querySelector('#vgAdd').onclick = function(){ this.closest('.hoja').remove(); if(modo!=='pedido'){ modo = 'pedido'; pintar(); } agregar(id); };
+    ${pe !== p.p ? '' : p.promo ? `<p class="sub">Promo ${esc(p.promo)}</p>` : p.may ? `<p class="sub">${esc(p.may)}</p>` : ''}
+    <div class="acts"><button class="btn sec" id="vgCerrar">Cerrar</button></div>`, true);
+  h.querySelector('#vgX').onclick = h.querySelector('#vgCerrar').onclick = ()=> h.remove();
 }
 function verTicket(){
   const ids = Object.keys(carrito);
