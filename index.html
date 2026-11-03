@@ -700,6 +700,7 @@ dd.pos{color:var(--brand)}
 .tr-amt{text-align:right}.tr-amt small{font-size:.7rem}.tr-amt b{font-size:1.05rem}
 .ver-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:.72rem;color:var(--muted)}
 .ver-row button{padding:6px 10px;border-radius:999px;border:1.5px solid var(--line);color:var(--brand);font-weight:700;font-size:.78rem;background:#fff}
+.tk-ayuda{display:block;color:var(--muted);font-size:.78rem;margin-top:4px}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1915,7 +1916,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.35.3';
+const APP_VERSION = '0.36';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2446,6 +2447,19 @@ function siguienteSku(cat, lista){
   ls.filter(a=> /pizza/i.test(a.nombre||'') && !a.borrado && vacio(a)).forEach(a=>{ a.costo = 38.25; a.editado = true; });
   store.set('articulos', ls);
   store.set('migraciones', [...store.get('migraciones', []), CLAVE]);
+})();
+
+/* Nombre corto para el ticket impreso */
+const compactarPres = t => String(t||'').replace(/(\d)\s+(g|kg|ml|l|pzas?)\b/gi, '$1$2');
+const nombreTkAuto = a => compactarPres([a.nombre, presCorta(a)].filter(Boolean).join(' '));
+const nombreTk = l => { const a = artPorId(l.pid); return (a && (a.nombreTk || nombreTkAuto(a))) || l.nombre; };
+(function nombresTicketNov2026(){
+  const CLAVE = 'nombres-ticket-2026-11-03';
+  if(store.get('migraciones', []).includes(CLAVE)) return;
+  const N = {"p001": "Jamón pavo FUD 170g", "p002": "Jamón pavo/cerdo FUD", "p003": "Jamón Marietta 190g", "p004": "Jamón cocido Chimex", "p005": "Jamón pierna Chimex", "p006": "Jamón pavo Aros 1kg", "p007": "Jamón Virginia FUD", "p008": "Jamón S.Rafael 250g", "p009": "Salchicha Chimex 400g", "p010": "Salchicha FUD 266g", "p011": "Salch. asar Chimex", "p012": "Salch. asar S.Antonio", "p013": "Salchicha Yossi 2kg", "p014": "Chuleta Nayar 550g", "p015": "Chorizo regional 1kg", "p016": "Carne adobada 1kg", "p017": "Chorizo pavo FUD 200g", "p018": "Deshebrada Guten 350g", "p019": "Chistorra Gus 500g", "p020": "Chorizo arg. Gus 500g", "p021": "Tocino Nayar 170g", "p022": "Tocineta 200g", "p022k": "Tocineta granel", "p023": "Q. amarillo Villita", "p024": "Q. manchego Villita", "p025": "Q. amarillo Castell", "p026": "Q. amarillo S.Antonio", "p027": "Medias lunas Villita", "p028": "Manchego reb. 200g", "p029": "Manchego rallado 170g", "p030": "Q. panela FUD 200g", "p031": "Quesillo B 5x200g", "p032": "Quesillo crem 5x200g", "p033": "Quesillo B 4x250g", "p034": "Quesillo B 1kg", "p035": "Quesillo crem 1kg", "p036": "Q. doble crema 1.1kg", "p037": "Crema 5x200g", "p038": "Philadelphia 180g", "p039": "Philadelphia 120g", "p040": "Margarina Villita 90g", "p041": "Margarina Delicia 90g", "p042": "Mantequilla N.Buena", "p043": "Crema Yoplait 180g", "p044": "Yoplait fresa 220g", "p045": "Yoplait fresa 330g", "p046": "Yoplait fresa 470g", "p047": "Yoplait licuado 470g", "p048": "Disfruta bebible 307g", "p049": "Disfruta batido 442g", "p050": "Disfruta fresa choco", "p051": "Disfruta plátano choco", "p052": "Yoplix natural 121g", "p053": "Yoplix chocolate 121g", "p054": "Yakult 10 pzas", "p055": "Yakult 40LT 10 pzas", "p056": "Pay de queso 2 pzas", "p057": "Flan Yoplait 4 pzas", "p058": "Bebible Kids 100g", "p059": "Café Olé clásico", "p060": "Café Olé espresso", "p061": "Café Olé moka", "p062": "Café Olé vainilla", "p063": "Yoplait fresa 1kg", "p064": "Yoplait natural 1kg", "p065": "Yoplait griego 1kg"};
+  const ls = store.get('articulos', []);
+  ls.forEach(a=>{ if(N[a.id] && !a.nombreTk){ a.nombreTk = N[a.id]; a.editado = true; } });
+  store.set('articulos', ls); store.set('migraciones', [...store.get('migraciones', []), CLAVE]);
 })();
 const fotoSrc = p => p.foto ? (FOTOS[p.foto] || p.foto) : '';
 const presCorta = p => (p.pres||'').split('·')[0].trim();
@@ -4380,7 +4394,7 @@ function htmlTicket(r){
   const fila = (a,b)=> `<div class="f"><span>${a}</span><span>${b}</span></div>`;
   const lineas = r.lineas.map(l=>{
     const q = restante(r, l);
-    return q > 0 ? `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(q)+' kg x '+fmt(l.precio||0) : q+' x '+fmt(l.precio||0), fmt(r2((l.precio||0)*q)))}${importeCon(l,q) < r2((l.precio||0)*q) ? fila('  Promo '+textoPromo(reglaDe(l)), '−'+fmt(r2((l.precio||0)*q - importeCon(l,q)))) : ''}` : '';
+    return q > 0 ? `${fila('<b>'+esc(nombreTk(l))+'</b>', fmt(r2((l.precio||0)*q)))}<div class="p">&nbsp;&nbsp;${l.porKilo ? fmtKg(q)+' kg x '+fmt(l.precio||0) : q+' x '+fmt(l.precio||0)}</div>${importeCon(l,q) < r2((l.precio||0)*q) ? fila('  Promo '+textoPromo(reglaDe(l)), '−'+fmt(r2((l.precio||0)*q - importeCon(l,q)))) : ''}` : '';
   }).join('');
   const quitados = d.flatMap(x=> x.lineas).map(l=> `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza', '−'+fmt(l.importe))}`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Recibo ${esc(r.folio)}</title><style>
@@ -4463,19 +4477,23 @@ function lineasTicket(r){
   L.push({t:dos('Vendedor', (r.vendedor||'').slice(0, W-10))});
   if(r.cliente){ L.push({t:dos('Cliente', (r.cliente.nombre||'').slice(0, W-9))}); const ti = tiendaDe(r.cliente); if(ti) L.push({t:dos('Tienda', ti.slice(0, W-8))}); }
   L.push({t:sep});
+  const envolverA = (t, w) => { const out = []; let l = ''; String(t).split(/\s+/).forEach(x=>{ if((l + ' ' + x).trim().length > w){ if(l) out.push(l); l = x.length > w ? x.slice(0, w) : x; } else l = (l + ' ' + x).trim(); }); if(l) out.push(l); return out; };
+  const item = (nombre, importe) => { const partes = envolverA(nombre, W - importe.length - 1); L.push({t:dos(partes[0] || '', importe)}); partes.slice(1).forEach(x=> L.push({t:x})); };
+  let primero = true;
   r.lineas.forEach(l=>{
     const q = restante(r, l); if(q <= 0) return;
-    envolver(l.nombre).forEach(x=> L.push({t:x}));
-    L.push({t:dos('  ' + (l.porKilo ? fmtKg(q)+' kg' : q) + ' x ' + fmt(l.precio||0), fmt(r2((l.precio||0)*q)))});
+    if(!primero) L.push({t:''}); primero = false;
+    item(nombreTk(l), fmt(r2((l.precio||0)*q)));
+    L.push({t:'  ' + (l.porKilo ? fmtKg(q)+' kg' : q) + ' x ' + fmt(l.precio||0)});
     if(importeCon(l, q) < r2((l.precio||0)*q)) L.push({t:dos('  Promo ' + (reglaDe(l)?.kg ? `${fmtExist(reglaDe(l).cantidad)}kg+ ${fmt(reglaDe(l).precio)}/kg` : textoPromo(reglaDe(l))), '-' + fmt(r2((l.precio||0)*q - importeCon(l, q))))});
   });
   if((r.devoluciones||[]).length){
     L.push({t:sep}); L.push({t:'DEVOLUCIONES', b:true});
-    r.devoluciones.forEach(x=>{ envolver(x.nombre).forEach(z=> L.push({t:z})); L.push({t:dos('  ' + (x.porKilo ? fmtKg(x.cantidad)+' kg' : x.cantidad) + ' x ' + fmt(x.precio||0) + ' ' + x.motivo, '-' + fmt(importeDev(x)))}); });
+    r.devoluciones.forEach((x,i)=>{ if(i) L.push({t:''}); item(nombreTk(x), '-' + fmt(importeDev(x))); L.push({t:'  ' + (x.porKilo ? fmtKg(x.cantidad)+' kg' : x.cantidad) + ' x ' + fmt(x.precio||0) + ' ' + x.motivo}); });
   }
   if(d.length){
     L.push({t:sep}); L.push({t:'DESCUENTO POR PEDIDO INCOMPLETO', b:true});
-    d.flatMap(x=>x.lineas).forEach(l=>{ envolver(l.nombre).forEach(x=> L.push({t:x})); L.push({t:dos('  ' + (l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza'), '-' + fmt(l.importe))}); });
+    d.flatMap(x=>x.lineas).forEach(l=>{ item(nombreTk(l), '-' + fmt(l.importe)); L.push({t:'  ' + (l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza')}); });
   }
   L.push({t:sep});
   if(d.length){ L.push({t:dos('Total anterior (v'+(r.version-1)+')', fmt(d[0].totalAnterior))}); L.push({t:dos('Descuento', '-' + fmt(d[0].monto))}); }
@@ -4529,7 +4547,7 @@ function escposTicket(r, imp = impSel() || IMP_NUEVA, extra = {}){
   const L = imp.ancho && imp.ancho !== impCfg().ancho ? lineasConAncho(r, imp.ancho) : lineasTicket(r);
   if(imp.modo==='grafico') push(...rasterLineas(L, imp.ancho));
   else {
-    push(0x1B,0x74,TABLAS[tabla].n);
+    push(0x1B,0x74,TABLAS[tabla].n, 0x1B,0x33,38);   /* tabla de caracteres e interlineado un poco mayor */
     L.forEach(l=>{ if(l.b) push(0x1B,0x45,1); if(l.g) push(0x1D,0x21,0x01); for(const ch of String(l.t)) push(byteDe(ch, tabla)); push(0x0A); if(l.g) push(0x1D,0x21,0x00); if(l.b) push(0x1B,0x45,0); });
   }
   push(0x0A,0x0A,0x0A);
@@ -4920,6 +4938,8 @@ function formArticuloHTML(a){
       </div>
     </div>
     <div class="gfield"><label for="aNom">Nombre del producto *</label><input id="aNom" maxlength="90" value="${esc(a.nombreForm ?? (a.id ? nombreTicket(a) : (a.nombre||'')))}" autocomplete="off"></div>
+    <div class="gfield"><label for="aTk">Nombre en ticket (máx. 22)</label><input id="aTk" maxlength="22" value="${esc(a.nombreTk||'')}" placeholder="${esc(a.nombre ? nombreTkAuto(a).slice(0,22) : 'Ej. Salchicha FUD 266g')}" autocomplete="off">
+      <small class="tk-ayuda">Así sale impreso en el ticket. Si lo dejas vacío se usa el nombre sin la marca.</small></div>
     <div class="gfield"><label for="aCat">Categoría *</label>
       <select class="field" id="aCat">${categorias().map(c=>`<option ${c===a.seccion?'selected':''}>${esc(c)}</option>`).join('')}<option value="__nueva">+ Nueva categoría…</option></select>
     </div>
@@ -4966,7 +4986,7 @@ function leerArticulo(){
   const v = id => document.getElementById(id);
   const num = x => x==='' || x==null ? null : r2(parseFloat(x));
   const precios = [...document.querySelectorAll('#aPrecios .pr-row')].map((r,i)=>({etiqueta:r.querySelector('.pr-et').value.trim() || `Precio ${i+2}`, valor:num(r.querySelector('.pr-v').value)})).filter(x=> x.valor!=null && x.valor>0);
-  return {nombre:v('aNom').value.trim(), nombreForm:v('aNom').value, seccion:v('aCat').value, proveedor:v('aProv').value.trim(), precio:num(v('aPrecio').value), costo:num(v('aCosto').value),
+  return {nombre:v('aNom').value.trim(), nombreForm:v('aNom').value, nombreTk:v('aTk').value.trim(), seccion:v('aCat').value, proveedor:v('aProv').value.trim(), precio:num(v('aPrecio').value), costo:num(v('aCosto').value),
           promo: leerPromo(), porKilo:document.querySelector('#aVend .on')?.dataset.v==='kg', sku:v('aSku').value.trim().toUpperCase(), codigo:v('aCod').value.trim(), precios, activo:v('aActivo').checked};
 }
 function bindFormArticulo(){
