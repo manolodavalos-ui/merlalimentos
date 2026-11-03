@@ -1913,7 +1913,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.35';
+const APP_VERSION = '0.35.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2543,7 +2543,8 @@ const r2 = n => Math.round(n*100)/100;
 const hoyISO = ()=> hoyClave();
 function promoActiva(a){
   const pr = a && a.promo;
-  if(!pr || pr.activa===false || a.porKilo || !(pr.cantidad > 1) || !(pr.precio > 0)) return false;
+  if(!pr || pr.activa===false || !(pr.precio > 0)) return false;
+  if(a.porKilo ? (pr.tipo!=='volumen' || !(pr.cantidad > 0)) : !(pr.cantidad > 1)) return false;
   const h = hoyISO();
   if(pr.inicio && h < pr.inicio) return false;
   if(pr.fin && h > pr.fin) return false;
@@ -2552,10 +2553,10 @@ function promoActiva(a){
 const artPorId = id => store.get('articulos', []).find(a=> a.id===id);
 /* Regla congelada en recibos (promoRegla) o la vigente del producto en tickets abiertos */
 function reglaDe(l){
-  if(l.porKilo) return null;
   if('promoRegla' in l) return l.promoRegla;
+  if(l.especial) return null;
   const a = artPorId(l.pid);
-  return promoActiva(a) ? {tipo:a.promo.tipo, cantidad:a.promo.cantidad, precio:a.promo.precio} : null;
+  return promoActiva(a) ? {tipo:a.promo.tipo, cantidad:a.promo.cantidad, precio:a.promo.precio, ...(a.porKilo ? {kg:true} : {})} : null;
 }
 function importeCon(l, q, regla = reglaDe(l)){
   const p = l.precio || 0;
@@ -2564,7 +2565,7 @@ function importeCon(l, q, regla = reglaDe(l)){
   const g = Math.floor(q / regla.cantidad);
   return r2(g*regla.precio + (q - g*regla.cantidad)*p);
 }
-const textoPromo = pr => !pr ? '' : pr.tipo==='volumen' ? `${pr.cantidad}+ a ${fmt(pr.precio)} c/u` : `${pr.cantidad} x ${fmt(pr.precio)}`;
+const textoPromo = pr => !pr ? '' : pr.tipo==='volumen' ? (pr.kg ? `${fmtExist(pr.cantidad)} kg o más a ${fmt(pr.precio)}/kg` : `${pr.cantidad}+ a ${fmt(pr.precio)} c/u`) : `${pr.cantidad} x ${fmt(pr.precio)}`;
 const listaLinea = l => r2((l.precio||0) * l.cantidad);
 const importeLinea = l => importeCon(l, l.cantidad);
 const ahorroLinea = l => r2(listaLinea(l) - importeLinea(l));
@@ -2601,7 +2602,9 @@ function agregarPieza(p){
 function agregarPeso(p, kg){
   const t = ticket();
   const e = precioEspecial(t.cliente, p.id);
-  t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio: e ?? p.precio, porKilo:true, cantidad:kg, ...(e ? {especial:true} : {})});
+  const previa = !e && promoActiva(p) && t.lineas.find(x=> x.pid===p.id && x.porKilo && !x.especial);
+  if(previa) previa.cantidad = r3(previa.cantidad + kg);   /* con promoción por volumen se suman los kilos en una sola línea */
+  else t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio: e ?? p.precio, porKilo:true, cantidad:kg, ...(e ? {especial:true} : {})});
   guardarTicket(t); actualizarVentaUI(p.id);
 }
 
@@ -2685,7 +2688,7 @@ function viewTicket(){
     <div class="tline" data-lid="${l.lid}">
       <div>${esc(l.nombre)}<span class="q">${l.porKilo ? fmtKg(l.cantidad)+' kg' : 'x '+l.cantidad}</span>
         ${l.precio==null?'<span class="np">Sin precio capturado</span>':''}
-        ${ahorroLinea(l) > 0 ? `<span class="promo-l">${svg('articulos')}Promo ${textoPromo(reglaDe(l))} · ahorras ${fmt(ahorroLinea(l))}</span>` : (reglaDe(l) && faltaPromo(l) ? `<span class="promo-h">Lleva ${faltaPromo(l)} más para la promo ${textoPromo(reglaDe(l))}</span>` : '')}
+        ${ahorroLinea(l) > 0 ? `<span class="promo-l">${svg('articulos')}Promo ${textoPromo(reglaDe(l))} · ahorras ${fmt(ahorroLinea(l))}</span>` : (reglaDe(l) && faltaPromo(l) ? `<span class="promo-h">Lleva ${l.porKilo ? fmtKg(faltaPromo(l)) + ' kg' : faltaPromo(l)} más para la promo ${textoPromo(reglaDe(l))}</span>` : '')}
         ${existencia(l.pid) <= 0 ? `<span class="nostock">${svg('alert')}No disponible en inventario</span>` : ''}</div>
       <div>${fmt(importeLinea(l))}</div>
     </div>`).join('');
@@ -4459,7 +4462,7 @@ function lineasTicket(r){
     const q = restante(r, l); if(q <= 0) return;
     envolver(l.nombre).forEach(x=> L.push({t:x}));
     L.push({t:dos('  ' + (l.porKilo ? fmtKg(q)+' kg' : q) + ' x ' + fmt(l.precio||0), fmt(r2((l.precio||0)*q)))});
-    if(importeCon(l, q) < r2((l.precio||0)*q)) L.push({t:dos('  Promo ' + textoPromo(reglaDe(l)), '-' + fmt(r2((l.precio||0)*q - importeCon(l, q))))});
+    if(importeCon(l, q) < r2((l.precio||0)*q)) L.push({t:dos('  Promo ' + (reglaDe(l)?.kg ? `${fmtExist(reglaDe(l).cantidad)}kg+ ${fmt(reglaDe(l).precio)}/kg` : textoPromo(reglaDe(l))), '-' + fmt(r2((l.precio||0)*q - importeCon(l, q))))});
   });
   if((r.devoluciones||[]).length){
     L.push({t:sep}); L.push({t:'DEVOLUCIONES', b:true});
@@ -5017,7 +5020,8 @@ function pedirTexto({titulo, etiqueta, ok, alAceptar}){
 function leerPromo(){
   const on = document.getElementById('pmOn'); if(!on || !on.checked) return null;
   const v = id => document.getElementById(id).value;
-  return {tipo:document.querySelector('#pmTipo .on')?.dataset.v || 'paquete', cantidad:parseInt(v('pmCant'),10)||0, precio:r2(parseFloat(v('pmPrecio'))||0),
+  const kg = document.querySelector('#aVend .on')?.dataset.v==='kg';
+  return {tipo: kg ? 'volumen' : (document.querySelector('#pmTipo .on')?.dataset.v || 'paquete'), cantidad: kg ? r3(parseFloat(v('pmCant'))||0) : (parseInt(v('pmCant'),10)||0), precio:r2(parseFloat(v('pmPrecio'))||0), ...(kg ? {kg:true} : {}),
           inicio:v('pmIni')||'', fin:v('pmFin')||'', activa:true};
 }
 function bindPromoForm(){
@@ -5025,10 +5029,19 @@ function bindPromoForm(){
   const campos = document.getElementById('pmCampos');
   const res = ()=>{
     const pr = leerPromo(), lista = parseFloat(document.getElementById('aPrecio').value) || 0;
+    const kg = document.querySelector('#aVend .on')?.dataset.v==='kg';
+    const bPaq = document.querySelector('#pmTipo [data-v="paquete"]'), bVol = document.querySelector('#pmTipo [data-v="volumen"]');
+    if(kg){ bPaq.hidden = true; bVol.classList.add('on'); bPaq.classList.remove('on'); } else bPaq.hidden = false;
+    const cant = document.getElementById('pmCant'); cant.step = kg ? '0.05' : '1'; cant.min = kg ? '0' : '2'; cant.inputMode = kg ? 'decimal' : 'numeric';
     const vol = (document.querySelector('#pmTipo .on')?.dataset.v)==='volumen';
-    document.getElementById('pmCantLbl').textContent = vol ? 'A partir de (piezas)' : 'Piezas por paquete';
-    document.getElementById('pmPrecioLbl').textContent = vol ? 'Precio por pieza' : 'Precio del paquete';
+    document.getElementById('pmCantLbl').textContent = kg ? 'A partir de (kg)' : vol ? 'A partir de (piezas)' : 'Piezas por paquete';
+    document.getElementById('pmPrecioLbl').textContent = kg ? 'Precio por kg' : vol ? 'Precio por pieza' : 'Precio del paquete';
     const r = document.getElementById('pmResumen');
+    if(kg){
+      if(!pr || !(pr.cantidad>0) || !(pr.precio>0)){ r.textContent = 'Ej.: a partir de 2 kg, el kilo a $80.00'; return; }
+      r.innerHTML = `Desde <b>${fmtKg(pr.cantidad)} kg</b>, todo el peso a <b>${fmt(pr.precio)}/kg</b> (precio normal ${fmt(lista)}/kg).` + (lista && pr.precio >= lista ? ' <b class="neg">El precio de promoción no es menor al normal.</b>' : lista ? ` El cliente ahorra ${fmt(r2((lista-pr.precio)*pr.cantidad))} en ${fmtKg(pr.cantidad)} kg.` : '');
+      return;
+    }
     if(!pr || !(pr.cantidad>1) || !(pr.precio>0)){ r.textContent = vol ? 'Ej.: a partir de 8 piezas, cada una a $22.00' : 'Ej.: 5 piezas por $86.00; las sobrantes a precio normal'; return; }
     const unit = vol ? pr.precio : pr.precio/pr.cantidad, ahorro = lista ? (lista-unit)*pr.cantidad : 0;
     r.innerHTML = vol ? `Desde <b>${pr.cantidad}</b> piezas, todas a <b>${fmt(pr.precio)}</b> (precio normal ${fmt(lista)}).`
@@ -5039,6 +5052,7 @@ function bindPromoForm(){
   on.onchange = ()=>{ campos.hidden = !on.checked; res(); };
   document.querySelectorAll('#pmTipo button').forEach(b=> b.onclick = ()=>{ document.querySelectorAll('#pmTipo button').forEach(x=> x.classList.toggle('on', x===b)); res(); });
   ['pmCant','pmPrecio','aPrecio'].forEach(id=> document.getElementById(id).addEventListener('input', res));
+  document.querySelectorAll('#aVend button').forEach(b=> b.addEventListener('click', ()=> setTimeout(res, 0)));
   res();
 }
 function guardarArticulo(){
@@ -5046,8 +5060,8 @@ function guardarArticulo(){
   if(!d.nombre){ toast('Escribe el nombre del producto'); document.getElementById('aNom').focus(); return; }
   if(!(d.precio > 0)){ toast('Escribe el precio'); document.getElementById('aPrecio').focus(); return; }
   if(d.promo){
-    if(d.porKilo){ toast('Las promociones son solo para productos por pieza'); return; }
-    if(!(d.promo.cantidad > 1)){ toast('La promoción necesita una cantidad de 2 o más'); document.getElementById('pmCant').focus(); return; }
+    if(d.porKilo){ if(!(d.promo.cantidad > 0)){ toast('Escribe a partir de cuántos kilos aplica'); document.getElementById('pmCant').focus(); return; } }
+    else if(!(d.promo.cantidad > 1)){ toast('La promoción necesita una cantidad de 2 o más'); document.getElementById('pmCant').focus(); return; }
     if(!(d.promo.precio > 0)){ toast('Escribe el precio de la promoción'); document.getElementById('pmPrecio').focus(); return; }
     if(d.promo.inicio && d.promo.fin && d.promo.fin < d.promo.inicio){ toast('La fecha final es anterior a la inicial'); return; }
   }
