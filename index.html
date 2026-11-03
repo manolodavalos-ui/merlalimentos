@@ -18,7 +18,7 @@
   --disabled:#b9c2be; --shadow:0 6px 24px rgba(20,40,30,.10);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
+html,body{height:100%;overscroll-behavior-y:none}   /* evita que al jalar la pantalla se recargue la app */
 body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);-webkit-tap-highlight-color:transparent}
 button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 input{font:inherit}
@@ -698,6 +698,8 @@ dd.pos{color:var(--brand)}
 .tr-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin-bottom:10px;padding:14px 16px}
 .tr-row > span:first-child{flex:1;min-width:0}.tr-row b{display:block}.tr-row small{display:block;color:var(--muted);font-size:.82rem;margin-top:2px}
 .tr-amt{text-align:right}.tr-amt small{font-size:.7rem}.tr-amt b{font-size:1.05rem}
+.ver-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:.72rem;color:var(--muted)}
+.ver-row button{padding:6px 10px;border-radius:999px;border:1.5px solid var(--line);color:var(--brand);font-weight:700;font-size:.78rem;background:#fff}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1464,7 +1466,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <div class="drawer-head">
       <div class="who" id="whoName"></div>
       <span class="role-tag" id="whoRole"></span>
-      <div id="menuVersion" style="margin-top:8px;font-size:.72rem;color:var(--muted)"></div>
+      <div class="ver-row"><span id="menuVersion"></span><button id="btnActualizar" type="button">⟳ Actualizar</button></div>
     </div>
     <div class="menu" id="menu"></div>
     <div class="drawer-foot">
@@ -1913,7 +1915,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.35.2';
+const APP_VERSION = '0.35.3';
 
 /* ================= Íconos ================= */
 const I = {
@@ -7564,6 +7566,7 @@ function enterApp(){
   go('turno');
   const pr = store.get('abrirPedidoRec', null);
   if(pr){ store.del('abrirPedidoRec'); go('catalogo'); catVista = 'pedidos'; renderCatalogo(); setTimeout(()=> detallePedidoRec(pr), 100); }
+  try{ const v = sessionStorage.getItem('mk_volver'); sessionStorage.removeItem('mk_volver'); if(v && v!=='turno' && puede(v)) go(v); }catch(_){}
 }
 
 document.getElementById('logoutBtn').onclick = ()=>{
@@ -7639,6 +7642,12 @@ function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;
 
 /* Arranque */
 document.getElementById('appVersion').textContent = 'Versión ' + APP_VERSION;
+document.getElementById('btnActualizar').onclick = ()=>{
+  try{ sessionStorage.setItem('mk_volver', current); }catch(_){}
+  toast('Buscando actualización…');
+  const recargar = ()=> location.reload();
+  try{ if(navigator.serviceWorker && navigator.serviceWorker.getRegistration) navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update().finally(recargar); else recargar(); }).catch(recargar); else recargar(); }catch(_){ recargar(); }
+};
 document.getElementById('menuVersion').textContent = 'Versión ' + APP_VERSION + ' · ' + store.get('config').dispositivo;
 document.getElementById('storeName').textContent = store.get('config').tienda;
 document.getElementById('user').value = 'vendedor';
