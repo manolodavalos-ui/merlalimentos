@@ -692,6 +692,12 @@ dd.pos{color:var(--brand)}
 .dia.fs{border-color:#b9a3e6;color:#5b3fa8;font-weight:800}
 .dia.fs.on{background:#5b3fa8;border-color:#5b3fa8;color:#fff}
 .tag-fs{font-style:normal;font-size:.68rem;font-weight:800;padding:2px 6px;border-radius:999px;background:#ece5fb;color:#5b3fa8;vertical-align:2px}
+.tr-tabs{margin:0 0 12px}.tr-tabs .dia{flex:1;text-align:center;padding:10px}
+.tr-cal{padding:14px 12px}
+.tr-dia{font-size:1rem;margin:16px 4px 8px;color:var(--brand)}
+.tr-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin-bottom:10px;padding:14px 16px}
+.tr-row > span:first-child{flex:1;min-width:0}.tr-row b{display:block}.tr-row small{display:block;color:var(--muted);font-size:.82rem;margin-top:2px}
+.tr-amt{text-align:right}.tr-amt small{font-size:.7rem}.tr-amt b{font-size:1.05rem}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1907,7 +1913,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.34.7';
+const APP_VERSION = '0.35';
 
 /* ================= Íconos ================= */
 const I = {
@@ -1999,7 +2005,7 @@ function renderMenu(){
     return `<button data-id="${m.id}" class="${m.id===current?'active':''}" ${ok?'':'disabled'}>
       ${svg(m.id)}<span>${m.label}</span>${m.id==='catalogo' && ok && nuevosRecibidos() ? `<i class="cat-badge">${nuevosRecibidos()}</i>` : ''}${ok?'':svg('lock','lock')}</button>`;
   }).join('');
-  el.querySelectorAll('button[data-id]').forEach(b=> b.onclick = ()=>{ go(b.dataset.id); closeDrawer(); });
+  el.querySelectorAll('button[data-id]').forEach(b=> b.onclick = ()=>{ if(b.dataset.id==='turno') turnoVista = 'resumen'; go(b.dataset.id); closeDrawer(); });
 }
 
 /* ================= Turno ================= */
@@ -2026,7 +2032,97 @@ function updateShiftPill(){
   p.classList.toggle('off', !t);
 }
 
+/* ===== Consultar turnos anteriores ===== */
+let turnoHistSel = null, turnoHistDia = null, turnoHistMes = null;
+const turnosCerrados = ()=> store.get('turnos', []);
+const diaTurno = h => hoyClave(new Date(h.abierto));
+function tabsTurno(){
+  const hist = turnoVista==='historial' || turnoVista==='histDet';
+  return `<div class="dias tr-tabs"><button class="dia${!hist?' on':''}" data-tv="actual">${turnoActual() ? 'Turno abierto' : 'Abrir turno'}</button><button class="dia${hist?' on':''}" data-tv="historial">Consultar turnos</button></div>`;
+}
 function viewTurno(){
+  if(turnoVista==='historial') return tabsTurno() + viewHistTurnos();
+  if(turnoVista==='histDet') return viewHistTurnoDet();
+  if(turnoVista==='tesoreria' && turnoActual()) return viewTurnoActual();
+  return tabsTurno() + viewTurnoActual();
+}
+function viewHistTurnos(){
+  const ls = turnosCerrados(), porDia = {};
+  ls.forEach(h=> (porDia[diaTurno(h)] ||= []).push(h));
+  const dias = Object.keys(porDia).sort();
+  if(!turnoHistDia) turnoHistDia = dias.length ? dias[dias.length-1] : hoyClave();
+  if(!turnoHistMes){ const d = kDate(turnoHistDia); d.setDate(1); turnoHistMes = hoyClave(d); }
+  const mes = kDate(turnoHistMes), y = mes.getFullYear(), m = mes.getMonth(), primero = (new Date(y,m,1).getDay()+6)%7, dimes = new Date(y,m+1,0).getDate(), hoy = hoyClave();
+  let celdas = ''; for(let i=0;i<primero;i++) celdas += '<span></span>';
+  for(let d=1; d<=dimes; d++){ const k = hoyClave(new Date(y,m,d)), n = (porDia[k]||[]).length;
+    celdas += `<button class="cal-d${k===turnoHistDia?' ext':''}${k===hoy?' hoy':''}" data-k="${k}" ${k > hoy ? 'disabled' : ''}>${d}${n ? `<i></i>` : ''}</button>`; }
+  const delDia = (porDia[turnoHistDia] || []).slice().sort((a,b)=> a.abierto.localeCompare(b.abierto));
+  return `<div class="card cal tr-cal">
+      <div class="cal-nav"><button class="icon-btn" data-m="-1" aria-label="Mes anterior">‹</button><b>${(t=> t.charAt(0).toUpperCase()+t.slice(1))(mes.toLocaleDateString('es-MX',{month:'long', year:'numeric'}))}</b><button class="icon-btn" data-m="1" aria-label="Mes siguiente">›</button></div>
+      <div class="cal-g">${['L','M','M','J','V','S','D'].map(x=>`<em>${x}</em>`).join('')}${celdas}</div>
+      <p class="note-sm">Los días con punto tienen turnos cerrados · ${ls.length} turnos en total</p>
+    </div>
+    <h3 class="tr-dia">${fDia(turnoHistDia)}</h3>
+    ${delDia.length ? delDia.map(h=>{ const c = calcCajon(h);
+      return `<button class="card tr-row" data-folio="${esc(h.folio)}">
+        <span><b>Turno ${esc(h.folio)}</b><small>${esc(h.nombre||'')} · ${esc(h.dispositivo||'')} · ${hora(h.abierto)} a ${h.cerrado ? hora(h.cerrado) : '—'}</small>
+          <small>${c.nRecibos} ${c.nRecibos===1?'recibo':'recibos'} · ventas netas ${fmt(c.netas)}${h.liquidacion ? ' · liquidación ' + fmt(h.liquidacion.totalDif) : ''}</small></span>
+        <span class="tr-amt"><small>Efectivo teórico</small><b>${fmt(c.teorico)}</b></span>
+      </button>`; }).join('') : `<div class="card empty"><p class="sub" style="margin:0">No hay turnos cerrados este día.</p></div>`}`;
+}
+function viewHistTurnoDet(){
+  const h = turnosCerrados().find(x=> x.folio===turnoHistSel); if(!h) return tabsTurno() + viewHistTurnos();
+  const c = calcCajon(h), fila = (lbl, v, signo, cls='')=> `<div class="cj-row ${cls}"><span>${lbl}</span><b>${signo==='-' && v ? '−' : ''}${fmt(v)}</b></div>`;
+  const movs = h.movimientos || [];
+  return `<div class="card t-head">
+      <div class="status-open" style="color:var(--muted)"><span class="dot" style="background:var(--muted)"></span>Turno ${esc(h.folio)} · cerrado</div>
+      <p class="sub" style="margin:0">${esc(h.nombre||'')} · ${esc(h.dispositivo||'')}<br>Abierto ${fecha(h.abierto)}${h.cerrado ? '<br>Cerrado ' + fecha(h.cerrado) : ''}</p>
+    </div>
+    <div class="card cajon">
+      <h3>Cajón de dinero</h3>
+      ${fila('Fondo inicial de caja', c.fondo)}
+      ${fila('Cobros en efectivo', c.cobrosEf)}
+      ${fila('Abonos a créditos (efectivo)', c.abonosEf)}
+      ${fila('Descuento por pedido incompleto', c.descEf, '-')}
+      ${fila('Cancelaciones', c.cancEf, '-')}
+      ${fila('Depositado', c.depositado)}
+      ${fila('Pagos o salidas', c.salidas, '-')}
+      ${c.gastosCaj ? fila('Compras y gastos pagados del cajón', c.gastosCaj, '-') : ''}
+      <div class="cj-teo"><span>Efectivo teórico en caja</span><b>${fmt(c.teorico)}</b></div>
+      <div class="cj-teo cj-ven"><span>Efectivo teórico de ventas</span><b>${fmt(c.efVentas)}</b></div>
+    </div>
+    <div class="card cajon">
+      <h3>Resumen</h3>
+      ${fila('Ventas brutas', c.brutas, '', 'fuerte')}
+      ${fila('Descuentos por promoción', c.promo, '-', 'sub')}
+      ${fila('Descuentos por pedido incompleto', c.descTotal, '-', 'sub')}
+      ${fila('Cancelaciones', c.cancTotal, '-', 'sub')}
+      ${c.devol ? fila('Devoluciones de clientes', c.devol, '-', 'sub') : ''}
+      ${fila('Ventas netas', c.netas, '', 'fuerte')}
+      ${fila('Cobranza de créditos', c.cobranza, '', 'sub')}
+      <div class="cj-met">${['Efectivo','Tarjeta','Crédito'].map(m=>`<span>${svg(ICON_PAGO[m])}${m}<b>${fmt(c.porMetodo[m]||0)}</b></span>`).join('')}</div>
+      <p class="sub" style="margin:8px 0 0">${c.nRecibos} ${c.nRecibos===1?'recibo':'recibos'} en este turno</p>
+    </div>
+    ${h.liquidacion ? `<div class="card cajon"><h3>Liquidación de camioneta</h3>${h.liquidacion.lineas.filter(l=> l.dif).map(l=>`<div class="cj-row"><span>${esc(l.nombre)}<small class="ir-s">cargó ${fmtExist(l.cargado)} · vendió ${fmtExist(l.vendido)} · contado ${fmtExist(l.contado)}</small></span><b class="${l.dif<0?'neg':''}">${l.dif>0?'+':''}${fmtExist(l.dif)}</b></div>`).join('') || '<p class="sub" style="margin:0">Todo cuadró.</p>'}${fila('Diferencia a costo', h.liquidacion.totalDif, '', 'fuerte')}</div>` : ''}
+    ${movs.length ? `<div class="card cajon"><h3>Movimientos de caja</h3>${movs.map(m=>`<div class="cj-mov"><span><b>${m.tipo==='deposito'?'Depósito':'Pago / salida'}</b><small>${hora(m.fecha)}${m.comentario?' · '+esc(m.comentario):''}</small></span><b class="${m.tipo==='deposito'?'pos':'neg'}">${m.tipo==='deposito'?'+':'−'}${fmt(m.monto)}</b></div>`).join('')}</div>` : ''}
+    <button class="btn ghost" id="trRecibos">${svg('recibos')}Ver recibos de este turno</button>`;
+}
+function bindTurnoHist(){
+  document.querySelectorAll('.tr-tabs .dia').forEach(b=> b.onclick = ()=>{ turnoVista = b.dataset.tv==='historial' ? 'historial' : 'resumen'; go('turno'); });
+  if(turnoVista==='historial'){
+    document.querySelectorAll('.tr-cal [data-m]').forEach(b=> b.onclick = ()=>{ const d = kDate(turnoHistMes); d.setMonth(d.getMonth() + Number(b.dataset.m)); turnoHistMes = hoyClave(d); go('turno'); });
+    document.querySelectorAll('.tr-cal .cal-d').forEach(b=> b.onclick = ()=>{ turnoHistDia = b.dataset.k; go('turno'); });
+    document.querySelectorAll('.tr-row').forEach(b=> b.onclick = ()=>{ turnoHistSel = b.dataset.folio; turnoVista = 'histDet'; go('turno'); window.scrollTo(0,0); });
+    return true;
+  }
+  if(turnoVista==='histDet'){
+    const r = document.getElementById('trRecibos'); if(r) r.onclick = ()=>{ go('recibos'); reciboQ = turnoHistSel; renderRecibos(); };
+    return true;
+  }
+  return false;
+}
+
+function viewTurnoActual(){
   const t = turnoActual();
   const cfg = store.get('config');
   if(!t){
@@ -2207,6 +2303,7 @@ function bindTesoreria(){
 }
 
 function bindTurno(){
+  if(bindTurnoHist()) return;
   document.querySelectorAll('.disp-ch .dia').forEach(b=> b.onclick = ()=> elegirDispositivo(Number(b.dataset.n)));
   const open = document.getElementById('openShift');
   if(open) open.onclick = ()=>{
@@ -4080,13 +4177,14 @@ function renderHeader(){
     const m = MENU.find(x=>x.id===current);
     const enCli = current==='clientes' && cliVista!=='inicio';
     const enTes = current==='turno' && turnoVista==='tesoreria' && !!turnoActual();
+    const enHist = current==='turno' && turnoVista==='histDet';
     const enCfg = current==='config' && cfgVista!=='inicio';
     const enArt = current==='articulos' && artVista==='editar';
     const enCred = current==='creditos' && credVista!=='inicio';
     const enInv = current==='inventario' && invVista!=='inicio';
     const enCat = current==='catalogo' && catVista!=='ver';
-    const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt || enCred || enInv || enCat;
-    title.textContent = enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea', datos:'Datos y respaldo', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
+    const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt || enCred || enInv || enCat || enHist;
+    title.textContent = enHist ? 'Turno ' + turnoHistSel : enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea', datos:'Datos y respaldo', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
@@ -7392,7 +7490,7 @@ function go(id){
   document.querySelector('.popover')?.remove();
   document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
   view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
-  if(id==='turno'){ if(!turnoActual()) turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
+  if(id==='turno'){ if(!turnoActual() && turnoVista==='tesoreria') turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
   else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
@@ -7468,6 +7566,7 @@ document.getElementById('menuBtn').onclick = ()=>{
   if(current==='inventario' && invVista!=='inicio'){ atrasInv(); return; }
   if(current==='catalogo' && catVista!=='ver'){ catVista = 'ver'; renderCatalogo(); return; }
   if(current==='turno' && turnoVista==='tesoreria'){ turnoVista = 'resumen'; go('turno'); return; }
+  if(current==='turno' && turnoVista==='histDet'){ turnoVista = 'historial'; go('turno'); return; }
   if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return; }
   if(current==='recibos' && reciboSel){ reciboSel = null; renderRecibos(); return; }
   if(current==='clientes' && cliVista!=='inicio'){ cliVista = cliVista==='editar' ? 'lista' : 'inicio'; cliSel = null; cliBorrador = null; renderClientes(); return; }
