@@ -711,7 +711,7 @@ dd.pos{color:var(--brand)}
 .cp-reg{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line);background:#fff8e6}
 .cp-reg > span{flex:1;min-width:0}.cp-reg b{display:block;font-size:.9rem;font-weight:600}.cp-reg small{display:block;color:var(--muted);font-size:.76rem}
 .cp-reg input{width:64px;padding:9px 6px;border:1.5px solid var(--line);border-radius:10px;font:inherit;text-align:right;background:#fff}
-.cp-foot .btn{padding:12px 12px;font-size:.9rem}
+.cp-foot{flex-wrap:wrap;gap:8px}.cp-foot span{flex-basis:100%}.cp-foot .btn{flex:1;padding:12px;font-size:.92rem}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
@@ -1927,7 +1927,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.37.1';
+const APP_VERSION = '0.37.2';
 
 /* ================= Íconos ================= */
 const I = {
