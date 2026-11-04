@@ -707,8 +707,10 @@ dd.pos{color:var(--brand)}
 .cp-bono input{width:64px;padding:7px;border:1.5px solid var(--line);border-radius:8px;text-align:right;font:inherit}
 .cp-bono small{flex-basis:100%;color:var(--muted);font-size:.74rem}
 .cp-ocs{display:flex;flex-wrap:wrap;gap:6px;padding:4px 16px}.cp-oc.on{border-color:var(--brand);background:var(--brand-soft)}
-.cp-h,.cp-row{grid-template-columns:1fr 54px 68px 50px}
-.cp-r{background:#fff8e6 !important}
+.cp-reg-h{color:#8a5a00}
+.cp-reg{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line);background:#fff8e6}
+.cp-reg > span{flex:1;min-width:0}.cp-reg b{display:block;font-size:.9rem;font-weight:600}.cp-reg small{display:block;color:var(--muted);font-size:.76rem}
+.cp-reg input{width:64px;padding:9px 6px;border:1.5px solid var(--line);border-radius:10px;font:inherit;text-align:right;background:#fff}
 .cp-foot .btn{padding:12px 12px;font-size:.9rem}
 .dia.cobro{border-color:#f3b8b2;color:var(--danger)}
 .dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
@@ -1925,7 +1927,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.37';
+const APP_VERSION = '0.37.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -6445,21 +6447,25 @@ function viewCompraProductos(){
         return `<button class="cl-opt cp-prov" data-p="${esc(p)}"><span class="cl-opt-ic">${svg('proveedores')}</span><span><b>${esc(p)}</b><small>${n} productos${bonoProv(p) ? ' · bonificación ' + bonoProv(p) + '%' : ''}${oc ? ` · <b class="warn">${oc} ${oc===1?'orden pendiente':'órdenes pendientes'}</b>` : ''}</small></span>${svg('chev')}</button>`; }).join('') || '<p class="sub">Captura el proveedor en tus artículos para poder comprar.</p>'}
       <button class="ub-b" id="cpNuevo">+ Nuevo producto</button></div>`;
   }
-  const arts = store.get('articulos',[]).filter(a=> !a.borrado && (a.proveedor===compProv || (compBorr[a.id] && compBorr[a.id].regalo > 0)) && coincideBusqueda([nombreTicket(a), a.sku, a.codigo].filter(Boolean).join(' '), compQ))
-    .sort((a,b)=> (!!compBorr[b.id] - !!compBorr[a.id]) || nombreTicket(a).localeCompare(nombreTicket(b),'es'));
+  const arts = store.get('articulos',[]).filter(a=> !a.borrado && a.proveedor===compProv && coincideBusqueda([nombreTicket(a), a.sku, a.codigo].filter(Boolean).join(' '), compQ))
+    .sort((a,b)=> (!!(compBorr[b.id]?.cant > 0) - !!(compBorr[a.id]?.cant > 0)) || nombreTicket(a).localeCompare(nombreTicket(b),'es'));
   const ocs = ocsPendientes(compProv);
+  const regalos = Object.entries(compBorr).filter(([k,b])=> !k.startsWith('__') && b && b.regalo > 0);
   return `<div class="cp-provbar"><span>${svg('proveedores')}<b>${esc(compProv)}</b></span><button class="ub-b" id="cpCambiar">Cambiar</button></div>
     <div class="cp-bono"><span>Bonificación del periodo</span><input id="cpBono" type="number" inputmode="decimal" min="0" max="30" step="0.5" value="${bonoProv(compProv) || ''}" placeholder="0"><span>%</span><small>Se resta del costo en Informes (utilidad real)</small></div>
     ${ocs.length ? `<div class="cp-ocs">${ocs.map(c=>`<button class="ub-b cp-oc${compOC===c.id?' on':''}" data-id="${c.id}">${svg('compras')}${esc(c.folio)} · ${fmt(compraTotal(c))}${compOC===c.id ? ' · cargada' : ' · cargar para recibir'}</button>`).join('')}</div>` : ''}
     <div class="comp-ctl"><div class="rc-search" style="flex:1;border:1px solid var(--line);border-radius:10px;position:static">${svg('search')}<input id="cpQ" placeholder="Buscar producto" value="${esc(compQ)}" autocomplete="off"></div><button class="ub-b" id="cpNuevo">+ Nuevo</button></div>
-    <div class="cp-h"><span>Producto</span><span>Cantidad</span><span>Costo c/u</span><span>Regalo</span></div>
+    <div class="cp-h"><span>Producto</span><span>Cantidad</span><span>Costo c/u</span></div>
     ${arts.map(a=>{ const b = compBorr[a.id] || {};
-      return `<div class="cp-row${b.cant > 0 || b.regalo > 0 ? ' on' : ''}" data-pid="${a.id}"><span><b>${esc(nombreTicket(a))}</b><small>actual ${a.costo ? fmt(a.costo) : 'sin costo'} · hay ${fmtCant(a.id, totalStock(a.id))}${a.proveedor!==compProv ? ' · ' + esc(a.proveedor||'') : ''}</small></span>
+      return `<div class="cp-row${b.cant > 0 ? ' on' : ''}" data-pid="${a.id}"><span><b>${esc(nombreTicket(a))}</b><small>actual ${a.costo ? fmt(a.costo) : 'sin costo'} · hay ${fmtCant(a.id, totalStock(a.id))}${a.proveedor!==compProv ? ' · ' + esc(a.proveedor||'') : ''}</small></span>
         <input class="cp-c" type="number" inputmode="decimal" min="0" step="${a.porKilo?'0.001':'1'}" value="${b.cant || ''}" placeholder="0">
-        <input class="cp-p" type="number" inputmode="decimal" min="0" step="0.01" value="${b.costo ?? (a.costo || '')}" placeholder="$">
-        <input class="cp-r" type="number" inputmode="decimal" min="0" step="${a.porKilo?'0.001':'1'}" value="${b.regalo || ''}" placeholder="0"></div>`; }).join('') || '<div class="rc-empty"><p>Sin productos de este proveedor.</p></div>'}
-    <div class="cr-pad"><button class="ub-b" id="cpRegaloOtro">+ Regalo de otro producto</button>
-      <p class="note-sm" style="text-align:left">"Regalo" son piezas sin costo de la promoción del proveedor. Entran al almacén y bajan el costo promedio.</p></div>
+        <input class="cp-p" type="number" inputmode="decimal" min="0" step="0.01" value="${b.costo ?? (a.costo || '')}" placeholder="$"></div>`; }).join('') || '<div class="rc-empty"><p>Sin productos de este proveedor.</p></div>'}
+    <div class="rc-day cp-reg-h">Regalos de la promoción${regalos.length ? ' · ' + regalos.length : ''}</div>
+    ${regalos.map(([pid,b])=>{ const a = artPorId(pid);
+      return `<div class="cp-reg" data-pid="${pid}"><span><b>${esc(a ? nombreTicket(a) : pid)}</b><small>sin costo · hay ${fmtCant(pid, totalStock(pid))}</small></span>
+        <input class="cp-rq" type="number" inputmode="decimal" min="0" step="${a?.porKilo?'0.001':'1'}" value="${b.regalo}"><button class="co-del cp-rdel" aria-label="Quitar regalo">${svg('trash')}</button></div>`; }).join('')}
+    <div class="cr-pad" style="padding-top:8px"><button class="ub-b" id="cpRegaloOtro">+ Agregar regalo</button>
+      <p class="note-sm" style="text-align:left">Piezas sin costo de la promoción del proveedor (del mismo producto u otro). Entran al almacén y bajan el costo promedio.</p></div>
     <div class="inv-foot cp-foot"><span id="cpRes"></span><button class="btn ghost" id="cpOC">Orden de compra</button><button class="btn" id="cpOk">Registrar compra</button></div>`;
 }
 const lineasCompra = ()=> Object.entries(compBorr).filter(([k,b])=> !k.startsWith('__') && b && (b.cant > 0 || b.regalo > 0)).flatMap(([pid,b])=>{
@@ -6544,10 +6550,16 @@ function bindCompraProductos(){
   on('cpNuevo', ()=>{ volverACompras = true; go('articulos'); artSel = null; artBorrador = null; artVista = 'editar'; renderArticulos(); if(compProv){ const p = document.getElementById('aProv'); if(p) p.value = compProv; } });
   document.querySelectorAll('.cp-prov').forEach(b=> b.onclick = ()=>{ compProv = b.dataset.p; compBorr = {}; compOC = null; compQ = ''; renderCompras(); window.scrollTo(0,0); });
   if(!compProv) return;
-  const leer = ()=> document.querySelectorAll('.cp-row').forEach(r=>{ const c = Number(r.querySelector('.cp-c').value)||0, p = r.querySelector('.cp-p').value, g = Number(r.querySelector('.cp-r').value)||0;
-    if(c > 0 || g > 0) compBorr[r.dataset.pid] = {cant:c, costo: p==='' ? null : Number(p), regalo:g}; else delete compBorr[r.dataset.pid]; });
+  const leer = ()=>{
+    document.querySelectorAll('.cp-row').forEach(r=>{ const c = Number(r.querySelector('.cp-c').value)||0, p = r.querySelector('.cp-p').value, x = compBorr[r.dataset.pid] || {regalo:0};
+      x.cant = c; x.costo = p==='' ? null : Number(p); compBorr[r.dataset.pid] = x; });
+    document.querySelectorAll('.cp-reg').forEach(r=>{ const x = compBorr[r.dataset.pid] || (compBorr[r.dataset.pid] = {cant:0, costo:null}); x.regalo = Number(r.querySelector('.cp-rq').value)||0; });
+    Object.keys(compBorr).forEach(k=>{ const x = compBorr[k]; if(!k.startsWith('__') && x && !(x.cant > 0) && !(x.regalo > 0) && !document.querySelector(`.cp-reg[data-pid="${k}"]`)) delete compBorr[k]; });
+  };
   const pinta = ()=>{ const ls = lineasCompra(), nReg = ls.filter(l=> l.regalo).length; $('cpRes').innerHTML = ls.length ? `${ls.filter(l=> !l.regalo).length} productos${nReg ? ` + ${nReg} regalo` : ''} · <b>${fmt(totalLineas(ls))}</b>` : 'Escribe cantidades'; };
-  document.querySelectorAll('.cp-row input').forEach(i=> i.oninput = ()=>{ leer(); const r = i.closest('.cp-row'); r.classList.toggle('on', Number(r.querySelector('.cp-c').value) > 0 || Number(r.querySelector('.cp-r').value) > 0); pinta(); });
+  document.querySelectorAll('.cp-row input').forEach(i=> i.oninput = ()=>{ leer(); const r = i.closest('.cp-row'); r.classList.toggle('on', Number(r.querySelector('.cp-c').value) > 0); pinta(); });
+  document.querySelectorAll('.cp-rq').forEach(i=> i.oninput = ()=>{ leer(); pinta(); });
+  document.querySelectorAll('.cp-rdel').forEach(b=> b.onclick = ()=>{ leer(); const pid = b.closest('.cp-reg').dataset.pid; if(compBorr[pid]){ compBorr[pid].regalo = 0; if(!(compBorr[pid].cant > 0)) delete compBorr[pid]; } renderCompras(); });
   const q = $('cpQ'); q.oninput = ()=>{ leer(); compQ = q.value; const pos = q.selectionStart; renderCompras(); const n = $('cpQ'); n.focus(); n.setSelectionRange(pos,pos); };
   on('cpCambiar', ()=>{ leer(); const cambiar = ()=>{ compProv = ''; compBorr = {}; compOC = null; compQ = ''; renderCompras(); };
     if(lineasCompra().length) confirmar({titulo:'Cambiar de proveedor', ok:'Cambiar', texto:'Se borran las cantidades que capturaste para esta compra.', alAceptar:cambiar}); else cambiar(); });
@@ -6556,7 +6568,7 @@ function bindCompraProductos(){
     const c = DB.compras.find(x=> x.id===b.dataset.id); if(!c) return;
     compBorr = {}; c.lineas.forEach(l=>{ const x = compBorr[l.pid] || (compBorr[l.pid] = {cant:0, costo:null, regalo:0}); if(l.regalo) x.regalo = r3(x.regalo + l.cant*(l.factor||1)); else { x.cant = r3(x.cant + l.cant*(l.factor||1)); x.costo = r2(l.costo/(l.factor||1)); } });
     compOC = c.id; renderCompras(); toast(`Orden ${c.folio} cargada: revisa lo que llegó y registra la compra`); });
-  on('cpRegaloOtro', ()=>{ leer(); elegirArticulo(pid=>{ const x = compBorr[pid] || (compBorr[pid] = {cant:0, costo:null, regalo:0}); x.regalo = (x.regalo || 0) + 1; renderCompras(); }); });
+  on('cpRegaloOtro', ()=>{ leer(); elegirArticulo(pid=>{ const x = compBorr[pid] || (compBorr[pid] = {cant:0, costo:null, regalo:0}); if(!(x.regalo > 0)) x.regalo = 1; renderCompras(); setTimeout(()=>{ const i = document.querySelector(`.cp-reg[data-pid="${pid}"] .cp-rq`); if(i){ i.focus(); i.select(); i.scrollIntoView({block:'center'}); } }, 60); }); });
   on('cpOC', ()=>{ leer(); generarOrdenCompra(); });
   on('cpOk', ()=>{ leer(); registrarCompraProductos(); }); pinta();
 }
