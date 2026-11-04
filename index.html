@@ -708,6 +708,16 @@ dd.pos{color:var(--brand)}
 .cp-bono small{flex-basis:100%;color:var(--muted);font-size:.74rem}
 .cp-ocs{display:flex;flex-wrap:wrap;gap:6px;padding:4px 16px}.cp-oc.on{border-color:var(--brand);background:var(--brand-soft)}
 .cp-reg-h{color:#8a5a00}
+.cp-h,.cp-row{grid-template-columns:1fr 54px 70px 38px}
+.cp-mas{width:34px;height:34px;border-radius:10px;border:1.5px dashed #e0b450;color:#8a5a00;font-size:1.3rem;font-weight:700;background:#fff8e6}
+.cp-mas:disabled{opacity:.3}
+.cp-sub{display:grid;grid-template-columns:1fr 54px 70px 38px;gap:8px;align-items:center;padding:6px 16px 8px 30px;background:#fff8e6;border-bottom:1px solid var(--line)}
+.cp-sub b{font-size:.86rem;font-weight:600}.cp-sub small{display:block;color:var(--muted);font-size:.72rem}
+.cp-sub input{width:100%;padding:8px 6px;border:1.5px solid var(--line);border-radius:10px;font:inherit;text-align:right;background:#fff}
+.cp-tot{margin:10px 16px}.cp-tot .cj-row b{display:flex;align-items:center;gap:2px}
+.cp-tot input[type=number]{width:84px;padding:6px;border:1.5px solid var(--line);border-radius:8px;text-align:right;font:inherit}
+.cp-tot input[type=checkbox]{width:18px;height:18px;vertical-align:-3px;accent-color:var(--brand)}
+.cp-bono span{white-space:nowrap}
 .cp-reg{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line);background:#fff8e6}
 .cp-reg > span{flex:1;min-width:0}.cp-reg b{display:block;font-size:.9rem;font-weight:600}.cp-reg small{display:block;color:var(--muted);font-size:.76rem}
 .cp-reg input{width:64px;padding:9px 6px;border:1.5px solid var(--line);border-radius:10px;font:inherit;text-align:right;background:#fff}
@@ -1927,7 +1937,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.37.2';
+const APP_VERSION = '0.38';
 
 /* ================= Íconos ================= */
 const I = {
@@ -6439,40 +6449,6 @@ function costoPromedio(a, qNueva, importeNuevo){
 }
 const provsCompra = ()=> [...new Set(store.get('articulos',[]).filter(a=> !a.borrado).map(a=> a.proveedor).filter(Boolean))].sort((a,b)=> a.localeCompare(b,'es'));
 const ocsPendientes = prov => DB.compras.filter(c=> c.proveedor===prov && ['Borrador','Enviada','Parcial'].includes(c.estado));
-function viewCompraProductos(){
-  if(!compProv){
-    const ps = provsCompra();
-    return `<div class="cl-home" style="min-height:0;padding-top:10px"><p class="sub" style="margin:0 0 10px">Elige el proveedor de esta compra.</p>
-      ${ps.map(p=>{ const n = store.get('articulos',[]).filter(a=> !a.borrado && a.proveedor===p).length, oc = ocsPendientes(p).length;
-        return `<button class="cl-opt cp-prov" data-p="${esc(p)}"><span class="cl-opt-ic">${svg('proveedores')}</span><span><b>${esc(p)}</b><small>${n} productos${bonoProv(p) ? ' · bonificación ' + bonoProv(p) + '%' : ''}${oc ? ` · <b class="warn">${oc} ${oc===1?'orden pendiente':'órdenes pendientes'}</b>` : ''}</small></span>${svg('chev')}</button>`; }).join('') || '<p class="sub">Captura el proveedor en tus artículos para poder comprar.</p>'}
-      <button class="ub-b" id="cpNuevo">+ Nuevo producto</button></div>`;
-  }
-  const arts = store.get('articulos',[]).filter(a=> !a.borrado && a.proveedor===compProv && coincideBusqueda([nombreTicket(a), a.sku, a.codigo].filter(Boolean).join(' '), compQ))
-    .sort((a,b)=> (!!(compBorr[b.id]?.cant > 0) - !!(compBorr[a.id]?.cant > 0)) || nombreTicket(a).localeCompare(nombreTicket(b),'es'));
-  const ocs = ocsPendientes(compProv);
-  const regalos = Object.entries(compBorr).filter(([k,b])=> !k.startsWith('__') && b && b.regalo > 0);
-  return `<div class="cp-provbar"><span>${svg('proveedores')}<b>${esc(compProv)}</b></span><button class="ub-b" id="cpCambiar">Cambiar</button></div>
-    <div class="cp-bono"><span>Bonificación del periodo</span><input id="cpBono" type="number" inputmode="decimal" min="0" max="30" step="0.5" value="${bonoProv(compProv) || ''}" placeholder="0"><span>%</span><small>Se resta del costo en Informes (utilidad real)</small></div>
-    ${ocs.length ? `<div class="cp-ocs">${ocs.map(c=>`<button class="ub-b cp-oc${compOC===c.id?' on':''}" data-id="${c.id}">${svg('compras')}${esc(c.folio)} · ${fmt(compraTotal(c))}${compOC===c.id ? ' · cargada' : ' · cargar para recibir'}</button>`).join('')}</div>` : ''}
-    <div class="comp-ctl"><div class="rc-search" style="flex:1;border:1px solid var(--line);border-radius:10px;position:static">${svg('search')}<input id="cpQ" placeholder="Buscar producto" value="${esc(compQ)}" autocomplete="off"></div><button class="ub-b" id="cpNuevo">+ Nuevo</button></div>
-    <div class="cp-h"><span>Producto</span><span>Cantidad</span><span>Costo c/u</span></div>
-    ${arts.map(a=>{ const b = compBorr[a.id] || {};
-      return `<div class="cp-row${b.cant > 0 ? ' on' : ''}" data-pid="${a.id}"><span><b>${esc(nombreTicket(a))}</b><small>actual ${a.costo ? fmt(a.costo) : 'sin costo'} · hay ${fmtCant(a.id, totalStock(a.id))}${a.proveedor!==compProv ? ' · ' + esc(a.proveedor||'') : ''}</small></span>
-        <input class="cp-c" type="number" inputmode="decimal" min="0" step="${a.porKilo?'0.001':'1'}" value="${b.cant || ''}" placeholder="0">
-        <input class="cp-p" type="number" inputmode="decimal" min="0" step="0.01" value="${b.costo ?? (a.costo || '')}" placeholder="$"></div>`; }).join('') || '<div class="rc-empty"><p>Sin productos de este proveedor.</p></div>'}
-    <div class="rc-day cp-reg-h">Regalos de la promoción${regalos.length ? ' · ' + regalos.length : ''}</div>
-    ${regalos.map(([pid,b])=>{ const a = artPorId(pid);
-      return `<div class="cp-reg" data-pid="${pid}"><span><b>${esc(a ? nombreTicket(a) : pid)}</b><small>sin costo · hay ${fmtCant(pid, totalStock(pid))}</small></span>
-        <input class="cp-rq" type="number" inputmode="decimal" min="0" step="${a?.porKilo?'0.001':'1'}" value="${b.regalo}"><button class="co-del cp-rdel" aria-label="Quitar regalo">${svg('trash')}</button></div>`; }).join('')}
-    <div class="cr-pad" style="padding-top:8px"><button class="ub-b" id="cpRegaloOtro">+ Agregar regalo</button>
-      <p class="note-sm" style="text-align:left">Piezas sin costo de la promoción del proveedor (del mismo producto u otro). Entran al almacén y bajan el costo promedio.</p></div>
-    <div class="inv-foot cp-foot"><span id="cpRes"></span><button class="btn ghost" id="cpOC">Orden de compra</button><button class="btn" id="cpOk">Registrar compra</button></div>`;
-}
-const lineasCompra = ()=> Object.entries(compBorr).filter(([k,b])=> !k.startsWith('__') && b && (b.cant > 0 || b.regalo > 0)).flatMap(([pid,b])=>{
-  const nombre = nombreTicket(artPorId(pid)||{nombre:pid}), out = [];
-  if(b.cant > 0) out.push({pid, nombre, cant:r3(b.cant), costo:r2(b.costo ?? artPorId(pid)?.costo ?? 0)});
-  if(b.regalo > 0) out.push({pid, nombre, cant:r3(b.regalo), costo:0, regalo:true});
-  return out; });
 const totalLineas = ls => r2(ls.reduce((s,l)=> s + l.cant*l.costo, 0));
 function aplicarCostos(ls){
   const arts = store.get('articulos', []), ahora = new Date().toISOString(), porPid = {};
@@ -6480,27 +6456,7 @@ function aplicarCostos(ls){
   Object.entries(porPid).forEach(([pid, x])=>{ const a = arts.find(y=> y.id===pid); if(!a) return; const n = costoPromedio(a, x.q, x.imp); if(n > 0 && n !== a.costo){ a.costo = n; a.editado = true; a.actualizado = ahora; } });
   store.set('articulos', arts);
 }
-function registrarCompraProductos(){
-  const ls = lineasCompra();
-  if(!ls.length){ toast('Escribe la cantidad de al menos un producto'); return; }
-  if(ls.some(l=> !l.regalo && !(l.costo > 0))){ toast('Falta el costo de algún producto'); return; }
-  const total = totalLineas(ls), nReg = ls.filter(l=> l.regalo).length;
-  dialogoPago(`Compra a ${esc(compProv)}${nReg ? ` · ${nReg} ${nReg===1?'regalo':'regalos'}` : ''}`, total, compProv, pago=>{
-    aplicarCostos(ls);   /* antes de mover el inventario, para promediar con lo que ya hay */
-    const e = nuevoEgreso('productos', total, pago, {lineas:ls, proveedor:compProv, oc: compOC});
-    moverStock(ls.map(l=> ({ub:'almacen', pid:l.pid, cant:l.cant})), 'compra', e.folio + ' · ' + compProv);
-    if(compOC){ const c = DB.compras.find(x=> x.id===compOC); if(c){ c.estado = 'Recibida'; c.recibidaEn = e.folio; c.sincronizado = false; DB.guardar('compras', c); } compOC = null; }
-    compBorr = {}; renderCompras(); toast(`Compra registrada · ${fmt(total)} · entró al almacén`);
-  });
-}
 /* ----- Orden de compra para compartir o enviar ----- */
-function generarOrdenCompra(){
-  const ls = lineasCompra();
-  if(!ls.length){ toast('Escribe la cantidad de al menos un producto'); return; }
-  const c = nuevaCompra();
-  c.proveedor = compProv; c.estado = 'Enviada'; c.lineas = ls.map(l=> ({pid:l.pid, cant:l.cant, factor:1, uc:'', costo:l.costo, ...(l.regalo ? {regalo:true} : {})}));
-  DB.guardar('compras', c); compOC = c.id; renderCompras(); compartirOC(c);
-}
 function pdfOrdenCompra(c){
   const { jsPDF } = window.jspdf, doc = new jsPDF({unit:'mm', format:'letter'});
   const W = 215.9, H = 279.4, M = 16, verde = [31,111,74], gris = [107,118,114];
@@ -6515,7 +6471,7 @@ function pdfOrdenCompra(c){
     doc.text('Cant.', M+3, y0+5.4); doc.text('Producto', M+24, y0+5.4); doc.text('Costo', W-M-38, y0+5.4, {align:'right'}); doc.text('Importe', W-M-3, y0+5.4, {align:'right'}); return y0 + 8; };
   y = cab(y); doc.setFontSize(10);
   c.lineas.forEach((l,i)=>{
-    const a = artPorId(l.pid), nm = doc.splitTextToSize((a ? nombreTicket(a) : l.pid) + (l.regalo ? '  (REGALO / PROMOCIÓN)' : ''), W-2*M-24-62), alto = Math.max(8, nm.length*4.6 + 3.4);
+    const a = artPorId(l.pid), nm = doc.splitTextToSize((l.regalo ? '   Regalo: ' : '') + (a ? nombreTicket(a) : l.pid) + (l.regalo ? '  (promoción)' : ''), W-2*M-24-62), alto = Math.max(8, nm.length*4.6 + 3.4);
     if(y + alto > H-30){ doc.addPage(); y = cab(18); doc.setFontSize(10); }
     if(i % 2){ doc.setFillColor(246,248,247); doc.rect(M, y, W-2*M, alto, 'F'); }
     doc.setFont('helvetica', l.regalo ? 'italic' : 'normal'); doc.setTextColor(40,45,43);
@@ -6545,32 +6501,188 @@ function compartirOC(c){
     descargarBlob(blob, nombre); toast('Se descargó el PDF');
   };
 }
+/* ===== Descuento directo por proveedor (volumen negociado) ===== */
+const DESC_DEF = {Sigma:{general:10, yogur:6}};
+const descProv = prov => ({general:0, yogur:0, ...(DESC_DEF[prov]||{}), ...(((store.get('config').descDirecto)||{})[prov]||{})});
+function guardarDescProv(prov, d){ const cfg = store.get('config'); cfg.descDirecto = cfg.descDirecto || {}; cfg.descDirecto[prov] = {...descProv(prov), ...d}; store.set('config', cfg); }
+const esYogur = a => /yoplait/i.test(a?.marca || '') || /yoplait/i.test(a?.nombre || '');
+const pctDirecto = (a, prov) => { const d = descProv(prov); return esYogur(a) ? d.yogur : d.general; };
+/* Costo de lista por pieza: el guardado, o el costo actual sin el descuento directo */
+const costoLista = (a, prov) => a.costoLista > 0 ? a.costoLista : (a.costo > 0 ? r4(a.costo / (1 - pctDirecto(a, prov)/100)) : 0);
+function r4(x){ return Math.round((Number(x)||0)*10000)/10000; }
+
+/* ----- Cálculo completo de la compra (como el ticket del proveedor) ----- */
+function calculoCompra(){
+  const prov = compProv, d = descProv(prov), ls = [];
+  Object.entries(compBorr).forEach(([pid, b])=>{
+    if(pid.startsWith('__') || !b) return; const a = artPorId(pid); if(!a) return;
+    if(b.cant > 0){
+      const lista = r4(b.costo ?? costoLista(a, prov)), base = r2(b.cant * lista), regs = (b.regs||[]).filter(g=> g.cant > 0);
+      const elegible = !regs.length && !b.sinDesc, pct = elegible ? (esYogur(a) ? d.yogur : d.general) : 0;
+      ls.push({pid, a, nombre:nombreTicket(a), cant:r3(b.cant), lista, base, pct, yogur:esYogur(a), regs, valorRegalos: r2(regs.reduce((s,g)=> s + g.cant*g.valor, 0))});
+    }
+    if(b.regalo > 0) ls.push({pid, a, nombre:nombreTicket(a), cant:r3(b.regalo), lista:0, base:0, pct:0, suelto:true, regs:[], valorRegalos:0});
+  });
+  const subtotal = r2(ls.reduce((s,l)=> s + l.base, 0));
+  const sugerido = r2(ls.reduce((s,l)=> s + l.base * l.pct / 100, 0));
+  const descuento = compBorr.__desc != null ? r2(compBorr.__desc) : sugerido;
+  const factor = sugerido > 0 ? descuento / sugerido : 0;
+  ls.forEach(l=>{ l.desc = r2(l.base * l.pct / 100 * factor); l.neto = r2(l.base - l.desc); l.costoReal = l.cant > 0 && !l.suelto ? r2((l.neto - l.valorRegalos) / l.cant) : 0; });
+  const devol = compBorr.__dev && compBorr.__dev.on ? r2(compBorr.__dev.monto || 0) : 0;
+  return {ls, subtotal, sugerido, descuento, devol, total: r2(subtotal - descuento - devol), d};
+}
+function devolucionesPend(prov){
+  const st = inv2().devoluciones || {};
+  return Object.entries(st).filter(([pid,q])=> q > 0.0005 && artPorId(pid)?.proveedor===prov).map(([pid,q])=> ({pid, cant:q, valor:r2(q * costoLista(artPorId(pid), prov))}));
+}
+
+/* ----- Vista ----- */
+function viewCompraProductos(){
+  if(!compProv){
+    const ps = provsCompra();
+    return `<div class="cl-home" style="min-height:0;padding-top:10px"><p class="sub" style="margin:0 0 10px">Elige el proveedor de esta compra.</p>
+      ${ps.map(p=>{ const n = store.get('articulos',[]).filter(a=> !a.borrado && a.proveedor===p).length, oc = ocsPendientes(p).length;
+        return `<button class="cl-opt cp-prov" data-p="${esc(p)}"><span class="cl-opt-ic">${svg('proveedores')}</span><span><b>${esc(p)}</b><small>${n} productos${bonoProv(p) ? ' · bonificación ' + bonoProv(p) + '%' : ''}${oc ? ` · <b class="warn">${oc} ${oc===1?'orden pendiente':'órdenes pendientes'}</b>` : ''}</small></span>${svg('chev')}</button>`; }).join('') || '<p class="sub">Captura el proveedor en tus artículos para poder comprar.</p>'}
+      <button class="ub-b" id="cpNuevo">+ Nuevo producto</button></div>`;
+  }
+  const C = calculoCompra(), d = C.d;
+  const arts = store.get('articulos',[]).filter(a=> !a.borrado && a.proveedor===compProv && coincideBusqueda([nombreTicket(a), a.sku, a.codigo].filter(Boolean).join(' '), compQ))
+    .sort((a,b)=> (!!(compBorr[b.id]?.cant > 0) - !!(compBorr[a.id]?.cant > 0)) || nombreTicket(a).localeCompare(nombreTicket(b),'es'));
+  const ocs = ocsPendientes(compProv), sueltos = Object.entries(compBorr).filter(([k,b])=> !k.startsWith('__') && b && b.regalo > 0);
+  const devs = devolucionesPend(compProv), dv = compBorr.__dev || {on:false, monto: r2(devs.reduce((s,x)=> s + x.valor, 0))};
+  return `<div class="cp-provbar"><span>${svg('proveedores')}<b>${esc(compProv)}</b></span><button class="ub-b" id="cpCambiar">Cambiar</button></div>
+    <div class="cp-bono"><span>Descuento directo</span><input id="cpDG" type="number" inputmode="decimal" min="0" max="30" step="0.5" value="${d.general || ''}" placeholder="0"><span>% general</span><input id="cpDY" type="number" inputmode="decimal" min="0" max="30" step="0.5" value="${d.yogur || ''}" placeholder="0"><span>% Yoplait</span>
+      <small>Solo a productos sin regalo. El costo que escribes es el de lista (sin descuento).</small></div>
+    <div class="cp-bono"><span>Bonificación del periodo</span><input id="cpBono" type="number" inputmode="decimal" min="0" max="30" step="0.5" value="${bonoProv(compProv) || ''}" placeholder="0"><span>%</span><small>Se resta del costo en Informes (utilidad real)</small></div>
+    ${ocs.length ? `<div class="cp-ocs">${ocs.map(c=>`<button class="ub-b cp-oc${compOC===c.id?' on':''}" data-id="${c.id}">${svg('compras')}${esc(c.folio)} · ${fmt(compraTotal(c))}${compOC===c.id ? ' · cargada' : ' · cargar para recibir'}</button>`).join('')}</div>` : ''}
+    <div class="comp-ctl"><div class="rc-search" style="flex:1;border:1px solid var(--line);border-radius:10px;position:static">${svg('search')}<input id="cpQ" placeholder="Buscar producto" value="${esc(compQ)}" autocomplete="off"></div><button class="ub-b" id="cpNuevo">+ Nuevo</button></div>
+    <div class="cp-h"><span>Producto</span><span>Piezas</span><span>Costo lista</span><span>Regalo</span></div>
+    ${arts.map(a=>{ const b = compBorr[a.id] || {}, l = C.ls.find(x=> x.pid===a.id && !x.suelto);
+      return `<div class="cp-row${b.cant > 0 ? ' on' : ''}" data-pid="${a.id}"><span><b>${esc(nombreTicket(a))}</b><small class="cp-info">${infoFilaCompra(a, l)}</small></span>
+        <input class="cp-c" type="number" inputmode="decimal" min="0" step="${a.porKilo?'0.001':'1'}" value="${b.cant || ''}" placeholder="0">
+        <input class="cp-p" type="number" inputmode="decimal" min="0" step="any" value="${b.costo ?? (costoLista(a, compProv) || '')}" placeholder="$">
+        <button class="cp-mas" aria-label="Agregar regalo a este producto" ${b.cant > 0 ? '' : 'disabled'}>+</button></div>
+        ${(b.regs||[]).map((g,i)=>{ const ga = artPorId(g.pid); return `<div class="cp-sub" data-pid="${a.id}" data-i="${i}"><span>🎁 <b>${esc(ga ? nombreTicket(ga) : g.pid)}</b><small>regalo · valor c/u</small></span>
+          <input class="cp-gq" type="number" inputmode="decimal" min="0" value="${g.cant}" aria-label="Piezas de regalo"><input class="cp-gv" type="number" inputmode="decimal" min="0" step="0.01" value="${g.valor}" aria-label="Valor del regalo"><button class="co-del cp-gdel" aria-label="Quitar regalo">${svg('trash')}</button></div>`; }).join('')}`; }).join('') || '<div class="rc-empty"><p>Sin productos de este proveedor.</p></div>'}
+    ${sueltos.length ? `<div class="rc-day cp-reg-h">Regalos sin producto asociado</div>${sueltos.map(([pid,b])=>{ const a = artPorId(pid); return `<div class="cp-reg" data-pid="${pid}"><span><b>${esc(a ? nombreTicket(a) : pid)}</b><small>entra a $0</small></span><input class="cp-rq" type="number" inputmode="decimal" min="0" value="${b.regalo}"><button class="co-del cp-rdel" aria-label="Quitar regalo">${svg('trash')}</button></div>`; }).join('')}` : ''}
+    <div class="cr-pad" style="padding-top:8px"><button class="ub-b" id="cpRegaloOtro">+ Regalo sin producto asociado</button></div>
+    ${C.ls.length ? `<div class="card cajon cp-tot">
+      <div class="cj-row"><span>Subtotal (lista)</span><b id="cpSubt">${fmt(C.subtotal)}</b></div>
+      <div class="cj-row"><span>Volumen negociado<small class="ir-s" id="cpSug">sugerido ${fmt(C.sugerido)} (${d.general}% general, ${d.yogur}% Yoplait)</small></span><b>−$<input id="cpDesc" type="number" inputmode="decimal" min="0" step="0.01" value="${C.descuento}"></b></div>
+      ${devs.length ? `<label class="cj-row"><span><input type="checkbox" id="cpDevOn" ${dv.on?'checked':''}> Devolución que te descuentan<small class="ir-s">${devs.length} productos pendientes de entregar a ${esc(compProv)}</small></span><b>−$<input id="cpDev" type="number" inputmode="decimal" min="0" step="0.01" value="${dv.monto}"></b></label>` : ''}
+      <div class="cj-teo"><span>Total a pagar</span><b id="cpTotal">${fmt(C.total)}</b></div>
+      ${C.ls.some(l=> l.regs.length) ? `<p class="note-sm" style="text-align:left">Regalos valuados en ${fmt(r2(C.ls.reduce((s,l)=> s + l.valorRegalos, 0)))}: se descuentan del costo del producto que los generó.</p>` : ''}
+    </div>` : ''}
+    <div class="inv-foot cp-foot"><span id="cpRes">${C.ls.length ? `${C.ls.filter(l=> !l.suelto).length} productos · total a pagar <b>${fmt(C.total)}</b>` : 'Escribe cantidades'}</span><button class="btn ghost" id="cpOC">Orden de compra</button><button class="btn" id="cpOk">Registrar compra</button></div>`;
+}
+
+function infoFilaCompra(a, l){
+  return l ? `= ${fmt(l.base)}${l.desc ? ` · −${l.pct}% ${fmt(l.desc)}` : (l.regs.length ? ' · promoción, sin descuento' : '')} · <b>real ${fmt(l.costoReal)} c/u</b>`
+           : `actual ${a.costo ? fmt(a.costo) : 'sin costo'} · hay ${fmtCant(a.id, totalStock(a.id))}`;
+}
+/* Recalcula en pantalla sin redibujar (para no perder el campo donde escribes) */
+function refrescarCompra(){
+  const C = calculoCompra(), $ = id => document.getElementById(id);
+  document.querySelectorAll('.cp-row').forEach(r=>{ const a = artPorId(r.dataset.pid), l = C.ls.find(x=> x.pid===r.dataset.pid && !x.suelto);
+    r.querySelector('.cp-info').innerHTML = infoFilaCompra(a, l); r.classList.toggle('on', !!l); r.querySelector('.cp-mas').disabled = !l; });
+  if($('cpSubt')) $('cpSubt').textContent = fmt(C.subtotal);
+  if($('cpSug')) $('cpSug').textContent = `sugerido ${fmt(C.sugerido)} (${C.d.general}% general, ${C.d.yogur}% Yoplait)`;
+  const ds = $('cpDesc'); if(ds && !ds.dataset.tocado && document.activeElement !== ds) ds.value = C.descuento;
+  if($('cpTotal')) $('cpTotal').textContent = fmt(C.total);
+  if($('cpRes')) $('cpRes').innerHTML = C.ls.length ? `${C.ls.filter(l=> !l.suelto).length} productos · total a pagar <b>${fmt(C.total)}</b>` : 'Escribe cantidades';
+  if(C.ls.length && !document.querySelector('.cp-tot')){ const y = window.scrollY, act = document.activeElement, sel = act && act.closest && act.closest('.cp-row') ? `.cp-row[data-pid="${act.closest('.cp-row').dataset.pid}"] .${act.className}` : null;
+    renderCompras(); window.scrollTo(0, y); if(sel){ const e = document.querySelector(sel); if(e) e.focus(); } }
+}
+/* Líneas para guardar: compradas (con costo real) y regalos (con su valor) */
+function lineasCompra(){
+  const C = calculoCompra(), out = [];
+  C.ls.forEach(l=>{
+    if(l.suelto){ out.push({pid:l.pid, nombre:l.nombre, cant:l.cant, costo:0, regalo:true}); return; }
+    out.push({pid:l.pid, nombre:l.nombre, cant:l.cant, costo:l.costoReal, lista:l.lista, pct:l.pct, desc:l.desc, importe:l.neto});
+    l.regs.forEach(g=> out.push({pid:g.pid, nombre:nombreTicket(artPorId(g.pid)||{nombre:g.pid}), cant:r3(g.cant), costo:r2(g.valor), regalo:true, de:l.pid}));
+  });
+  return out;
+}
+function registrarCompraProductos(){
+  const C = calculoCompra(), ls = lineasCompra();
+  if(!C.ls.length){ toast('Escribe la cantidad de al menos un producto'); return; }
+  if(C.ls.some(l=> !l.suelto && !(l.lista > 0))){ toast('Falta el costo de algún producto'); return; }
+  dialogoPago(`Compra a ${esc(compProv)}`, C.total, compProv, pago=>{
+    /* costo promedio: cada producto con lo que realmente costó (regalos descontados del producto que los generó) */
+    const arts = store.get('articulos', []), ahora = new Date().toISOString(), porPid = {};
+    ls.forEach(l=>{ const x = porPid[l.pid] || (porPid[l.pid] = {q:0, imp:0}); x.q += l.cant; x.imp += l.cant * l.costo; });
+    Object.entries(porPid).forEach(([pid, x])=>{ const a = arts.find(y=> y.id===pid); if(!a) return; const n = costoPromedio(a, x.q, x.imp); if(n > 0) a.costo = n; a.editado = true; a.actualizado = ahora; });
+    C.ls.filter(l=> !l.suelto && l.lista > 0).forEach(l=>{ const a = arts.find(y=> y.id===l.pid); if(a) a.costoLista = l.lista; });
+    store.set('articulos', arts);
+    const e = nuevoEgreso('productos', C.total, pago, {lineas:ls, proveedor:compProv, oc:compOC, desglose:{subtotal:C.subtotal, volumen:C.descuento, devolucion:C.devol}});
+    moverStock(ls.map(l=> ({ub:'almacen', pid:l.pid, cant:l.cant})), 'compra', e.folio + ' · ' + compProv);
+    if(C.devol > 0){
+      const xs = devolucionesPend(compProv), n = store.get('devProvSeq', 0) + 1; store.set('devProvSeq', n);
+      const folio = `DP-${String(n).padStart(3,'0')}`;
+      moverStock(xs.map(x=> ({ub:'devoluciones', pid:x.pid, cant:-x.cant})), 'devProveedor', folio + ' · ' + compProv + ' · ' + e.folio);
+      const h = store.get('devProv', []); h.push({id:'DP'+Date.now(), folio, fecha:ahora, proveedor:compProv, lineas:xs.map(x=> ({pid:x.pid, cant:x.cant, costo:costoArt(artPorId(x.pid))})), valor:r2(xs.reduce((s,x)=> s + x.valor, 0)), notaCredito:C.devol, referencia:'Descontada en ' + e.folio, usuario:session.usuario}); store.set('devProv', h);
+    }
+    if(compOC){ const c = DB.compras.find(x=> x.id===compOC); if(c){ c.estado = 'Recibida'; c.recibidaEn = e.folio; c.sincronizado = false; DB.guardar('compras', c); } compOC = null; }
+    compBorr = {}; renderCompras(); toast(`Compra registrada · ${fmt(C.total)} · entró al almacén`);
+  });
+}
+function generarOrdenCompra(){
+  const C = calculoCompra();
+  if(!C.ls.length){ toast('Escribe la cantidad de al menos un producto'); return; }
+  const c = nuevaCompra();
+  c.proveedor = compProv; c.estado = 'Enviada';
+  c.lineas = C.ls.flatMap(l=> l.suelto ? [{pid:l.pid, cant:l.cant, factor:1, uc:'', costo:0, regalo:true}]
+    : [{pid:l.pid, cant:l.cant, factor:1, uc:'', costo:l.lista}, ...l.regs.map(g=> ({pid:g.pid, cant:g.cant, factor:1, uc:'', costo:0, regalo:true, de:l.pid, valor:g.valor}))]);
+  DB.guardar('compras', c); compOC = c.id; renderCompras(); compartirOC(c);
+}
 function bindCompraProductos(){
   const $ = id => document.getElementById(id), on = (id, f)=>{ const e = $(id); if(e) e.onclick = f; };
   on('cpNuevo', ()=>{ volverACompras = true; go('articulos'); artSel = null; artBorrador = null; artVista = 'editar'; renderArticulos(); if(compProv){ const p = document.getElementById('aProv'); if(p) p.value = compProv; } });
   document.querySelectorAll('.cp-prov').forEach(b=> b.onclick = ()=>{ compProv = b.dataset.p; compBorr = {}; compOC = null; compQ = ''; renderCompras(); window.scrollTo(0,0); });
   if(!compProv) return;
   const leer = ()=>{
-    document.querySelectorAll('.cp-row').forEach(r=>{ const c = Number(r.querySelector('.cp-c').value)||0, p = r.querySelector('.cp-p').value, x = compBorr[r.dataset.pid] || {regalo:0};
+    document.querySelectorAll('.cp-row').forEach(r=>{ const c = Number(r.querySelector('.cp-c').value)||0, p = r.querySelector('.cp-p').value, x = compBorr[r.dataset.pid] || {regs:[]};
       x.cant = c; x.costo = p==='' ? null : Number(p); compBorr[r.dataset.pid] = x; });
-    document.querySelectorAll('.cp-reg').forEach(r=>{ const x = compBorr[r.dataset.pid] || (compBorr[r.dataset.pid] = {cant:0, costo:null}); x.regalo = Number(r.querySelector('.cp-rq').value)||0; });
-    Object.keys(compBorr).forEach(k=>{ const x = compBorr[k]; if(!k.startsWith('__') && x && !(x.cant > 0) && !(x.regalo > 0) && !document.querySelector(`.cp-reg[data-pid="${k}"]`)) delete compBorr[k]; });
+    document.querySelectorAll('.cp-sub').forEach(r=>{ const x = compBorr[r.dataset.pid]; const g = x && x.regs && x.regs[Number(r.dataset.i)]; if(g){ g.cant = Number(r.querySelector('.cp-gq').value)||0; g.valor = Number(r.querySelector('.cp-gv').value)||0; } });
+    document.querySelectorAll('.cp-reg').forEach(r=>{ const x = compBorr[r.dataset.pid] || (compBorr[r.dataset.pid] = {cant:0, costo:null, regs:[]}); x.regalo = Number(r.querySelector('.cp-rq').value)||0; });
+    const ds = $('cpDesc'); if(ds && ds.dataset.tocado) compBorr.__desc = Number(ds.value)||0;
+    const dv = $('cpDev'); if(dv) compBorr.__dev = {on: $('cpDevOn').checked, monto: Number(dv.value)||0};
+    Object.keys(compBorr).forEach(k=>{ const x = compBorr[k]; if(!k.startsWith('__') && x && !(x.cant > 0) && !(x.regalo > 0)) delete compBorr[k]; });
   };
-  const pinta = ()=>{ const ls = lineasCompra(), nReg = ls.filter(l=> l.regalo).length; $('cpRes').innerHTML = ls.length ? `${ls.filter(l=> !l.regalo).length} productos${nReg ? ` + ${nReg} regalo` : ''} · <b>${fmt(totalLineas(ls))}</b>` : 'Escribe cantidades'; };
-  document.querySelectorAll('.cp-row input').forEach(i=> i.oninput = ()=>{ leer(); const r = i.closest('.cp-row'); r.classList.toggle('on', Number(r.querySelector('.cp-c').value) > 0); pinta(); });
-  document.querySelectorAll('.cp-rq').forEach(i=> i.oninput = ()=>{ leer(); pinta(); });
+  const rehacer = (foco)=>{ leer(); const y = window.scrollY; renderCompras(); window.scrollTo(0, y); if(foco){ const e = document.querySelector(foco); if(e){ e.focus(); const v = e.value; e.value = ''; e.value = v; } } };
+  document.querySelectorAll('.cp-row input, .cp-sub input').forEach(i=> i.oninput = ()=>{ if(i.closest('.cp-row')){ delete compBorr.__desc; const d = $('cpDesc'); if(d) delete d.dataset.tocado; } leer(); refrescarCompra(); });
+  document.querySelectorAll('.cp-mas').forEach(b=> b.onclick = ()=>{
+    leer(); const pid = b.closest('.cp-row').dataset.pid;
+    elegirArticuloProv(compProv, gpid=>{ const x = compBorr[pid]; if(!x) return; const ga = artPorId(gpid); x.regs = [...(x.regs||[]), {pid:gpid, cant:1, valor: r2(costoLista(ga, compProv) || ga.costo || 0)}]; delete compBorr.__desc; renderCompras();
+      setTimeout(()=>{ const i = document.querySelector(`.cp-sub[data-pid="${pid}"][data-i="${x.regs.length-1}"] .cp-gq`); if(i){ i.focus(); i.select(); } }, 60); });
+  });
+  document.querySelectorAll('.cp-gdel').forEach(b=> b.onclick = ()=>{ leer(); const r = b.closest('.cp-sub'), x = compBorr[r.dataset.pid]; if(x) x.regs.splice(Number(r.dataset.i), 1); delete compBorr.__desc; renderCompras(); });
+  document.querySelectorAll('.cp-rq').forEach(i=> i.oninput = ()=>{ leer(); refrescarCompra(); });
   document.querySelectorAll('.cp-rdel').forEach(b=> b.onclick = ()=>{ leer(); const pid = b.closest('.cp-reg').dataset.pid; if(compBorr[pid]){ compBorr[pid].regalo = 0; if(!(compBorr[pid].cant > 0)) delete compBorr[pid]; } renderCompras(); });
+  const ds = $('cpDesc'); if(ds) ds.oninput = ()=>{ ds.dataset.tocado = '1'; leer(); refrescarCompra(); };
+  const dvOn = $('cpDevOn'); if(dvOn) dvOn.onchange = ()=>{ leer(); refrescarCompra(); }; const dv = $('cpDev'); if(dv) dv.oninput = ()=>{ leer(); refrescarCompra(); };
+  $('cpDG').onchange = $('cpDY').onchange = ()=>{ guardarDescProv(compProv, {general: Math.max(0, Number($('cpDG').value)||0), yogur: Math.max(0, Number($('cpDY').value)||0)}); delete compBorr.__desc; rehacer(); };
   const q = $('cpQ'); q.oninput = ()=>{ leer(); compQ = q.value; const pos = q.selectionStart; renderCompras(); const n = $('cpQ'); n.focus(); n.setSelectionRange(pos,pos); };
   on('cpCambiar', ()=>{ leer(); const cambiar = ()=>{ compProv = ''; compBorr = {}; compOC = null; compQ = ''; renderCompras(); };
-    if(lineasCompra().length) confirmar({titulo:'Cambiar de proveedor', ok:'Cambiar', texto:'Se borran las cantidades que capturaste para esta compra.', alAceptar:cambiar}); else cambiar(); });
+    if(calculoCompra().ls.length) confirmar({titulo:'Cambiar de proveedor', ok:'Cambiar', texto:'Se borran las cantidades que capturaste para esta compra.', alAceptar:cambiar}); else cambiar(); });
   $('cpBono').onchange = ()=>{ const v = Math.max(0, Math.min(30, Number($('cpBono').value)||0)); guardarBono(compProv, v); toast(v ? `Bonificación de ${compProv}: ${v}%` : 'Sin bonificación'); };
   document.querySelectorAll('.cp-oc').forEach(b=> b.onclick = ()=>{
     const c = DB.compras.find(x=> x.id===b.dataset.id); if(!c) return;
-    compBorr = {}; c.lineas.forEach(l=>{ const x = compBorr[l.pid] || (compBorr[l.pid] = {cant:0, costo:null, regalo:0}); if(l.regalo) x.regalo = r3(x.regalo + l.cant*(l.factor||1)); else { x.cant = r3(x.cant + l.cant*(l.factor||1)); x.costo = r2(l.costo/(l.factor||1)); } });
+    compBorr = {};
+    c.lineas.filter(l=> !l.regalo).forEach(l=>{ const x = compBorr[l.pid] || (compBorr[l.pid] = {cant:0, costo:null, regs:[]}); x.cant = r3(x.cant + l.cant*(l.factor||1)); x.costo = r2(l.costo/(l.factor||1)); });
+    c.lineas.filter(l=> l.regalo).forEach(l=>{ if(l.de && compBorr[l.de]) compBorr[l.de].regs.push({pid:l.pid, cant:l.cant, valor:l.valor || costoLista(artPorId(l.pid)||{}, compProv)}); else { const x = compBorr[l.pid] || (compBorr[l.pid] = {cant:0, costo:null, regs:[]}); x.regalo = r3((x.regalo||0) + l.cant); } });
     compOC = c.id; renderCompras(); toast(`Orden ${c.folio} cargada: revisa lo que llegó y registra la compra`); });
-  on('cpRegaloOtro', ()=>{ leer(); elegirArticulo(pid=>{ const x = compBorr[pid] || (compBorr[pid] = {cant:0, costo:null, regalo:0}); if(!(x.regalo > 0)) x.regalo = 1; renderCompras(); setTimeout(()=>{ const i = document.querySelector(`.cp-reg[data-pid="${pid}"] .cp-rq`); if(i){ i.focus(); i.select(); i.scrollIntoView({block:'center'}); } }, 60); }); });
+  on('cpRegaloOtro', ()=>{ leer(); elegirArticulo(pid=>{ const x = compBorr[pid] || (compBorr[pid] = {cant:0, costo:null, regs:[]}); if(!(x.regalo > 0)) x.regalo = 1; renderCompras(); }); });
   on('cpOC', ()=>{ leer(); generarOrdenCompra(); });
-  on('cpOk', ()=>{ leer(); registrarCompraProductos(); }); pinta();
+  on('cpOk', ()=>{ leer(); registrarCompraProductos(); });
+}
+function elegirArticuloProv(prov, cb){
+  const bg = dialogo(`<h3>Producto de regalo</h3><p class="sub">Productos de ${esc(prov)}</p><input class="field" id="egQ" placeholder="Buscar" autocomplete="off"><div class="ea-list" id="egL"></div>`);
+  const pintar = ()=>{ const q = bg.querySelector('#egQ').value;
+    bg.querySelector('#egL').innerHTML = store.get('articulos',[]).filter(a=> !a.borrado && a.proveedor===prov && coincideBusqueda([nombreTicket(a), a.sku].join(' '), q)).slice(0,80)
+      .map(a=>`<button class="ea-row" data-pid="${a.id}"><b>${esc(nombreTicket(a))}</b><small>lista ${fmt(costoLista(a, prov))}</small></button>`).join('') || '<p class="note-sm">Sin resultados</p>';
+    bg.querySelectorAll('.ea-row').forEach(r=> r.onclick = ()=>{ bg.remove(); cb(r.dataset.pid); }); };
+  bg.querySelector('#egQ').oninput = pintar; pintar();
 }
 
 function dialogoPago(titulo, total, prov, alGuardar, opts = {}){
@@ -6673,7 +6785,8 @@ function detalleEgreso(e){
       <dt>Total</dt><dd>${fmt(e.total)}</dd><dt>Pago</dt><dd>${esc(e.metodo)}${e.delCajon ? ' · del cajón' : ''}</dd>
       ${e.credito ? `<dt>Vence</dt><dd>${fechaCorta(e.credito.vence)}</dd><dt>Saldo</dt><dd class="${saldoEgreso(e) ? 'neg' : 'pos'}">${saldoEgreso(e) ? fmt(saldoEgreso(e)) : 'Pagado'}</dd>` : ''}
       ${e.nota ? `<dt>Nota</dt><dd>${esc(e.nota)}</dd>` : ''}</dl>
-    ${e.lineas ? `<div class="deuda">${e.lineas.map(l=>`<div class="deuda-r"><span>${esc(l.nombre)}<small>${fmtExist(l.cant)} × ${l.regalo ? 'regalo' : fmt(l.costo)}</small></span><b>${l.regalo ? '<i class="pos">gratis</i>' : fmt(r2(l.cant*l.costo))}</b></div>`).join('')}</div>` : ''}
+    ${e.desglose ? `<dl class="meta"><dt>Subtotal (lista)</dt><dd>${fmt(e.desglose.subtotal)}</dd>${e.desglose.volumen ? `<dt>Volumen negociado</dt><dd class="neg">−${fmt(e.desglose.volumen)}</dd>` : ''}${e.desglose.devolucion ? `<dt>Devolución descontada</dt><dd class="neg">−${fmt(e.desglose.devolucion)}</dd>` : ''}</dl>` : ''}
+    ${e.lineas ? `<div class="deuda">${e.lineas.map(l=>`<div class="deuda-r"><span>${l.regalo ? '🎁 ' : ''}${esc(l.nombre)}<small>${fmtExist(l.cant)} × ${l.regalo ? 'regalo' + (l.costo ? ' (valor ' + fmt(l.costo) + ')' : '') : (l.lista ? 'lista ' + fmt(l.lista) + (l.pct ? ' −' + l.pct + '%' : '') + ' · real ' + fmt(l.costo) : fmt(l.costo))}</small></span><b>${l.regalo ? '<i class="pos">gratis</i>' : fmt(l.importe ?? r2(l.cant*l.costo))}</b></div>`).join('')}</div>` : ''}
     ${e.foto ? `<img src="${e.foto}" style="width:100%;border-radius:10px;margin-top:8px">` : ''}
     <div class="cd-acts">${saldoEgreso(e) > 0 && adm ? `<button class="btn" data-a="pagar">Registrar pago</button>` : ''}${adm ? `<button class="btn ghost danger-o" data-a="canc">Cancelar registro</button>` : ''}<button class="btn ghost" data-a="x">Cerrar</button></div>`);
   bg.querySelector('[data-a="x"]').onclick = ()=> bg.remove();
