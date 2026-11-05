@@ -182,6 +182,10 @@ main.flush{padding:0}
 .hecho-f{text-align:center;color:var(--muted);margin:4px 0 18px}
 
 .rc-wrap{background:#fff;min-height:calc(100vh - 64px)}
+.rc-cli{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#f3f0ff}
+.rc-cli span{display:flex;flex-direction:column}.rc-cli small{color:var(--muted,#666)}
+.cg-tk{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;font:inherit;cursor:pointer}
+.cg-tk svg{width:26px;height:26px;flex:none;stroke:var(--green,#1f6f4a)}.cg-tk span{flex:1}.cg-tk::after{content:'›';font-size:26px;color:#999}.cg-tk span{display:flex;flex-direction:column}.cg-tk small{color:var(--muted,#666)}.cg-tk:disabled{opacity:.55}
 .rc-search{position:sticky;top:64px;z-index:5;display:flex;align-items:center;gap:14px;padding:4px 16px;background:#fff;border-bottom:1px solid var(--line)}
 .rc-search svg{width:22px;height:22px;stroke:var(--muted);flex-shrink:0}
 .rc-search input{flex:1;border:0;outline:none;font:inherit;font-size:1.02rem;padding:13px 0;background:transparent;color:var(--text)}
@@ -1937,7 +1941,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.38';
+const APP_VERSION = '0.38.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3481,7 +3485,9 @@ function viewClienteEditar(c){
     ${c.telefono?`<a class="ub-b" href="tel:${c.telefono}">${svg('tel')}Llamar</a>`:''}
     ${c.lat!=null?`<a class="ub-b" href="${linkMapa(c.lat,c.lng)}" target="_blank" rel="noopener">${svg('mapa')}Cómo llegar</a>`:''}
   </div>`;
-  return (c.telefono||c.lat!=null ? acciones : '') + formClienteHTML({...c, ...cliBorrador});
+  const tk = recibosDeCliente(c.id).filter(r=> !anulado(r)).sort((a,b)=> fechaRec(b).localeCompare(fechaRec(a)));
+  const bloqueTk = `<button class="cg-tk" id="cliTickets"${tk.length?'':' disabled'}>${svg('recibos')}<span><b>Tickets del cliente</b><small>${tk.length ? `${tk.length} ventas · ${fmt(r2(tk.reduce((s,r)=> s + (Number(r.total)||0), 0)))} · última ${new Date(fechaRec(tk[0])).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}` : 'Aún no tiene ventas registradas'}</small></span></button>`;
+  return (c.telefono||c.lat!=null ? acciones : '') + bloqueTk + formClienteHTML({...c, ...cliBorrador});
 }
 
 function renderClientes(conservar){
@@ -3503,6 +3509,7 @@ function renderClientes(conservar){
   else if(cliVista==='lista') view.innerHTML = viewClientesLista();
   else view.innerHTML = viewClientesInicio();
   renderHeader();
+  const ctk = document.getElementById('cliTickets'); if(ctk) ctk.onclick = ()=>{ const id = cliSel; reciboQ = ''; go('recibos'); reciboCli = id; renderRecibos(); };
   if(cliVista==='crear' || cliVista==='editar'){ bindFormCliente(); if(conservar) window.scrollTo(0,y); else window.scrollTo(0,0); return; }
   if(cliVista==='lista'){
     const q = document.getElementById('cgQ');
@@ -4269,12 +4276,15 @@ const fechaLarga = d => d.toLocaleDateString('es-MX',{weekday:'long', day:'numer
 const hora = iso => new Date(iso).toLocaleTimeString('es-MX',{hour:'numeric', minute:'2-digit'});
 
 const fechaRec = r => (r.descuento && r.descuento.fecha) || r.fecha;
+let reciboCli = null;
+function recibosDeCliente(cid){ return DB.recibos.filter(r=> r.cliente && r.cliente.id===cid); }
 function filtrarRecibos(){
-  const q = reciboQ.trim().toLowerCase();
+  const q = reciboQ.trim();
   return DB.recibos.slice().sort((a,b)=> fechaRec(b).localeCompare(fechaRec(a))).filter(r=>{
+    if(reciboCli && !(r.cliente && r.cliente.id===reciboCli)) return false;
     if(!q) return true;
-    const txt = [r.folio, r.metodo, r.vendedor, fmt(r.total), String(r.total), ...(r.lineas||[]).map(l=>l.nombre)].join(' ').toLowerCase();
-    return txt.includes(q);
+    const c = r.cliente || {}, txt = [r.folio, r.metodo, r.vendedor, fmt(r.total), String(r.total), c.nombre, c.tienda, c.numero, ...(r.lineas||[]).map(l=>l.nombre)].filter(Boolean).join(' ');
+    return coincideBusqueda(txt, q);
   });
 }
 
@@ -4297,7 +4307,9 @@ function listaRecibosHTML(){
 
 function viewRecibos(){
   return `<div class="rc-wrap">
-    <div class="rc-search">${svg('search')}<input id="rcQ" placeholder="Buscar" value="${esc(reciboQ)}" autocomplete="off"></div>
+    <div class="rc-search">${svg('search')}<input id="rcQ" placeholder="Buscar por folio, cliente, tienda o producto" value="${esc(reciboQ)}" autocomplete="off"></div>
+    ${reciboCli ? (()=>{ const c = clientes().find(x=> x.id===reciboCli), ls = recibosDeCliente(reciboCli).filter(r=> !anulado(r));
+      return `<div class="rc-cli"><span>Tickets de <b>${esc(c ? (c.tienda || c.nombre) : 'cliente')}</b><small>${ls.length} ventas · ${fmt(r2(ls.reduce((s,r)=> s + (Number(r.total)||0), 0)))}</small></span><button class="ub-b" id="rcCliX">${svg('close')}Quitar</button></div>`; })() : ''}
     <div id="rcList">${listaRecibosHTML()}</div>
   </div>`;
 }
@@ -4913,6 +4925,7 @@ function renderRecibos(){
   }
   const q = document.getElementById('rcQ');
   q.oninput = ()=>{ reciboQ = q.value; document.getElementById('rcList').innerHTML = listaRecibosHTML(); bindFilas(); };
+  const cx = document.getElementById('rcCliX'); if(cx) cx.onclick = ()=>{ reciboCli = null; renderRecibos(); };
   bindFilas();
 }
 function bindFilas(){
@@ -7765,7 +7778,7 @@ function go(id){
   document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
   view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
   if(id==='turno'){ if(!turnoActual() && turnoVista==='tesoreria') turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
-  else if(id==='recibos'){ reciboSel = null; renderRecibos(); }
+  else if(id==='recibos'){ reciboSel = null; reciboCli = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
   else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
