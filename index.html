@@ -413,8 +413,9 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .tk-prev{margin:6px 0 14px}
 .tk-prev b{display:block;font-size:.85rem;color:var(--brand);margin-bottom:6px}
 .tk-prev pre{background:#fffdf5;border:1px dashed var(--line);border-radius:8px;padding:10px;font-size:11px;line-height:1.35;overflow-x:auto;white-space:pre;font-family:ui-monospace,monospace}
-#impPrueba,#hechoPrint{display:flex;align-items:center;justify-content:center;gap:8px}
-#impPrueba svg,#hechoPrint svg{width:20px;height:20px;stroke:currentColor}
+#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare{display:flex;align-items:center;justify-content:center;gap:8px}
+#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg{width:20px;height:20px;stroke:currentColor}
+.tk-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 12px}.tk-acts .btn{margin:0}
 
 .add-prod{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em}
 .add-prod svg{width:20px;height:20px;stroke:#fff}
@@ -1941,7 +1942,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.38.1';
+const APP_VERSION = '0.38.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2727,7 +2728,7 @@ function viewTicket(){
   const t = ticket();
   const filas = t.lineas.map(l=>`
     <div class="tline" data-lid="${l.lid}">
-      <div>${esc(l.nombre)}<span class="q">${l.porKilo ? fmtKg(l.cantidad)+' kg' : 'x '+l.cantidad}</span>
+      <div>${esc(nombreTk(l))}<span class="q">${l.porKilo ? fmtKg(l.cantidad)+' kg' : 'x '+l.cantidad}</span>
         ${l.precio==null?'<span class="np">Sin precio capturado</span>':''}
         ${ahorroLinea(l) > 0 ? `<span class="promo-l">${svg('articulos')}Promo ${textoPromo(reglaDe(l))} · ahorras ${fmt(ahorroLinea(l))}</span>` : (reglaDe(l) && faltaPromo(l) ? `<span class="promo-h">Lleva ${l.porKilo ? fmtKg(faltaPromo(l)) + ' kg' : faltaPromo(l)} más para la promo ${textoPromo(reglaDe(l))}</span>` : '')}
         ${existencia(l.pid) <= 0 ? `<span class="nostock">${svg('alert')}No disponible en inventario</span>` : ''}</div>
@@ -3100,7 +3101,7 @@ function viewHecho(){
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
     </dl>
     ${r.metodo==='Crédito' && r.cliente?.id ? bloqueDeuda(r) : ''}
-    <button class="btn ghost" id="hechoPrint">${svg('recibos')}Imprimir ticket</button>
+    <div class="tk-acts"><button class="btn ghost" id="hechoPrint">${svg('recibos')}Imprimir</button><button class="btn ghost" id="hechoShare">${svg('share')}Compartir</button></div>
     <button class="btn" id="nuevaVenta">Nueva venta</button>
   </div>`;
 }
@@ -3117,6 +3118,7 @@ function bloqueDeuda(r){
 function bindHecho(){
   document.getElementById('nuevaVenta').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
   document.getElementById('hechoPrint').onclick = ()=> imprimirRecibo(ultimoRecibo);
+  document.getElementById('hechoShare').onclick = ()=> compartirRecibo(ultimoRecibo);
 }
 
 /* ================= Clientes (selector básico) ================= */
@@ -4033,7 +4035,7 @@ function viewPedidoDet(){
   const p = DB.pedidos.find(x=>x.id===pedidoSel);
   if(!p) return viewPedidos();
   const c = p.cliente || {};
-  const lineas = p.lineas.map(l=>`<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}</small></div><span>${fmt(importeLinea(l))}</span></div>`).join('');
+  const lineas = p.lineas.map(l=>`<div class="rd-line"><div>${esc(nombreTk(l))}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}</small></div><span>${fmt(importeLinea(l))}</span></div>`).join('');
   const cli = clientes().find(x=>x.id===c.id) || c;
   return `<div class="rc-wrap rd">
     <div class="rd-head"><span class="big">${fmt(p.total)}</span><span class="lbl">Entrega ${fechaCorta(p.fechaEntrega)}</span></div>
@@ -4429,7 +4431,7 @@ function htmlTicket(r){
     const q = restante(r, l);
     return q > 0 ? `${fila('<b>'+esc(nombreTk(l))+'</b>', fmt(r2((l.precio||0)*q)))}<div class="p">&nbsp;&nbsp;${l.porKilo ? fmtKg(q)+' kg x '+fmt(l.precio||0) : q+' x '+fmt(l.precio||0)}</div>${importeCon(l,q) < r2((l.precio||0)*q) ? fila('  Promo '+textoPromo(reglaDe(l)), '−'+fmt(r2((l.precio||0)*q - importeCon(l,q)))) : ''}` : '';
   }).join('');
-  const quitados = d.flatMap(x=> x.lineas).map(l=> `<div class="p">${esc(l.nombre)}</div>${fila(l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza', '−'+fmt(l.importe))}`).join('');
+  const quitados = d.flatMap(x=> x.lineas).map(l=> `<div class="p">${esc(nombreTk(l))}</div>${fila(l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' pza', '−'+fmt(l.importe))}`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Recibo ${esc(r.folio)}</title><style>
     @page{size:${impCfg().ancho}mm auto;margin:3mm}
     body{font-family:monospace,ui-monospace;font-size:11px;color:#000;margin:0;width:${impCfg().ancho-6}mm}
@@ -4441,7 +4443,7 @@ function htmlTicket(r){
     ${fila('Fecha', new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'}))}
     ${fila('Vendedor', esc(r.vendedor||''))}${r.cliente ? fila('Cliente', esc(r.cliente.nombre||'')) + (tiendaDe(r.cliente) ? fila('Tienda', esc(tiendaDe(r.cliente))) : '') : ''}
     <div class="s"></div>${lineas || '<div class="c">Sin productos</div>'}
-    ${(r.devoluciones||[]).length ? `<div class="s"></div><div class="b">Devoluciones</div>${r.devoluciones.map(x=> `<div class="p">${esc(x.nombre)}</div>${fila((x.porKilo ? fmtKg(x.cantidad)+' kg' : x.cantidad) + ' x ' + fmt(x.precio||0) + ' ' + esc(x.motivo), '−'+fmt(importeDev(x)))}`).join('')}` : ''}
+    ${(r.devoluciones||[]).length ? `<div class="s"></div><div class="b">Devoluciones</div>${r.devoluciones.map(x=> `<div class="p">${esc(nombreTk(x))}</div>${fila((x.porKilo ? fmtKg(x.cantidad)+' kg' : x.cantidad) + ' x ' + fmt(x.precio||0) + ' ' + esc(x.motivo), '−'+fmt(importeDev(x)))}`).join('')}` : ''}
     ${d.length ? `<div class="s"></div><div class="b">Descuento por pedido incompleto</div>${quitados}` : ''}
     <div class="s"></div>
     ${d.length ? fila('Total anterior (v'+(r.version-1)+')', fmt(d[0].totalAnterior)) + fila('Descuento', '−'+fmt(d[0].monto)) : ''}
@@ -4620,6 +4622,25 @@ async function enviarBt(imp, bytes, reintento){
 }
 function copias(bytes, n){ if(!(n > 1)) return bytes; const t = new Uint8Array(bytes.length * n); for(let i=0;i<n;i++) t.set(bytes, i*bytes.length); return t; }
 
+/* Imagen PNG del ticket (mismo contenido que el impreso) para compartir */
+function imagenTicket(r){
+  const L = lineasTicket(r), cols = Math.max(32, ...L.map(l=> String(l.t).length)), esc2 = 2, fs = 22*esc2, ch = fs*0.6, pad = 28*esc2;
+  const W = Math.ceil(cols*ch) + pad*2, altos = L.map(l=> Math.round((l.g ? 1.5 : 1.3)*fs)), H = altos.reduce((a,b)=> a+b, 0) + pad*2;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0,0,W,H); g.fillStyle = '#111'; g.textBaseline = 'top';
+  let y = pad; L.forEach((l,i)=>{ const f = l.g ? Math.round(fs*1.25) : fs; g.font = `${l.b||l.g ? 'bold ' : ''}${f}px "DejaVu Sans Mono", "Roboto Mono", "Courier New", monospace`;
+    const t = String(l.t), w = g.measureText(t).width, k = w > W - pad*2 ? (W - pad*2)/w : 1; g.save(); g.translate(pad, 0); g.scale(k, 1); g.fillText(t, 0, y + (altos[i]-f)/2); g.restore(); y += altos[i]; });
+  return new Promise(res=> cv.toBlob(res, 'image/png'));
+}
+async function compartirRecibo(r){
+  const nombre = `Ticket ${r.folio}${r.version>1 ? ' v'+r.version : ''}.png`, texto = `Ticket ${r.folio} · ${impCfg().encabezado || 'Merkalimentos'} · Total ${fmt(Math.abs(r.total))}`;
+  let blob = null; try{ blob = await imagenTicket(r); }catch(_){}
+  if(blob){ const file = new File([blob], nombre, {type:'image/png'});
+    try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:nombre, text:texto}); return; } }catch(e){ if(e && e.name==='AbortError') return; } }
+  const plano = lineasTicket(r).map(l=> l.t).join('\n');
+  try{ if(navigator.share){ await navigator.share({title:nombre, text:'```\n' + plano + '\n```'}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
+  if(blob){ descargarBlob(blob, nombre); toast('Se descargó la imagen del ticket'); } else copiarTexto(plano, 'Ticket copiado');
+}
 function imprimirRecibo(r, opciones = {}){
   const imp = opciones.imp || impSel();
   if(!imp){ imprimirNavegador(r); return; }
@@ -4866,9 +4887,9 @@ function renderConfig(conservar){
 function viewReciboDetalle(r){
   if(reciboVista==='descuento') return viewDescuento(r);
   const d = descuentosDe(r), sig = r.reemplazadoPor && recPorId(r.reemplazadoPor), ant = r.anteriorId && recPorId(r.anteriorId);
-  const lineas = (r.lineas||[]).map(l=> `<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}${ahorroLinea(l)>0 ? ` · <i class="pos">promo ${textoPromo(reglaDe(l))} (−${fmt(ahorroLinea(l))})</i>` : ''}</small></div><span>${fmt(importeLinea(l))}</span></div>`).join('');
+  const lineas = (r.lineas||[]).map(l=> `<div class="rd-line"><div>${esc(nombreTk(l))}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}${ahorroLinea(l)>0 ? ` · <i class="pos">promo ${textoPromo(reglaDe(l))} (−${fmt(ahorroLinea(l))})</i>` : ''}</small></div><span>${fmt(importeLinea(l))}</span></div>`).join('');
   const bloqueDesc = d.map(x=>`<div class="rd-desc"><div class="rd-desc-h"><b>Descuento por pedido incompleto</b><span>${fecha(x.fecha)} · ${esc(x.vendedor||x.usuario)}</span></div>
-      ${x.lineas.map(l=>`<div class="rd-line"><div>${esc(l.nombre)}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}</small></div><span class="neg">−${fmt(l.importe)}</span></div>`).join('')}</div>`).join('');
+      ${x.lineas.map(l=>`<div class="rd-line"><div>${esc(nombreTk(l))}<small>${l.porKilo ? fmtKg(l.cantidad)+' kg' : l.cantidad+' x '+fmt(l.precio||0)}</small></div><span class="neg">−${fmt(l.importe)}</span></div>`).join('')}</div>`).join('');
   const banner = r.cancelado
       ? `<div class="rd-banner canc"><b>CANCELADO</b><span>${r.cancelacion ? `Ticket completo cancelado el ${fecha(r.cancelacion.fecha)} por ${esc(r.cancelacion.vendedor||r.cancelacion.usuario)}` : 'Ticket cancelado'}</span></div>`
     : r.reemplazadoPor
@@ -4904,7 +4925,7 @@ function viewReciboDetalle(r){
       ${r.credito?.nota ? `<dt>Nota</dt><dd>${esc(r.credito.nota)}</dd>` : ''}
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
     </dl>
-    <button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir ${r.version>1 ? 'versión '+r.version : 'recibo'}</button>
+    <div class="tk-acts"><button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir${r.version>1 ? ' v'+r.version : ''}</button><button class="btn ghost" id="rdShare">${svg('share')}Compartir</button></div>
   </div>`;
 }
 
@@ -4919,6 +4940,7 @@ function renderRecibos(){
     if(reciboVista==='descuento') bindDescuento(r);
     else {
       const pb = document.getElementById('rdPrint'); if(pb) pb.onclick = ()=> imprimirRecibo(r);
+      const sb = document.getElementById('rdShare'); if(sb) sb.onclick = ()=> compartirRecibo(r);
       document.querySelectorAll('[data-ir]').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.ir; reciboVista = 'detalle'; renderRecibos(); });
     }
     window.scrollTo(0,0); return;
@@ -6268,7 +6290,7 @@ function bloqueDevTicket(t){
   if(!ds.length) return '';
   return `<div class="dev-h">${svg('back')}Devoluciones</div>` + ds.map(d=>`
     <div class="tline dev" data-did="${d.did}">
-      <div>${esc(d.nombre)}<span class="q">${d.porKilo ? fmtKg(d.cantidad)+' kg' : 'x '+d.cantidad}</span>
+      <div>${esc(nombreTk(d))}<span class="q">${d.porKilo ? fmtKg(d.cantidad)+' kg' : 'x '+d.cantidad}</span>
         <span class="dev-m">${esc(d.motivo)} · caduca ${dm(d.caducidad)}</span></div>
       <div class="neg">−${fmt(importeDev(d))}</div>
     </div>`).join('');
@@ -6325,7 +6347,7 @@ function moverDevoluciones(devs, signo, ref){
   if(!(devs||[]).length) return;
   moverStock(devs.map(d=> ({ub:'devoluciones', pid:d.pid, cant: r3(signo * d.cantidad)})), signo > 0 ? 'devCliente' : 'devolucion', ref);
 }
-const lineasDevHTML = r => (r.devoluciones||[]).length ? `<div class="rd-desc"><div class="rd-desc-h"><b>Devoluciones</b><span>Se descontaron a precio de venta</span></div>${r.devoluciones.map(d=>`<div class="rd-line"><div>${esc(d.nombre)}<small>${d.porKilo ? fmtKg(d.cantidad)+' kg' : d.cantidad+' x '+fmt(d.precio||0)} · ${esc(d.motivo)} · caduca ${dm(d.caducidad)}</small></div><span class="neg">−${fmt(importeDev(d))}</span></div>`).join('')}</div>` : '';
+const lineasDevHTML = r => (r.devoluciones||[]).length ? `<div class="rd-desc"><div class="rd-desc-h"><b>Devoluciones</b><span>Se descontaron a precio de venta</span></div>${r.devoluciones.map(d=>`<div class="rd-line"><div>${esc(nombreTk(d))}<small>${d.porKilo ? fmtKg(d.cantidad)+' kg' : d.cantidad+' x '+fmt(d.precio||0)} · ${esc(d.motivo)} · caduca ${dm(d.caducidad)}</small></div><span class="neg">−${fmt(importeDev(d))}</span></div>`).join('')}</div>` : '';
 
 /* Cobro cuando la devolución es mayor que la compra */
 function viewCobroDevolucion(total){
