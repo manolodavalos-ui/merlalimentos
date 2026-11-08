@@ -186,6 +186,14 @@ main.flush{padding:0}
 .nb-dot{width:12px;height:12px;border-radius:50%;background:#e0a800;flex:none}.nb-dot.on{background:#1f9d55;box-shadow:0 0 0 4px #1f9d5522}
 .nb-sw{display:flex;gap:12px;align-items:flex-start;margin:14px 0 6px;padding:12px 14px;border:1px solid var(--line);border-radius:12px}.nb-sw input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--brand)}.nb-sw span{display:flex;flex-direction:column}.nb-sw small{color:var(--muted)}
 .nb-reglas{margin-top:16px}.nb-reglas summary{font-weight:700;cursor:pointer;padding:6px 0}.nb-reglas pre{font-size:.68rem;background:#f4f6f5;border-radius:10px;padding:10px;overflow-x:auto;white-space:pre;margin:8px 0}
+.pd-edit{margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#fff6dd;color:#7a5600;font-size:.9rem}.cobro .pd-edit{margin:0 0 14px}
+.lnk{background:none;border:0;color:var(--brand);font-weight:700;text-decoration:underline;padding:0;font:inherit;cursor:pointer}
+.pd-canc{opacity:.6}
+.rl-res{display:flex;flex-direction:column;gap:2px;margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--bg)}.rl-res span{font-size:.9rem;color:var(--muted)}.rl-res .neg,.rl-res .pos{color:inherit}.rl-res .neg b{color:var(--danger)}.rl-res .pos b{color:var(--brand)}
+.rl-row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer}.rl-row.falta{background:#fff7f6}
+.rl-t{display:flex;flex-direction:column}.rl-t small{color:var(--muted)}.rl-q{display:flex;flex-direction:column;align-items:flex-end;gap:3px}.rl-q b{font-size:1.05rem}
+.rl-det{grid-column:1/-1;margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--bg);font-size:.88rem}.rl-det div{display:flex;justify-content:space-between;padding:3px 0}.rl-det small{color:var(--muted)}
+.rl-fecha{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}.rl-fecha input{border:0;background:transparent;font:inherit;color:inherit;width:auto;max-width:130px}
 .rc-cli{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#f3f0ff}
 .rc-cli span{display:flex;flex-direction:column}.rc-cli small{color:var(--muted,#666)}
 .cg-tk{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;font:inherit;cursor:pointer}
@@ -419,7 +427,7 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .tk-prev pre{background:#fffdf5;border:1px dashed var(--line);border-radius:8px;padding:10px;font-size:11px;line-height:1.35;overflow-x:auto;white-space:pre;font-family:ui-monospace,monospace}
 #impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare{display:flex;align-items:center;justify-content:center;gap:8px}
 #impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg{width:20px;height:20px;stroke:currentColor}
-.tk-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 12px}.tk-acts .btn{margin:0}
+.tk-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 12px}.tk-acts .btn{display:flex;align-items:center;justify-content:center;gap:8px}.tk-acts .btn svg{width:20px;height:20px;flex:none;stroke:currentColor}.tk-acts .btn{margin:0}
 
 .add-prod{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em}
 .add-prod svg{width:20px;height:20px;stroke:#fff}
@@ -1946,7 +1954,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.39.2';
+const APP_VERSION = '0.40';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2739,6 +2747,7 @@ function viewTicket(){
       <div>${fmt(importeLinea(l))}</div>
     </div>`).join('');
   return `<div class="ticket-wrap">
+    ${t.editPedido ? `<div class="pd-edit">Editando la venta <b>#${esc(t.editFolio || '')}</b>: agrega, quita o cambia cantidades y toca Programar. <button class="lnk" id="tkDescartarEd">Descartar cambios</button></div>` : ''}
     ${t.nombre ? `<div class="tk-name">${svg('recibos')}<div><b>${esc(t.nombre)}</b>${t.comentario?`<small>${esc(t.comentario)}</small>`:''}</div></div>` : ''}
     <div class="tk-cli">${barraCliente()}</div>
     <div class="ticket-list">
@@ -2758,8 +2767,8 @@ function renderVenta(){
   if(ventaVista==='cotizacion'){
     view.innerHTML = viewCotizacion(); renderHeader(); bindCotizacion(); window.scrollTo(0,0); return;
   }
-  if(['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet','recibidos'].includes(ventaVista)){
-    view.innerHTML = {recibidos:viewPedidosRec, programar:viewProgramar, programado:viewProgramado, pedidos:viewPedidos, inicioPre:viewInicioPre, pedidoDet:viewPedidoDet,
+  if(['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet','recibidos','relacion'].includes(ventaVista)){
+    view.innerHTML = {recibidos:viewPedidosRec, programar:viewProgramar, programado:viewProgramado, pedidos:viewPedidos, inicioPre:viewInicioPre, pedidoDet:viewPedidoDet, relacion:viewRelacion,
                       inicioCot:viewInicioCot, cotHist:viewCotHist, cotDet:viewCotDet}[ventaVista]();
     renderHeader();
     if(ventaVista==='inicioCot') bindInicioCot();
@@ -2768,10 +2777,14 @@ function renderVenta(){
     else if(ventaVista==='programar') bindProgramar();
     else if(ventaVista==='programado') bindProgramado();
     else if(ventaVista==='inicioPre') bindInicioPre();
+    else if(ventaVista==='relacion') bindRelacion();
+    else if(ventaVista==='pedidoDet'){ const e = document.getElementById('pdEditar'); if(e) e.onclick = ()=> editarPedidoProg(pedidoSel); const c = document.getElementById('pdCancelar'); if(c) c.onclick = ()=> cancelarPedidoProg(pedidoSel); }
     else if(ventaVista==='recibidos'){ document.querySelectorAll('.pr-row').forEach(b=> b.onclick = ()=> detallePedidoRec(b.dataset.id)); document.getElementById('prPegar').onclick = pegarPedido; }
     else if(ventaVista==='pedidos'){
       document.querySelectorAll('[data-ped]').forEach(el=> el.onclick = ()=>{ pedidoSel = el.dataset.ped; ventaVista = 'pedidoDet'; renderVenta(); });
       const vp = document.getElementById('vacioProg'); if(vp) vp.onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
+      const rl = document.getElementById('pdRel'); if(rl) rl.onclick = ()=>{ relDesde = 'pedidos'; ventaVista = 'relacion'; renderVenta(); };
+      const vc = document.getElementById('pdVerCanc'); if(vc) vc.onclick = ()=>{ pedVerCanc = !pedVerCanc; renderVenta(); };
     }
     window.scrollTo(0,0);
     return;
@@ -2794,6 +2807,7 @@ function renderVenta(){
   renderHeader();
   bindAccionesTicket();
   if(ventaVista==='ticket'){
+    const dEd = document.getElementById('tkDescartarEd'); if(dEd) dEd.onclick = cancelarEdicionPedido;
     view.querySelectorAll('.tline:not(.dev)').forEach(el=> el.onclick = ()=> editarLinea(el.dataset.lid));
     view.querySelectorAll('.tline.dev').forEach(el=> el.onclick = ()=> quitarDevolucion(el.dataset.did));
     const da = document.getElementById('devAdd'); if(da) da.onclick = abrirDevolucion;
@@ -3957,6 +3971,7 @@ function iniciarProgramar(){
 function viewProgramar(){
   const t = ticket(), c = t.cliente;
   return `<div class="cobro">
+    ${t.editPedido ? `<div class="pd-edit">Editando la venta <b>#${esc(t.editFolio || '')}</b> · <button class="lnk" id="pDescartar">Descartar cambios</button></div>` : ''}
     <div class="cobro-total">
       <span class="lbl">Importe del pedido</span>
       <span class="big">${fmt(totalTicket(t))}</span>
@@ -3971,15 +3986,17 @@ function viewProgramar(){
     </select>
     <label for="pCom">Comentario para la entrega</label>
     <textarea class="field" id="pCom" rows="2" maxlength="200" placeholder="Opcional">${esc(t.comentario||'')}</textarea>
-    <button class="btn" id="pOk">${svg('check')}Programar entrega</button>
+    <button class="btn" id="pOk">${svg('check')}${t.editPedido ? 'Guardar cambios' : 'Programar entrega'}</button>
   </div>`;
 }
 function bindProgramar(){
+  const dsc = document.getElementById('pDescartar'); if(dsc) dsc.onclick = cancelarEdicionPedido;
   document.getElementById('pOk').onclick = ()=>{
     const fechaEntrega = document.getElementById('pFecha').value;
     if(totalTicket(ticket()) < 0){ toast('La devolución es mayor que el pedido'); return; }
     if(!fechaEntrega){ toast('Elige la fecha de entrega'); return; }
     if(fechaEntrega < hoyClave()){ toast('La fecha de entrega no puede ser anterior a hoy'); return; }
+    if(ticket().editPedido){ if(!ticket().lineas.length){ toast('La venta quedó sin productos: mejor cancélala'); return; } const ed = guardarEdicionPedido(); if(ed){ ultimoPedido = {...ed, _editado:true}; ventaVista = 'programado'; renderVenta(); } return; }
     const t = ticket(), turno = turnoActual();
     const seq = (turno.pedidos || 0) + 1; turno.pedidos = seq; store.set('turno', turno);
     const pedido = {
@@ -4000,7 +4017,7 @@ function viewProgramado(){
   const p = ultimoPedido;
   return `<div class="cobro">
     <div class="hecho-ok">${svg('check')}</div>
-    <h2 class="hecho-t">Entrega programada</h2>
+    <h2 class="hecho-t">${p._editado ? 'Cambios guardados' : 'Entrega programada'}</h2>
     <p class="hecho-f">Pedido ${esc(p.folio)}</p>
     <dl class="meta">
       <dt>Cliente</dt><dd>${esc(p.cliente.nombre)}</dd>
@@ -4022,18 +4039,127 @@ function viewInicioPre(){
   const deHoy = prox.filter(p=> p.fechaEntrega===hoy).length, deManana = prox.filter(p=> p.fechaEntrega===manana()).length;
   return `<div class="cl-home">
     <button class="cl-opt" id="optProgramar"><span class="cl-opt-ic">${svg('preventa')}</span><span><b>Programar venta</b>
-      <small>${n ? `Tienes un pedido en curso${t.cliente?' de '+esc(t.cliente.nombre):''} con ${n} ${n===1?'producto':'productos'}` : 'Elegir cliente y productos para programar su entrega'}</small></span>${svg('chev')}</button>
+      <small>${t.editPedido && n ? `Editando la venta #${esc(t.editFolio||'')}${t.cliente?' de '+esc(t.cliente.nombre):''}` : n ? `Tienes un pedido en curso${t.cliente?' de '+esc(t.cliente.nombre):''} con ${n} ${n===1?'producto':'productos'}` : 'Elegir cliente y productos para programar su entrega'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optProgramadas"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Ventas programadas</b>
       <small>${prox.length ? `${prox.length} por entregar${deHoy?` · ${deHoy} hoy`:''}${deManana?` · ${deManana} mañana`:''}` : 'No hay ventas programadas'}</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optRelacion"><span class="cl-opt-ic">${svg('inventario')}</span><span><b>Productos a entregar</b>
+      <small>${deManana ? (()=>{ const R = relacionDia(manana()), f = R.ls.filter(x=> x.falta > 0).length; return `Mañana: ${R.ls.length} productos${f ? ` · <b class="neg">faltan ${f}</b>` : ' · alcanza ✓'}`; })() : 'Lista de productos y cantidades por día de entrega, contra tu inventario'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optRecibidos"><span class="cl-opt-ic">${svg('catalogo')}</span><span><b>Pedidos recibidos${nuevosRecibidos() ? ` <i class="cat-badge">${nuevosRecibidos()}</i>` : ''}</b>
       <small>${pedidosRecibidos().length ? `${nuevosRecibidos()} nuevos · ${pedidosRecibidos().length} en total` : 'Pedidos que envían tus clientes desde Cliente consentido'}</small></span>${svg('chev')}</button>
   </div>`;
 }
 function bindInicioPre(){
+  document.getElementById('optRelacion').onclick = ()=>{ relDesde = 'inicioPre'; relDia = null; ventaVista = 'relacion'; renderVenta(); };
   document.getElementById('optProgramar').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
   document.getElementById('optProgramadas').onclick = ()=>{ ventaVista = 'pedidos'; renderVenta(); };
   document.getElementById('optRecibidos').onclick = ()=>{ ventaVista = 'recibidos'; renderVenta(); };
 }
+/* ----- Editar y cancelar ventas programadas ----- */
+function editarPedidoProg(id){
+  const p = DB.pedidos.find(x=> x.id===id); if(!p || p.estado!=='Programado') return;
+  if(!turnoActual()){ toast('Abre un turno para editar la venta'); return; }
+  if(current!=='preventa') go('preventa');
+  const t = ticket();
+  if(t.lineas.length && t.editPedido !== p.id){ toast('Tienes un pedido en curso: termínalo o vacíalo primero'); ventaVista = 'ticket'; renderVenta(); return; }
+  if(t.editPedido !== p.id){
+    const lineas = (p.lineas||[]).map(l=>{ const {costo, ...x} = l; if(!x.especial) delete x.promoRegla; return x; });
+    guardarTicket({lineas, cliente:p.cliente, devoluciones:JSON.parse(JSON.stringify(p.devoluciones||[])), preguntado:true, nombre:p.ticketNombre || null,
+      comentario:p.comentario || '', fechaEntrega:p.fechaEntrega, horario:p.horario, editPedido:p.id, editFolio:p.folio});
+  }
+  ventaVista = 'ticket'; renderVenta(); toast(`Editando la venta #${p.folio}: agrega o cambia productos y toca Programar`);
+}
+function guardarEdicionPedido(){
+  const t = ticket(), p = DB.pedidos.find(x=> x.id===t.editPedido);
+  if(!p){ toast('No se encontró la venta original'); return null; }
+  const antes = {fecha:new Date().toISOString(), usuario:session.nombre, total:p.total, productos:cuentaTicket(p), fechaEntrega:p.fechaEntrega};
+  moverDevoluciones(p.devoluciones, -1, '#' + p.folio + ' (edición)');
+  Object.assign(p, {fechaEntrega:document.getElementById('pFecha').value, horario:document.getElementById('pHorario').value, comentario:document.getElementById('pCom').value.trim(),
+    cliente:t.cliente || p.cliente, lineas:congelarLineas(t.lineas), devoluciones:t.devoluciones||[], total:totalTicket(t), ticketNombre:t.nombre || p.ticketNombre || null,
+    editado:{fecha:antes.fecha, usuario:session.nombre}, historial:[...(p.historial||[]), antes], sincronizado:false});
+  DB.guardarPedido(p);
+  moverDevoluciones(p.devoluciones, 1, '#' + p.folio);
+  guardarTicket({lineas:[]});
+  return p;
+}
+function cancelarEdicionPedido(){
+  const t = ticket();
+  confirmar({titulo:'Descartar cambios', ok:'Descartar', texto:`La venta #${esc(t.editFolio || '')} queda como estaba.`, alAceptar:()=>{ guardarTicket({lineas:[]}); ventaVista = 'pedidos'; renderVenta(); }});
+}
+function cancelarPedidoProg(id){
+  const p = DB.pedidos.find(x=> x.id===id); if(!p || p.estado!=='Programado') return;
+  const conDev = (p.devoluciones||[]).length;
+  const bg = dialogo(`<h3>Cancelar venta #${esc(p.folio)}</h3>
+    <p class="sub">${esc(p.cliente?.tienda || p.cliente?.nombre || '')} · ${fmt(p.total)} · entrega ${fechaCorta(p.fechaEntrega)}</p>
+    <label class="cj-l">Motivo</label>
+    <div class="dias" id="cpMot">${['Cancelación del cliente','Error de captura','Otro'].map((m,i)=>`<button class="dia${i===0?' on':''}" data-m="${m}">${m}</button>`).join('')}</div>
+    <input class="field" id="cpNota" placeholder="Comentario (opcional)" maxlength="120" style="margin-top:10px">
+    ${conDev ? `<label class="nb-sw" style="margin-top:12px"><input type="checkbox" id="cpDev" checked><span><b>Quitar también la devolución</b><small>Esta venta registró ${conDev} producto(s) devuelto(s). Desmárcalo si ya recogiste esa mercancía.</small></span></label>` : ''}
+    <div class="sheet-actions"><button class="btn ghost" data-a="no">Regresar</button><button class="btn danger" data-a="si">Cancelar venta</button></div>`);
+  bg.querySelectorAll('#cpMot .dia').forEach(b=> b.onclick = ()=>{ bg.querySelectorAll('#cpMot .dia').forEach(x=> x.classList.toggle('on', x===b)); });
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  bg.querySelector('[data-a="si"]').onclick = ()=>{
+    const motivo = bg.querySelector('#cpMot .dia.on').dataset.m, nota = bg.querySelector('#cpNota').value.trim(), dev = bg.querySelector('#cpDev');
+    if(dev && dev.checked) moverDevoluciones(p.devoluciones, -1, 'Cancelación #' + p.folio);
+    p.estado = 'Cancelado'; p.cancelado = {fecha:new Date().toISOString(), usuario:session.nombre, motivo, nota, devolucionQuitada: !!(dev && dev.checked)}; p.sincronizado = false;
+    DB.guardarPedido(p); bg.remove(); toast(`Venta #${p.folio} cancelada`); renderVenta();
+  };
+}
+
+/* ----- Relación de productos a entregar por día ----- */
+let relDia = null, relSoloFalta = false, relAbierto = null, relDesde = 'inicioPre';
+function relacionDia(dia){
+  const peds = DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega===dia), m = {};
+  peds.forEach(p=> (p.lineas||[]).forEach(l=>{
+    const x = m[l.pid] = m[l.pid] || {pid:l.pid, nombre:nombreTk(l), cant:0, pedidos:[]};
+    x.cant = r3(x.cant + Number(l.cantidad||0)); x.pedidos.push({cli:p.cliente?.tienda || p.cliente?.nombre || '', folio:p.folio, cant:Number(l.cantidad||0)});
+  }));
+  const ls = Object.values(m).map(x=>{ const a = artPorId(x.pid), alm = stockEn('almacen', x.pid), cam = stockEn('camioneta', x.pid), hay = r3(alm + cam);
+    return {...x, a, alm, cam, hay, falta: r3(Math.max(0, x.cant - Math.max(0, hay))), sec: a?.seccion || 'Otros', nombre: a ? nombreTicket(a) : x.nombre}; });
+  const orden = categorias();
+  ls.sort((a,b)=> (orden.indexOf(a.sec) - orden.indexOf(b.sec)) || a.nombre.localeCompare(b.nombre,'es'));
+  return {peds, ls, total: sumar(peds, p=> p.total)};
+}
+function viewRelacion(){
+  if(!relDia) relDia = DB.pedidos.some(p=> p.estado==='Programado' && p.fechaEntrega===manana()) ? manana() : hoyClave();
+  const R = relacionDia(relDia), faltan = R.ls.filter(x=> x.falta > 0), ver = relSoloFalta ? faltan : R.ls;
+  const chip = (k, t)=> `<button class="dia${relDia===k?' on':''}" data-rd="${k}">${t}</button>`;
+  const pasado = (()=>{ const d = new Date(); d.setDate(d.getDate()+2); return hoyClave(d); })();
+  let sec = '', filas = '';
+  ver.forEach(x=>{
+    if(x.sec !== sec){ sec = x.sec; filas += `<div class="rc-day">${esc(sec)}</div>`; }
+    filas += `<div class="rl-row${x.falta > 0 ? ' falta' : ''}" data-pid="${x.pid}">
+      <span class="rl-t"><b>${esc(x.nombre)}</b><small>${x.pedidos.length} ${x.pedidos.length===1?'pedido':'pedidos'} · hay ${fmtCant(x.pid, x.hay)}${x.cam ? ` (almacén ${fmtCant(x.pid, x.alm)}, camioneta ${fmtCant(x.pid, x.cam)})` : ''}</small></span>
+      <span class="rl-q"><b>${fmtCant(x.pid, x.cant)}</b>${x.falta > 0 ? `<i class="tag-c">faltan ${fmtCant(x.pid, x.falta)}</i>` : `<i class="tag-v">alcanza</i>`}</span>
+      ${relAbierto===x.pid ? `<div class="rl-det">${x.pedidos.map(d=>`<div><span>${esc(d.cli)} <small>#${esc(d.folio)}</small></span><b>${fmtCant(x.pid, d.cant)}</b></div>`).join('')}</div>` : ''}
+    </div>`;
+  });
+  return `<div class="rc-wrap">
+    <div class="cr-pad" style="padding-top:12px">
+      <div class="dias filtro" style="padding:0;border:0">${chip(hoyClave(),'Hoy')}${chip(manana(),'Mañana')}${chip(pasado,'Pasado mañana')}
+        <label class="dia rl-fecha">Otro día <input type="date" id="rlFecha" value="${relDia}"></label></div>
+      <div class="rl-res"><b>${fechaCorta(relDia)}</b><span>${R.peds.length} ${R.peds.length===1?'venta programada':'ventas programadas'} · ${fmt(R.total)} · ${R.ls.length} productos</span>
+        ${R.ls.length ? (faltan.length ? `<span class="neg"><b>Faltan ${faltan.length} ${faltan.length===1?'producto':'productos'}</b> para cubrir el día</span>` : `<span class="pos"><b>El inventario alcanza para todo el día ✓</b></span>`) : ''}</div>
+      ${R.ls.length ? `<div class="tk-acts" style="margin:10px 0 4px"><button class="btn ghost" id="rlFalta">${relSoloFalta ? 'Ver todos' : 'Solo faltantes'}</button><button class="btn ghost" id="rlShare">${svg('share')}Compartir</button></div>` : ''}
+    </div>
+    ${R.ls.length ? (filas || '<div class="rc-empty"><p>Todo alcanza ✓</p></div>') + `<p class="note-sm" style="padding:0 16px">"Hay" es el inventario actual de almacén más camioneta. Toca un producto para ver a qué clientes va.</p>`
+      : `<div class="rc-empty">${svg('preventa')}<p>No hay ventas programadas para este día.</p></div>`}
+  </div>`;
+}
+function textoRelacion(){
+  const R = relacionDia(relDia), ls = relSoloFalta ? R.ls.filter(x=> x.falta > 0) : R.ls;
+  return `*Productos a entregar · ${fechaCorta(relDia)}*\n${R.peds.length} ventas programadas · ${fmt(R.total)}\n\n` +
+    ls.map(x=> `• ${x.nombre}: ${fmtCant(x.pid, x.cant)}${x.falta > 0 ? ` (faltan ${fmtCant(x.pid, x.falta)})` : ''}`).join('\n');
+}
+function bindRelacion(){
+  document.querySelectorAll('[data-rd]').forEach(b=> b.onclick = ()=>{ relDia = b.dataset.rd; relAbierto = null; renderVenta(); });
+  const f = document.getElementById('rlFecha'); if(f) f.onchange = ()=>{ if(f.value){ relDia = f.value; relAbierto = null; renderVenta(); } };
+  const sf = document.getElementById('rlFalta'); if(sf) sf.onclick = ()=>{ relSoloFalta = !relSoloFalta; renderVenta(); };
+  const sh = document.getElementById('rlShare'); if(sh) sh.onclick = async ()=>{ const t = textoRelacion();
+    try{ if(navigator.share){ await navigator.share({title:'Productos a entregar', text:t}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
+    copiarTexto(t, 'Lista copiada'); };
+  document.querySelectorAll('.rl-row').forEach(r=> r.onclick = ()=>{ relAbierto = relAbierto===r.dataset.pid ? null : r.dataset.pid; const y = window.scrollY; renderVenta(); window.scrollTo(0, y); });
+}
+
 let pedidoSel = null;
 function viewPedidoDet(){
   const p = DB.pedidos.find(x=>x.id===pedidoSel);
@@ -4048,8 +4174,10 @@ function viewPedidoDet(){
       <dt>Cliente</dt><dd>${esc(c.nombre||'')}</dd>
       ${c.tienda?`<dt>Tienda</dt><dd>${esc(c.tienda)}</dd>`:''}
       <dt>Horario</dt><dd>${esc(p.horario)}</dd>
-      <dt>Estado</dt><dd>${esc(p.estado)}</dd>
+      <dt>Estado</dt><dd>${p.estado==='Cancelado' ? `<b class="neg">Cancelada</b>` : esc(p.estado)}</dd>
       <dt>Programó</dt><dd>${esc(p.vendedor||'')} · ${fecha(p.fecha)}</dd>
+      ${p.editado ? `<dt>Modificó</dt><dd>${esc(p.editado.usuario||'')} · ${fecha(p.editado.fecha)}${(p.historial||[]).length ? ` · antes ${fmt(p.historial[p.historial.length-1].total)}` : ''}</dd>` : ''}
+      ${p.cancelado ? `<dt>Canceló</dt><dd>${esc(p.cancelado.usuario||'')} · ${fecha(p.cancelado.fecha)} · ${esc(p.cancelado.motivo)}${p.cancelado.nota ? ' · ' + esc(p.cancelado.nota) : ''}</dd>` : ''}
       ${p.comentario?`<dt>Comentario</dt><dd>${esc(p.comentario)}</dd>`:''}
     </dl>
     ${cli.telefono||tieneUbicacion(cli) ? `<div class="cg-acts" style="padding:12px 0 0">
@@ -4058,21 +4186,25 @@ function viewPedidoDet(){
     </div>` : ''}
     <div class="rd-lines">${lineas}</div>${lineasDevHTML(p)}
     <div class="rd-tot"><span>Total</span><b>${fmt(p.total)}</b></div>
+    ${p.estado==='Programado' ? `<div class="tk-acts" style="margin:16px 0 8px"><button class="btn ghost" id="pdEditar">Editar venta</button><button class="btn ghost danger-o" id="pdCancelar">Cancelar venta</button></div>` : ''}
   </div>`;
 }
+let pedVerCanc = false;
 function viewPedidos(){
-  const ls = DB.pedidos.slice().sort((a,b)=> (a.fechaEntrega+a.fecha).localeCompare(b.fechaEntrega+b.fecha));
+  const nCanc = DB.pedidos.filter(p=> p.estado==='Cancelado').length;
+  const ls = DB.pedidos.filter(p=> pedVerCanc || p.estado!=='Cancelado').sort((a,b)=> (a.fechaEntrega+a.fecha).localeCompare(b.fechaEntrega+b.fecha));
+  const top = `<div class="cr-pad" style="padding-top:12px"><div class="tk-acts" style="margin:0"><button class="btn ghost" id="pdRel">${svg('inventario')}Productos a entregar</button>${nCanc ? `<button class="btn ghost" id="pdVerCanc">${pedVerCanc ? 'Ocultar canceladas' : `Ver canceladas (${nCanc})`}</button>` : ''}</div></div>`;
   if(!ls.length) return `<div class="rc-wrap"><div class="rc-empty">${svg('preventa')}<p>No hay ventas programadas.</p><button class="btn" id="vacioProg" style="max-width:240px">Programar venta</button></div></div>`;
   let html = '', dia = '';
   ls.forEach(p=>{
     if(p.fechaEntrega!==dia){ dia = p.fechaEntrega; html += `<div class="rc-day">Entrega: ${fechaCorta(dia)}</div>`; }
-    html += `<div class="ab-row"><div class="ab-main" role="button" data-ped="${p.id}">
-      <span class="ab-t"><b>${esc(p.cliente.nombre)}${p.cliente.tienda?` <i class="muted">· ${esc(p.cliente.tienda)}</i>`:''}</b><span>${fmt(p.total)}</span></span>
+    html += `<div class="ab-row${p.estado==='Cancelado' ? ' pd-canc' : ''}"><div class="ab-main" role="button" data-ped="${p.id}">
+      <span class="ab-t"><b>${esc(p.cliente.nombre)}${p.cliente.tienda?` <i class="muted">· ${esc(p.cliente.tienda)}</i>`:''}${p.estado==='Cancelado' ? ' <i class="tag-c">Cancelada</i>' : p.editado ? ' <i class="tag-v">Modificada</i>' : ''}</b><span>${fmt(p.total)}</span></span>
       <span class="ab-m">#${esc(p.folio)} · ${esc(p.horario)} · ${cuentaTicket(p)} ${cuentaTicket(p)===1?'producto':'productos'}</span>
       ${p.comentario?`<span class="ab-c">${esc(p.comentario)}</span>`:''}
     </div></div>`;
   });
-  return `<div class="rc-wrap">${html}</div>`;
+  return `<div class="rc-wrap">${top}${html}</div>`;
 }
 
 /* Toque corto = agregar · mantener presionado = ver precio (persiana) */
@@ -4191,8 +4323,8 @@ function renderHeader(){
   const pill = document.getElementById('shiftPill');
   const acts = document.getElementById('headActions');
   const mb = document.getElementById('menuBtn');
-  if(enVenta() && ['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet','recibidos'].includes(ventaVista)){
-    title.textContent = {recibidos:'Pedidos recibidos', programar:'Programar entrega', programado:'Entrega programada', pedidos:'Ventas programadas', inicioPre:'Preventa', pedidoDet:'Venta programada',
+  if(enVenta() && ['programar','programado','pedidos','inicioPre','pedidoDet','inicioCot','cotHist','cotDet','recibidos','relacion'].includes(ventaVista)){
+    title.textContent = {recibidos:'Pedidos recibidos', programar:'Programar entrega', programado:'Entrega programada', pedidos:'Ventas programadas', inicioPre:'Preventa', pedidoDet:'Venta programada', relacion:'Productos a entregar',
                          inicioCot:'Cotizar', cotHist:'Cotizaciones realizadas', cotDet:'Cotización'}[ventaVista];
     pill.classList.add('hidden');
     acts.innerHTML = '';
@@ -8087,6 +8219,7 @@ document.getElementById('menuBtn').onclick = ()=>{
   if(enVenta() && ventaVista==='cotizacion'){ ventaVista = 'ticket'; renderVenta(); return; }
   if(enVenta() && ventaVista==='programar'){ ventaVista = 'ticket'; renderVenta(); return; }
   if(enVenta() && ventaVista==='pedidoDet'){ ventaVista = 'pedidos'; renderVenta(); return; }
+  if(enVenta() && ventaVista==='relacion'){ ventaVista = relDesde; renderVenta(); return; }
   if(enVenta() && ventaVista==='recibidos'){ ventaVista = 'inicioPre'; renderVenta(); return; }
   if(enVenta() && ventaVista==='pedidos'){ ventaVista = esPre() ? 'inicioPre' : 'grid'; renderVenta(); return; }
   if(enVenta() && esPre() && ventaVista==='grid'){ ventaVista = 'inicioPre'; renderVenta(); return; }
