@@ -26,11 +26,27 @@ header.cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;pa
 .pagina{background:var(--card);border-radius:14px;box-shadow:0 4px 18px rgba(20,40,30,.08);margin:12px 0 18px;padding:16px 14px 18px}
 .pagina h2{display:flex;align-items:center;gap:10px;font-size:.86rem;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
 .pagina h2::after{content:"";flex:1;height:2px;background:var(--soft)}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-@media(min-width:620px){.grid{grid-template-columns:repeat(3,1fr)}}
-@media(min-width:820px){.grid{grid-template-columns:repeat(4,1fr)}}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+@media(min-width:620px){.grid{grid-template-columns:repeat(4,1fr);gap:10px}}
+@media(min-width:820px){.grid{grid-template-columns:repeat(5,1fr)}}
+/* 3 por renglón en celular, como la app de venta */
+@media(max-width:619px){
+  .prod{border-radius:10px}
+  .prod .ft{padding:5px;font-size:.66rem}
+  .prod .tx{padding:6px 6px 8px;gap:1px}
+  .prod .mc{font-size:.56rem;letter-spacing:.03em}
+  .prod .nm{font-size:.72rem;line-height:1.15}
+  .prod .ps{font-size:.64rem}
+  .prod .pr{font-size:.9rem;padding-top:3px}
+  .prod .pr small{font-size:.6rem}
+  .prod .ant{display:block;margin-left:0;font-size:.64rem}
+  .prod .ch{font-size:.58rem;padding:1px 4px}
+  .prod .tu{top:4px;left:4px;font-size:.52rem;padding:2px 5px}
+  .prod .qty{top:4px;right:4px;min-width:22px;height:22px;font-size:.72rem;padding:0 5px}
+  .prod .add{right:5px;bottom:6px;width:24px;height:24px;line-height:24px;font-size:1.05rem}
+}
 .prod{position:relative;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;text-align:left;background:#fff}
-.prod .ft{aspect-ratio:1;background:#f6f8f7 center/contain no-repeat;display:grid;place-items:center;color:var(--muted);font-size:.78rem;text-align:center;padding:8px}
+.prod .ft{position:relative;aspect-ratio:1;background:#f6f8f7 center/contain no-repeat;display:grid;place-items:center;color:var(--muted);font-size:.78rem;text-align:center;padding:8px}
 .prod .tx{padding:8px 9px 10px;display:flex;flex-direction:column;gap:2px;flex:1}
 .prod .mc{font-size:.68rem;font-weight:800;color:var(--brand);letter-spacing:.06em;text-transform:uppercase}
 .prod .nm{font-size:.86rem;font-weight:600;line-height:1.2}
@@ -38,9 +54,9 @@ header.cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;pa
 .prod .pr{margin-top:auto;padding-top:4px;font-size:1.08rem;font-weight:800}
 .prod .pr small{font-size:.7rem;font-weight:600;color:var(--muted)}
 .prod .ant{font-size:.74rem;color:var(--muted);text-decoration:line-through;font-weight:500;margin-left:4px}
-.prod .tu{position:absolute;top:7px;left:7px;background:var(--gold);color:#3a2a00;font-size:.62rem;font-weight:800;padding:3px 7px;border-radius:999px}
+.prod .tu{position:absolute;z-index:2;top:7px;left:7px;background:var(--gold);color:#3a2a00;font-size:.62rem;font-weight:800;padding:3px 7px;border-radius:999px}
 .prod .ch{font-size:.68rem;color:var(--brand);background:var(--soft);border-radius:6px;padding:2px 6px;margin-top:3px;align-self:flex-start}
-.prod .qty{position:absolute;top:7px;right:7px;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:var(--brand);color:#fff;font-weight:800;font-size:.82rem;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.prod .qty{position:absolute;z-index:2;top:7px;right:7px;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:var(--brand);color:#fff;font-weight:800;font-size:.82rem;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.2)}
 .modo-pedido .prod:active{transform:scale(.97)}
 .modo-pedido .prod .add{display:block}
 .prod .add{display:none;position:absolute;right:7px;bottom:8px;width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;font-size:1.3rem;line-height:30px;text-align:center}
@@ -549,11 +565,10 @@ function tarjeta(p){
   const f = foto(p), pe = precio(p), esp = pe !== p.p, q = carrito[p.id];
   return `<button class="prod" data-id="${p.id}">
     ${esp ? '<span class="tu">TU PRECIO</span>' : ''}${q ? `<span class="qty">${p.kg ? r3(q) + ' kg' : q}</span>` : ''}
-    <span class="ft" ${f ? `style="background-image:url('${f}')"` : ''}>${f ? '' : esc(nombre(p))}</span>
+    <span class="ft" ${f ? `style="background-image:url('${f}')"` : ''}>${f ? '' : esc(nombre(p))}<span class="add">+</span></span>
     <span class="tx">${p.m ? `<span class="mc">${esc(p.m)}</span>` : ''}<span class="nm">${esc(p.n)}</span>${p.pr ? `<span class="ps">${esc(p.pr)}</span>` : ''}
       ${!esp && p.promo ? `<span class="ch">Promo ${esc(p.promo)}</span>` : ''}${!esp && p.may && !p.promo ? `<span class="ch">${esc(p.may)}</span>` : ''}
       <span class="pr">${fmt(pe)}${p.kg ? ' <small>por kg</small>' : ''}${esp ? `<span class="ant">${fmt(p.p)}</span>` : ''}</span></span>
-    <span class="add">+</span>
   </button>`;
 }
 const nCarrito = ()=> Object.keys(carrito).length;
