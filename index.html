@@ -727,8 +727,8 @@ dd.pos{color:var(--brand)}
 .cp-reg > span{flex:1;min-width:0}.cp-reg b{display:block;font-size:.9rem;font-weight:600}.cp-reg small{display:block;color:var(--muted);font-size:.76rem}
 .cp-reg input{width:64px;padding:9px 6px;border:1.5px solid var(--line);border-radius:10px;font:inherit;text-align:right;background:#fff}
 .cp-foot{flex-wrap:wrap;gap:8px}.cp-foot span{flex-basis:100%}.cp-foot .btn{flex:1;padding:12px;font-size:.92rem}
-.dia.cobro{border-color:#f3b8b2;color:var(--danger)}
-.dia.cobro.on{background:var(--danger);border-color:var(--danger);color:#fff}
+.dia.dia-cob{border-color:#f3b8b2;color:var(--danger)}
+.dia.dia-cob.on{background:var(--danger);border-color:var(--danger);color:#fff}
 .mp-box{position:relative;isolation:isolate;z-index:0;height:58vh;min-height:300px;margin:0 12px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
 #mpMapa{position:absolute;inset:0;background:#e8ecea}
 .mp-box .map-aviso{position:absolute;left:0;right:0;bottom:0;z-index:500}
@@ -1942,7 +1942,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.38.2';
+const APP_VERSION = '0.38.3';
 
 /* ================= Íconos ================= */
 const I = {
@@ -5346,7 +5346,7 @@ function viewMapa(){
   const f = cobro ? new Date() : fechaDeDia(mapaDia), esHoy = mapaDia===diaHoy();
   const cuenta = k => ls.filter(x=> x.cobro?.estado===k).length;
   return `<div class="mp-wrap">
-    <div class="dias filtro mp-dias">${DIAS.map(([k,t])=>`<button class="dia${k===mapaDia?' on':''}" data-d="${k}">${t}${k===diaHoy()?' ·':''}</button>`).join('')}${puede('creditos') ? `<button class="dia cobro${cobro?' on':''}" data-d="cobro">Cobranza</button>` : ''}</div>
+    <div class="dias filtro mp-dias">${DIAS.map(([k,t])=>`<button class="dia${k===mapaDia?' on':''}" data-d="${k}">${t}${k===diaHoy()?' ·':''}</button>`).join('')}${puede('creditos') ? `<button class="dia dia-cob${cobro?' on':''}" data-d="cobro">Cobranza</button>` : ''}</div>
     ${cobro ? `<div class="mp-res"><b>Ruta de cobro</b> · ${ls.length} con saldo · ${fmt(sumar(ls, x=>x.cobro.saldo))}
       <span class="mp-leg"><i style="background:${COLOR_EST.venc}"></i>${cuenta('venc')} vencidos <i style="background:${COLOR_EST.prox}"></i>${cuenta('prox')} por vencer <i style="background:${COLOR_EST.ok}"></i>${cuenta('ok')} al corriente</span></div>`
     : `<div class="mp-res"><b>${DIA_LARGO[mapaDia]} ${f.getDate()}</b>${esHoy?' (hoy)':''} · ${ls.length} ${ls.length===1?'cliente':'clientes'}
