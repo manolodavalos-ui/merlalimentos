@@ -1946,7 +1946,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.39';
+const APP_VERSION = '0.39.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -6448,7 +6448,7 @@ function bindNubeCfg(){
     renderConfig(true);
   };
   if($('fbPublica')) $('fbPublica').onchange = e=>{ guardarFb({publica: e.target.checked}); if(e.target.checked) fbProgramarPublicar(500); renderConfig(true); };
-  if($('fbPublicar')) $('fbPublicar').onclick = ()=> publicarNubeConAviso(()=> renderConfig(true));
+  if($('fbPublicar')) $('fbPublicar').onclick = ()=>{ fbError = ''; fbEscucharPedidos(); publicarNubeConAviso(()=> renderConfig(true)); };
   if($('fbNotif')) $('fbNotif').onclick = async ()=>{ try{ await Notification.requestPermission(); }catch(_){} renderConfig(true); };
   if($('fbCopiarReglas')) $('fbCopiarReglas').onclick = ()=> copiarTexto(reglasFirestore(fbUser.email || fbCfg().email), 'Reglas copiadas');
   if($('fbSalir')) $('fbSalir').onclick = ()=> confirmar({titulo:'Desconectar este celular', ok:'Desconectar', texto:'Dejará de recibir pedidos en línea y de actualizar el catálogo hasta que vuelvas a conectarlo.', alAceptar: async ()=>{ await fbSalir().catch(()=>{}); renderConfig(true); }});
