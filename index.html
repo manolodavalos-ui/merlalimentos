@@ -182,6 +182,10 @@ main.flush{padding:0}
 .hecho-f{text-align:center;color:var(--muted);margin:4px 0 18px}
 
 .rc-wrap{background:#fff;min-height:calc(100vh - 64px)}
+.nb-est{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px}.nb-est span:last-child{display:flex;flex-direction:column}.nb-est small{color:var(--muted)}
+.nb-dot{width:12px;height:12px;border-radius:50%;background:#e0a800;flex:none}.nb-dot.on{background:#1f9d55;box-shadow:0 0 0 4px #1f9d5522}
+.nb-sw{display:flex;gap:12px;align-items:flex-start;margin:14px 0 6px;padding:12px 14px;border:1px solid var(--line);border-radius:12px}.nb-sw input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--brand)}.nb-sw span{display:flex;flex-direction:column}.nb-sw small{color:var(--muted)}
+.nb-reglas{margin-top:16px}.nb-reglas summary{font-weight:700;cursor:pointer;padding:6px 0}.nb-reglas pre{font-size:.68rem;background:#f4f6f5;border-radius:10px;padding:10px;overflow-x:auto;white-space:pre;margin:8px 0}
 .rc-cli{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#f3f0ff}
 .rc-cli span{display:flex;flex-direction:column}.rc-cli small{color:var(--muted,#666)}
 .cg-tk{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;font:inherit;cursor:pointer}
@@ -1942,7 +1946,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.38.3';
+const APP_VERSION = '0.39';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4236,7 +4240,7 @@ function renderHeader(){
     const enInv = current==='inventario' && invVista!=='inicio';
     const enCat = current==='catalogo' && catVista!=='ver';
     const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt || enCred || enInv || enCat || enHist;
-    title.textContent = enHist ? 'Turno ' + turnoHistSel : enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea', datos:'Datos y respaldo', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
+    title.textContent = enHist ? 'Turno ' + turnoHistSel : enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea (GitHub)', nube:'Nube', datos:'Datos y respaldo', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
       : (m ? m.label : '');
@@ -4832,12 +4836,14 @@ function viewConfig(){
   if(cfgVista==='promos') return viewPromos();
   if(cfgVista==='devol') return viewDevolCfg();
   if(cfgVista==='gh') return viewGhCfg();
+  if(cfgVista==='nube') return viewNubeCfg();
   if(cfgVista==='datos') return viewDatosCfg();
   const c = impCfg();
   return `<div class="cl-home">
     <button class="cl-opt" id="optPromo"><span class="cl-opt-ic">${svg('articulos')}</span><span><b>Promociones</b><small>${store.get('articulos',[]).filter(a=>!a.borrado && a.promo).length} configuradas · ${articulos().filter(promoActiva).length} vigentes</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optDev"><span class="cl-opt-ic">${svg('back')}</span><span><b>Devoluciones</b><small>${devCfg().proveedores.join(', ') || 'Ningún proveedor'} · hasta ${devCfg().dias} días de caducado</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optDatos"><span class="cl-opt-ic">${svg('download')}</span><span><b>Datos y respaldo</b><small>${store.get('ultimoRespaldo', null) ? 'Último respaldo ' + new Date(store.get('ultimoRespaldo')).toLocaleDateString('es-MX',{day:'numeric', month:'short'}) : 'Sin respaldos'} · borrar datos de prueba</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optNube"><span class="cl-opt-ic">${svg('share')}</span><span><b>Nube: catálogo y pedidos en línea</b><small>${fbUser ? 'Conectado · ' + esc(fbUser.email || '') + (fbVivo ? ' · recibiendo pedidos' : '') : fbCfg().email ? 'Conectando…' : 'Sin conectar'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optGh"><span class="cl-opt-ic">${svg('catalogo')}</span><span><b>Catálogo en línea</b><small>${ghCfg().token ? 'Clave de GitHub guardada' + (ghCfg().publicado ? ' · publicado ' + new Date(ghCfg().publicado).toLocaleDateString('es-MX',{day:'numeric',month:'short'}) : '') : 'Falta la clave para publicar'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optImp"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Impresoras</b><small>${impSel() ? esc(impSel().nombre) + ' · ' + esc(CONEXIONES[impSel().conexion].nombre) + ' · ' + resumenImp(impSel()) : 'Ninguna configurada'}${impresoras().length > 1 ? ' · ' + impresoras().length + ' impresoras' : ''}</small></span>${svg('chev')}</button>
   </div>`;
@@ -4866,11 +4872,13 @@ function renderConfig(conservar){
     document.getElementById('optPromo').onclick = ()=>{ cfgVista='promos'; renderConfig(); };
     document.getElementById('optDev').onclick = ()=>{ cfgVista='devol'; renderConfig(); };
     document.getElementById('optGh').onclick = ()=>{ cfgVista='gh'; renderConfig(); };
+    document.getElementById('optNube').onclick = ()=>{ cfgVista='nube'; renderConfig(); if(fbCfg().email && !FB) fbCargar().then(()=> renderConfig(true)).catch(()=> renderConfig(true)); };
     document.getElementById('optDatos').onclick = ()=>{ cfgVista='datos'; renderConfig(); };
     return;
   }
   if(cfgVista==='devol'){ document.getElementById('dvGuardar').onclick = guardarDevolCfg; return; }
   if(cfgVista==='gh'){ document.getElementById('ghGuardar').onclick = guardarGhForm; return; }
+  if(cfgVista==='nube'){ bindNubeCfg(); return; }
   if(cfgVista==='datos'){ document.getElementById('dtResp').onclick = ()=> descargarRespaldo(); document.getElementById('dtRest').onchange = e=>{ const f = e.target.files[0]; if(f) restaurarRespaldo(f); }; const l = document.getElementById('dtLimpiar'); if(l) l.onclick = limpiarDatosPrueba; return; }
   if(cfgVista==='promos'){
     document.querySelectorAll('.pm-sw').forEach(sw=> sw.onchange = ()=>{
@@ -5247,7 +5255,7 @@ function viewCatalogo(){
       <button class="ub-b" id="catPed">${svg('recibos')}Pedidos recibidos${nRec ? ` <i class="cat-badge">${nRec}</i>` : ''}</button>
       ${adm ? `<button class="ub-b" id="catPub">${svg('share')}Publicar</button>` : ''}
     </div>
-    ${adm ? `<p class="cat-est">${!g.token ? 'Para publicar, guarda la clave de GitHub en Configuración → Catálogo en línea' : g.publicado ? `Publicado ${new Date(g.publicado).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${catalogoPendiente() ? ' · <b class="warn">hay cambios sin publicar</b>' : ' · al día'}` : '<b class="warn">Aún no se ha publicado</b>'}</p>` : ''}
+    ${adm && fbUser ? `<p class="cat-est">Nube: ${fbCfg().publicado ? 'actualizado ' + new Date(fbCfg().publicado).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'sin publicar'}${fbCfg().publica === false ? ' · este celular no publica' : nubePendiente() ? ' · <b class="neg">subiendo cambios…</b>' : ' ✓'}${fbVivo ? ' · pedidos en línea ✓' : ''}</p>` : adm ? `<p class="cat-est">${!g.token ? 'Para publicar, guarda la clave de GitHub en Configuración → Catálogo en línea' : g.publicado ? `Publicado ${new Date(g.publicado).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${catalogoPendiente() ? ' · <b class="warn">hay cambios sin publicar</b>' : ' · al día'}` : '<b class="warn">Aún no se ha publicado</b>'}</p>` : ''}
   </div>`;
   const html = categorias().map(sec=>{
     const ps = lista.filter(p=> p.seccion===sec);
@@ -5261,7 +5269,7 @@ function renderCatalogo(){
   if(catVista==='pedidos'){ document.querySelectorAll('.pr-row').forEach(b=> b.onclick = ()=> detallePedidoRec(b.dataset.id)); document.getElementById('prPegar').onclick = pegarPedido; return; }
   document.getElementById('catEnviar').onclick = ()=> elegirClienteSimple(enviarCatalogo);
   document.getElementById('catPed').onclick = ()=>{ catVista = 'pedidos'; renderCatalogo(); window.scrollTo(0,0); };
-  const pub = document.getElementById('catPub'); if(pub) pub.onclick = ()=> publicarConAviso();
+  const pub = document.getElementById('catPub'); if(pub) pub.onclick = ()=> fbListo() ? publicarNubeConAviso() : publicarConAviso();
   const orden = [...document.querySelectorAll('#catGrid .tile')].map(t=> t.dataset.pid);
   document.querySelectorAll('#catGrid .tile').forEach(t=>{
     let ultimo = 0;
@@ -6156,6 +6164,8 @@ function elegirClienteSimple(cb){
 function enviarCatalogo(id){
   const tok = tokenCliente(id), c = clientes().find(x=> x.id===id); if(!c) return;
   const abrir = ()=> window.open(urlWa(c.telefono, `Hola ${c.nombre}, te comparto *Cliente consentido Merkalimentos*, nuestro catálogo${Object.keys(c.preciosEspeciales||{}).length ? ' con tus precios especiales' : ''}. Desde ahí puedes hacer tu pedido y lo puedes agregar a tu pantalla de inicio:\n${linkCatalogo(tok)}`), '_blank');
+  if(fbListo() && fbCfg().publica !== false){ if(!nubePendiente()) return abrir(); return publicarNubeConAviso(abrir); }
+  if(fbListo()) return abrir();
   const publicado = (ghCfg().tokens || []).includes(tok);
   if(publicado && !catalogoPendiente()) return abrir();
   if(session.rol==='admin') return confirmar({titulo: publicado ? 'Hay cambios sin publicar' : 'Este cliente aún no tiene su catálogo publicado', ok:'Publicar y enviar',
@@ -6170,8 +6180,8 @@ function decodificarPedido(txt){
   const b = txt.replace(/-/g,'+').replace(/_/g,'/'), json = decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4))));
   return JSON.parse(json);
 }
-function importarPedido(raw){
-  const o = decodificarPedido(raw);
+function importarPedido(raw){ return importarObjPedido(decodificarPedido(raw)); }
+function importarObjPedido(o, extra = {}){
   if(!o || !o.id || !Array.isArray(o.l)) return null;
   const ls = pedidosRecibidos();
   if(ls.some(p=> p.id===o.id)) return {id:o.id, repetido:true};
@@ -6179,7 +6189,7 @@ function importarPedido(raw){
   ls.push({id:o.id, fecha:o.f || new Date().toISOString(), recibido:new Date().toISOString(), token:o.c || null, clienteId:c?.id || null,
     cliente:{nombre:o.cli?.n || c?.nombre || 'Cliente', tienda:o.cli?.t || c?.tienda || '', telefono:o.cli?.tel || c?.telefono || ''},
     lineas:o.l.map(([pid, cant, precio, nombre])=> ({pid, cantidad:Number(cant), precio:Number(precio), nombre: nombre || nombreTicket(artPorId(pid) || {nombre:pid}), porKilo: !!artPorId(pid)?.porKilo})),
-    nota:o.nota || '', estado:'Nuevo'});
+    nota:o.nota || '', estado:'Nuevo', ...extra});
   store.set('pedidosRecibidos', ls);
   return {id:o.id, repetido:false};
 }
@@ -6213,7 +6223,7 @@ const totalPedRec = p => r2(p.lineas.reduce((s,l)=> s + l.precio*l.cantidad, 0))
 function viewPedidosRec(){
   const ls = pedidosRecibidos().slice().sort((a,b)=> b.recibido.localeCompare(a.recibido));
   const pegar = `<div class="cr-pad" style="padding-top:12px"><button class="btn" id="prPegar" style="margin-top:0">${svg('copy')}Pegar pedido de WhatsApp</button>
-    <p class="note-sm" style="text-align:left">Copia el mensaje del cliente en WhatsApp y toca este botón. Si al tocar el link del mensaje se abre tu app, el pedido entra solo.</p></div>`;
+    <p class="note-sm" style="text-align:left">${fbUser ? '<b class="pos">Pedidos en línea activos:</b> los pedidos del catálogo llegan solos. Usa este botón solo si un cliente te lo mandó por WhatsApp.' : 'Copia el mensaje del cliente en WhatsApp y toca este botón. Si al tocar el link del mensaje se abre tu app, el pedido entra solo.'}</p></div>`;
   if(!ls.length) return `<div class="rc-wrap">${pegar}<div class="rc-empty">${svg('catalogo')}<p>Aún no hay pedidos registrados.</p></div></div>`;
   const col = {Nuevo:'tag-v', Atendido:'tag-v', Descartado:'tag-c'};
   return `<div class="rc-wrap">${pegar}${ls.map(p=>`<button class="rc-row pr-row" data-id="${p.id}">
@@ -6239,7 +6249,7 @@ function detallePedidoRec(id){
   act('desc', ()=>{ marcarPedRec(p.id, 'Descartado'); current==='catalogo' ? renderCatalogo() : renderVenta(); });
   act('pre', ()=> cargarPedidoRec(p, 'preventa')); act('venta', ()=> cargarPedidoRec(p, 'venta'));
 }
-function marcarPedRec(id, estado){ store.set('pedidosRecibidos', pedidosRecibidos().map(x=> x.id===id ? {...x, estado, atendido: new Date().toISOString()} : x)); renderMenu(); }
+function marcarPedRec(id, estado){ store.set('pedidosRecibidos', pedidosRecibidos().map(x=> x.id===id ? {...x, estado, atendido: new Date().toISOString()} : x)); fbMarcarPedido(id, estado); renderMenu(); }
 function cargarPedidoRec(p, modo){
   if(!turnoActual()){ toast('Abre un turno para pasar el pedido'); return; }
   go(modo);
@@ -6251,6 +6261,197 @@ function cargarPedidoRec(p, modo){
   marcarPedRec(p.id, 'Atendido');
   ventaVista = 'ticket'; renderVenta();
   toast(c ? 'Pedido cargado: revisa y ' + (modo==='preventa' ? 'programa la entrega' : 'cobra') : 'Pedido cargado: asigna el cliente');
+}
+
+/* ================= Nube (Firebase): catálogo en vivo y pedidos automáticos ================= */
+const FB_CFG = {apiKey:'AIzaSyD3rk9iHtDDDSOW1akq_fmLMN9ElhEMJjk', authDomain:'merkalimentos-dc899.firebaseapp.com', projectId:'merkalimentos-dc899',
+  storageBucket:'merkalimentos-dc899.firebasestorage.app', messagingSenderId:'518404099139', appId:'1:518404099139:web:6f12453f8842ddc2da98f6'};
+let fbEmailTmp = '', FB = null, fbDb = null, fbAuth = null, fbUser = null, fbUnsub = null, fbTimer = null, fbCargando = null, fbError = '', fbVivo = false;
+const fbCfg = ()=> ({email:'', publica:true, ...(store.get('config').fb || {})});
+function guardarFb(c){ const cfg = store.get('config'); cfg.fb = {...fbCfg(), ...c}; store.set('config', cfg); }
+const fbListo = ()=> !!(FB && fbUser);
+function fbCargar(){
+  if(fbCargando) return fbCargando;
+  fbCargando = (async ()=>{
+    FB = await import('./fb/fb-app.js');
+    const app = FB.initializeApp(FB_CFG);
+    try{ fbDb = FB.initializeFirestore(app, {ignoreUndefinedProperties:true, localCache: FB.persistentLocalCache({tabManager: FB.persistentMultipleTabManager()})}); }
+    catch(_){ fbDb = FB.initializeFirestore(app, {ignoreUndefinedProperties:true}); }
+    fbAuth = FB.getAuth(app);
+    await new Promise(res=> FB.onAuthStateChanged(fbAuth, u=>{
+      fbUser = u; res();
+      if(u){ fbEscucharPedidos(); fbProgramarPublicar(2000); }
+      else { if(fbUnsub) fbUnsub(); fbUnsub = null; fbVivo = false; }
+      if(current==='config' && cfgVista==='nube') renderConfig(true);
+    }));
+    return FB;
+  })().catch(e=>{ fbCargando = null; FB = null; fbError = 'No se pudo cargar (¿sin internet?)'; throw e; });
+  return fbCargando;
+}
+async function fbEntrar(email, pass){
+  await fbCargar();
+  await FB.signInWithEmailAndPassword(fbAuth, email, pass);
+  guardarFb({email});
+  try{ if('Notification' in window && Notification.permission==='default') await Notification.requestPermission(); }catch(_){}
+}
+async function fbSalir(){ if(!FB) return; await FB.signOut(fbAuth); guardarFb({email:'', firma:''}); }
+const fbMsgError = e => ({ 'auth/invalid-credential':'Correo o contraseña incorrectos', 'auth/wrong-password':'Contraseña incorrecta', 'auth/user-not-found':'Ese correo no está dado de alta en Firebase',
+  'auth/invalid-email':'Correo no válido', 'auth/too-many-requests':'Demasiados intentos, espera unos minutos', 'auth/network-request-failed':'Sin internet', 'permission-denied':'Firebase rechazó el acceso: revisa las reglas de Firestore' })[e && e.code] || ('Error: ' + ((e && (e.code || e.message)) || '').toString().slice(0,60));
+
+/* ----- Pedidos que llegan de Cliente consentido ----- */
+function fbEscucharPedidos(){
+  if(fbUnsub || !fbUser) return;
+  const q = FB.query(FB.collection(fbDb, 'pedidos'), FB.where('creado', '>=', FB.Timestamp.fromMillis(Date.now() - 7*864e5)));
+  fbUnsub = FB.onSnapshot(q, snap=>{
+    fbVivo = true; fbError = '';
+    const nuevos = [];
+    snap.docChanges().forEach(ch=>{ if(ch.type==='removed') return; const r = recibirPedidoNube(ch.doc.data()); if(r) nuevos.push(r); });
+    if(nuevos.length) avisarPedidos(nuevos);
+  }, e=>{ fbVivo = false; fbUnsub = null; fbError = fbMsgError(e); if(current==='config' && cfgVista==='nube') renderConfig(true); });
+}
+function recibirPedidoNube(d){
+  if(!d || !d.id || !Array.isArray(d.l)) return null;
+  const ls = pedidosRecibidos(), ya = ls.find(p=> p.id===d.id);
+  if(ya){ /* el otro celular lo atendió o descartó */
+    if(ya.estado==='Nuevo' && d.estado && d.estado!=='Nuevo'){ ya.estado = d.estado; ya.atendido = d.atendido || new Date().toISOString(); ya.por = d.por || ''; store.set('pedidosRecibidos', ls); refrescarPedidosUI(); }
+    return null;
+  }
+  const r = importarObjPedido({id:d.id, f:d.f, c:d.c, cli:d.cli, nota:d.nota, l:d.l.map(x=> [x.id, x.q, x.p, x.n])}, {nube:true, estado: d.estado || 'Nuevo'});
+  return r && !r.repetido && (d.estado || 'Nuevo')==='Nuevo' ? pedidosRecibidos().find(p=> p.id===d.id) : null;
+}
+function fbMarcarPedido(id, estado){
+  if(!fbListo()) return;
+  const p = pedidosRecibidos().find(x=> x.id===id); if(!p || !p.nube) return;
+  FB.updateDoc(FB.doc(fbDb, 'pedidos', id), {estado, atendido:new Date().toISOString(), por: store.get('config').dispositivo || ''}).catch(()=>{});
+}
+function refrescarPedidosUI(){
+  renderMenu();
+  if(current==='catalogo') renderCatalogo();
+  else if(enVenta() && ['recibidos','inicioPre'].includes(ventaVista)) renderVenta();
+}
+function sonidoPedido(){
+  try{ const ctx = new (window.AudioContext || window.webkitAudioContext)(); [0, .18, .36].forEach((t,i)=>{ const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = [880, 1175, 1568][i]; o.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(.25, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + t + .16);
+    o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + .17); }); setTimeout(()=> ctx.close(), 900); }catch(_){}
+}
+function avisarPedidos(ps){
+  const p = ps[0], quien = p.cliente.tienda || p.cliente.nombre, txt = ps.length > 1 ? `${ps.length} pedidos nuevos del catálogo` : `Nuevo pedido de ${quien} · ${fmt(totalPedRec(p))}`;
+  refrescarPedidosUI(); toast('🛒 ' + txt); sonidoPedido();
+  try{ navigator.vibrate && navigator.vibrate([250, 120, 250]); }catch(_){}
+  try{ if('Notification' in window && Notification.permission==='granted' && navigator.serviceWorker)
+    navigator.serviceWorker.ready.then(r=> r.showNotification('Merkalimentos', {body:txt, tag:'pedido-' + p.id, icon:'icon-192.png', badge:'icon-192.png', vibrate:[250,120,250]})).catch(()=>{}); }catch(_){}
+}
+
+/* ----- Catálogo: se publica solo cuando cambian productos, precios o clientes ----- */
+function firmaNube(){ const d = datosCatalogo(); delete d.publicado;
+  return hashTxt(JSON.stringify(d) + JSON.stringify(clientes().filter(c=> c.catalogo).map(c=> [c.catalogo, datosClienteCat(c)]))); }
+const nubePendiente = ()=> fbCfg().firma !== firmaNube();
+function fbProgramarPublicar(ms = 8000){
+  if(!fbListo() || fbCfg().publica === false) return;
+  clearTimeout(fbTimer); fbTimer = setTimeout(()=> publicarNube().catch(()=>{}), ms);
+}
+async function publicarNube(forzar){
+  if(!fbListo()) return false;
+  const firma = firmaNube();
+  if(!forzar && fbCfg().firma === firma) return true;
+  const d = datosCatalogo(), cls = clientes().filter(c=> c.catalogo);
+  const ops = [b=> b.set(FB.doc(fbDb, 'catalogo', 'general'), d), ...cls.map(c=> b=> b.set(FB.doc(fbDb, 'clientesCat', c.catalogo), datosClienteCat(c)))];
+  for(let i = 0; i < ops.length; i += 400){ const b = FB.writeBatch(fbDb); ops.slice(i, i + 400).forEach(f=> f(b)); await b.commit(); }
+  guardarFb({firma, publicado:new Date().toISOString()});
+  if(current==='catalogo' && catVista!=='pedidos') renderCatalogo();
+  return true;
+}
+const conLimite = (p, ms) => Promise.race([p, new Promise((_, rej)=> setTimeout(()=> rej(Object.assign(new Error('tiempo'), {code:'tiempo'})), ms))]);
+async function publicarNubeConAviso(despues){
+  toast('Actualizando catálogo en la nube…');
+  try{ await conLimite(publicarNube(true), 15000); toast('Catálogo actualizado ✓'); despues && despues(); }
+  catch(e){ toast(e.code==='tiempo' ? 'Sin respuesta de la nube: se enviará al tener señal' : 'No se pudo actualizar: ' + fbMsgError(e)); despues && despues(); }
+}
+(function vigilarCambios(){
+  const set0 = store.set.bind(store);
+  store.set = (k, v)=>{ set0(k, v); if(k==='articulos' || k==='clientes') fbProgramarPublicar(); };
+})();
+window.addEventListener('online', ()=>{ if(fbCfg().email){ fbCargar().then(()=>{ fbEscucharPedidos(); fbProgramarPublicar(1500); }).catch(()=>{}); } });
+setTimeout(()=>{ if(fbCfg().email) fbCargar().catch(()=>{}); }, 1200);
+
+/* ----- Configuración ----- */
+const reglasFirestore = email => `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function staff() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.email == '${email}';
+    }
+    match /catalogo/{docId} {
+      allow get: if true;
+      allow list, write: if staff();
+    }
+    match /clientesCat/{tok} {
+      allow get: if true;
+      allow list, write: if staff();
+    }
+    match /pedidos/{pid} {
+      allow create: if request.resource.data.id == pid
+        && request.resource.data.estado == 'Nuevo'
+        && request.resource.data.creado == request.time
+        && request.resource.data.keys().hasOnly(['v','id','f','c','cli','l','nota','total','estado','creado'])
+        && request.resource.data.l is list
+        && request.resource.data.l.size() > 0
+        && request.resource.data.l.size() <= 150
+        && request.resource.data.nota is string
+        && request.resource.data.nota.size() <= 300;
+      allow read, update, delete: if staff();
+    }
+  }
+}`;
+function viewNubeCfg(){
+  const c = fbCfg();
+  if(!fbUser) return `<div class="gform cf">
+    <p class="sub">Conecta este celular a la nube para que el catálogo de clientes se actualice solo y los pedidos lleguen directo a la app.</p>
+    ${c.email && !FB ? `<p class="note-sm" style="text-align:left">Conectando como <b>${esc(c.email)}</b>…</p>` : ''}
+    ${fbError ? `<p class="note-sm neg" style="text-align:left">${esc(fbError)}</p>` : ''}
+    <div class="gfield"><label for="fbEmail">Correo de la cuenta del negocio</label><input id="fbEmail" type="email" autocomplete="username" value="${esc(c.email || fbEmailTmp)}" placeholder="correo@gmail.com"></div>
+    <div class="gfield"><label for="fbPass">Contraseña</label><input id="fbPass" type="password" autocomplete="current-password"></div>
+    <button class="btn" id="fbEntrar">Conectar</button>
+    <p class="note-sm" style="text-align:left">El usuario se crea una sola vez en la consola de Firebase: <b>Authentication → Usuarios → Agregar usuario</b>. Usa el mismo en todos los celulares.</p>
+  </div>`;
+  const pub = c.publicado ? new Date(c.publicado).toLocaleString('es-MX',{day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : 'aún no';
+  const notif = !('Notification' in window) ? 'no disponible' : Notification.permission==='granted' ? 'activados' : Notification.permission==='denied' ? 'bloqueados' : 'sin activar';
+  return `<div class="gform cf">
+    <div class="nb-est"><span class="nb-dot${fbVivo ? ' on' : ''}"></span><span><b>Conectado</b><small>${esc(fbUser.email || '')}</small></span></div>
+    ${fbError ? `<p class="note-sm neg" style="text-align:left">${esc(fbError)}</p>` : ''}
+    <div class="cj-row"><span>Pedidos en línea</span><b>${fbVivo ? 'Recibiendo ✓' : 'Esperando conexión'}</b></div>
+    <div class="cj-row"><span>Catálogo actualizado</span><b>${pub}${c.publica !== false && nubePendiente() ? ' · cambios por subir' : ''}</b></div>
+    <div class="cj-row"><span>Avisos del sistema</span><b>${notif}</b></div>
+    <label class="nb-sw"><input type="checkbox" id="fbPublica" ${c.publica !== false ? 'checked' : ''}><span><b>Este celular actualiza el catálogo</b><small>Déjalo activado solo en el celular donde capturas productos, precios y clientes (TPV1). En el de respaldo desactívalo.</small></span></label>
+    <div class="tk-acts">
+      <button class="btn ghost" id="fbPublicar"${c.publica === false ? ' disabled' : ''}>Actualizar ahora</button>
+      <button class="btn ghost" id="fbNotif"${'Notification' in window && Notification.permission==='default' ? '' : ' disabled'}>Activar avisos</button>
+    </div>
+    <details class="nb-reglas"><summary>Reglas de seguridad de Firestore</summary>
+      <p class="note-sm" style="text-align:left">Pégalas en la consola de Firebase: <b>Firestore Database → Reglas → Publicar</b>. Solo tu cuenta puede modificar el catálogo y leer pedidos; los clientes solo ven su catálogo y envían pedidos.</p>
+      <pre>${esc(reglasFirestore(fbUser.email || c.email))}</pre>
+      <button class="btn ghost" id="fbCopiarReglas">${svg('copy')}Copiar reglas</button>
+    </details>
+    <button class="btn ghost danger-o" id="fbSalir" style="margin-top:14px">Desconectar este celular</button>
+  </div>`;
+}
+function bindNubeCfg(){
+  const $ = id => document.getElementById(id);
+  if($('fbEntrar')) $('fbEntrar').onclick = async ()=>{
+    const email = $('fbEmail').value.trim().toLowerCase(), pass = $('fbPass').value; fbEmailTmp = email;
+    if(!email || !pass){ toast('Escribe correo y contraseña'); return; }
+    $('fbEntrar').disabled = true; $('fbEntrar').textContent = 'Conectando…'; fbError = '';
+    try{ await fbEntrar(email, pass); toast('Celular conectado a la nube ✓'); }
+    catch(e){ fbError = fbMsgError(e); toast(fbError); }
+    renderConfig(true);
+  };
+  if($('fbPublica')) $('fbPublica').onchange = e=>{ guardarFb({publica: e.target.checked}); if(e.target.checked) fbProgramarPublicar(500); renderConfig(true); };
+  if($('fbPublicar')) $('fbPublicar').onclick = ()=> publicarNubeConAviso(()=> renderConfig(true));
+  if($('fbNotif')) $('fbNotif').onclick = async ()=>{ try{ await Notification.requestPermission(); }catch(_){} renderConfig(true); };
+  if($('fbCopiarReglas')) $('fbCopiarReglas').onclick = ()=> copiarTexto(reglasFirestore(fbUser.email || fbCfg().email), 'Reglas copiadas');
+  if($('fbSalir')) $('fbSalir').onclick = ()=> confirmar({titulo:'Desconectar este celular', ok:'Desconectar', texto:'Dejará de recibir pedidos en línea y de actualizar el catálogo hasta que vuelvas a conectarlo.', alAceptar: async ()=>{ await fbSalir().catch(()=>{}); renderConfig(true); }});
 }
 
 /* ----- Configuración de GitHub ----- */
