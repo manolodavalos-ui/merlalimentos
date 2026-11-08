@@ -1955,7 +1955,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.41';
+const APP_VERSION = '0.41.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3504,7 +3504,7 @@ function viewClientesLista(){
 }
 function viewClienteEditar(c){
   const acciones = `<div class="cg-acts">
-    ${c.telefono?`<a class="ub-b" href="https://wa.me/52${c.telefono}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a>`:''}
+    ${c.telefono?`<a class="ub-b" href="${urlWa(c.telefono, '')}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a>`:''}
     ${c.telefono?`<a class="ub-b" href="tel:${c.telefono}">${svg('tel')}Llamar</a>`:''}
     ${c.lat!=null?`<a class="ub-b" href="${linkMapa(c.lat,c.lng)}" target="_blank" rel="noopener">${svg('mapa')}Cómo llegar</a>`:''}
   </div>`;
@@ -4188,7 +4188,7 @@ function viewPedidoDet(){
       ${p.comentario?`<dt>Comentario</dt><dd>${esc(p.comentario)}</dd>`:''}
     </dl>
     ${cli.telefono||tieneUbicacion(cli) ? `<div class="cg-acts" style="padding:12px 0 0">
-      ${cli.telefono?`<a class="ub-b" href="https://wa.me/52${cli.telefono}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a>`:''}
+      ${cli.telefono?`<a class="ub-b" href="${urlWa(cli.telefono, '')}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a>`:''}
       ${tieneUbicacion(cli)?`<a class="ub-b" href="${linkMapa(cli.lat,cli.lng)}" target="_blank" rel="noopener">${svg('mapa')}Cómo llegar</a>`:''}
     </div>` : ''}
     <div class="rd-lines">${lineas}</div>${lineasDevHTML(p)}
@@ -4984,6 +4984,7 @@ function viewConfig(){
     <button class="cl-opt" id="optDatos"><span class="cl-opt-ic">${svg('download')}</span><span><b>Datos y respaldo</b><small>${store.get('ultimoRespaldo', null) ? 'Último respaldo ' + new Date(store.get('ultimoRespaldo')).toLocaleDateString('es-MX',{day:'numeric', month:'short'}) : 'Sin respaldos'} · borrar datos de prueba</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optNube"><span class="cl-opt-ic">${svg('share')}</span><span><b>Nube: catálogo y pedidos en línea</b><small>${fbUser ? 'Conectado · ' + esc(fbUser.email || '') + (fbVivo ? ' · recibiendo pedidos' : '') : fbCfg().email ? 'Conectando…' : 'Sin conectar'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optGh"><span class="cl-opt-ic">${svg('catalogo')}</span><span><b>Catálogo en línea</b><small>${ghCfg().token ? 'Clave de GitHub guardada' + (ghCfg().publicado ? ' · publicado ' + new Date(ghCfg().publicado).toLocaleDateString('es-MX',{day:'numeric',month:'short'}) : '') : 'Falta la clave para publicar'}</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optWa"><span class="cl-opt-ic">${svg('whatsapp')}</span><span><b>WhatsApp para enviar mensajes</b><small>${waApp()==='business' ? 'WhatsApp Business' : waApp()==='normal' ? 'WhatsApp normal' : 'Preguntar cada vez'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optImp"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Impresoras</b><small>${impSel() ? esc(impSel().nombre) + ' · ' + esc(CONEXIONES[impSel().conexion].nombre) + ' · ' + resumenImp(impSel()) : 'Ninguna configurada'}${impresoras().length > 1 ? ' · ' + impresoras().length + ' impresoras' : ''}</small></span>${svg('chev')}</button>
   </div>`;
 }
@@ -5011,6 +5012,11 @@ function renderConfig(conservar){
     document.getElementById('optPromo').onclick = ()=>{ cfgVista='promos'; renderConfig(); };
     document.getElementById('optDev').onclick = ()=>{ cfgVista='devol'; renderConfig(); };
     document.getElementById('optGh').onclick = ()=>{ cfgVista='gh'; renderConfig(); };
+    document.getElementById('optWa').onclick = ()=>{
+      const bg = dialogo(`<h3>WhatsApp para enviar mensajes</h3><p class="sub">Catálogos, recordatorios de pago, órdenes de compra y avisos a clientes se abrirán con:</p>
+        <div class="cd-acts">${[['business','WhatsApp Business'],['normal','WhatsApp normal'],['preguntar','Preguntar cada vez']].map(([k,t])=>`<button class="btn${waApp()===k?'':' ghost'}" data-w="${k}">${t}</button>`).join('')}</div>`);
+      bg.querySelectorAll('[data-w]').forEach(b=> b.onclick = ()=>{ const cfg = store.get('config'); cfg.waApp = b.dataset.w; store.set('config', cfg); bg.remove(); renderConfig(); toast('Listo: ' + b.textContent); });
+    };
     document.getElementById('optNube').onclick = ()=>{ cfgVista='nube'; renderConfig(); if(fbCfg().email && !FB) fbCargar().then(()=> renderConfig(true)).catch(()=> renderConfig(true)); };
     document.getElementById('optDatos').onclick = ()=>{ cfgVista='datos'; renderConfig(); };
     return;
@@ -5539,7 +5545,7 @@ function popupCliente(x){
     ${c.referencia ? `<small><i>${esc(c.referencia)}</i></small>` : ''}
     <div class="mp-acts">
       <a class="ub-b" href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}" target="_blank" rel="noopener">${svg('mapa')}Cómo llegar</a>
-      ${c.telefono ? `<a class="ub-b" href="https://wa.me/52${c.telefono}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a>` : ''}
+      ${c.telefono ? `<a class="ub-b" href="${urlWa(c.telefono, '')}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a>` : ''}
       <button class="ub-b" data-pedido="${c.id}">${svg('preventa')}Tomar pedido</button>
     </div>
   </div>`;
@@ -6198,7 +6204,7 @@ function renderInventario(){
     document.querySelectorAll('.co-del').forEach(bt=> bt.onclick = ()=>{ leerCompraForm(c); c.lineas.splice(Number(bt.closest('.co-l').dataset.i), 1); guardar(); renderInventario(); });
     on('coAdd', ()=>{ leerCompraForm(c); elegirArticulo(pid=>{ if(!c.lineas.some(l=> l.pid===pid)){ const p = paramInv(pid), f = p.factor > 1 ? p.factor : 1; c.lineas.push({pid, cant:1, factor:f, uc:p.uc, costo:r2(costoArt(artPorId(pid))*f)}); } guardar(); renderInventario(); }); });
     on('coSug', ()=>{ leerCompraForm(c); const s = sugeridoCompra(c.proveedor); let n = 0; s.forEach(x=>{ if(!c.lineas.some(l=> l.pid===x.pid)){ c.lineas.push(x); n++; } }); guardar(); renderInventario(); toast(n ? `${n} ${n===1?'producto sugerido':'productos sugeridos'}${c.proveedor?' de '+c.proveedor:''}` : 'Nada que sugerir (configura mínimos o revisa ventas)'); });
-    on('coWa', ()=>{ guardar(); if(c.estado==='Borrador'){ c.estado = 'Enviada'; DB.guardar('compras', c); } window.open(urlWa('', textoCompra(c)), '_blank'); renderInventario(); });
+    on('coWa', ()=>{ guardar(); if(c.estado==='Borrador'){ c.estado = 'Enviada'; DB.guardar('compras', c); } abrirWa(urlWa('', textoCompra(c))); renderInventario(); });
     on('coRecibir', ()=>{ guardar(); invBorr = null; invVista = 'recepcion'; renderInventario(); });
     on('coCanc', ()=> confirmar({titulo:'Cancelar orden', peligro:true, ok:'Cancelar orden', texto:'La orden quedará cancelada.', alAceptar:()=>{ c.estado = 'Cancelada'; DB.guardar('compras', c); renderInventario(); }}));
     document.querySelectorAll('.co-foto').forEach(a=> a.onclick = e=>{ e.preventDefault(); const f = c.recepciones[Number(a.dataset.i)].foto; dialogo(`<img src="${f}" style="width:100%;border-radius:10px">`); });
@@ -6332,7 +6338,7 @@ function elegirClienteSimple(cb){
 }
 function enviarCatalogo(id){
   const tok = tokenCliente(id), c = clientes().find(x=> x.id===id); if(!c) return;
-  const abrir = ()=> window.open(urlWa(c.telefono, `Hola ${c.nombre}, te comparto *Cliente consentido Merkalimentos*, nuestro catálogo${Object.keys(c.preciosEspeciales||{}).length ? ' con tus precios especiales' : ''}. Desde ahí puedes hacer tu pedido y lo puedes agregar a tu pantalla de inicio:\n${linkCatalogo(tok)}`), '_blank');
+  const abrir = ()=> abrirWa(urlWa(c.telefono, `Hola ${c.nombre}, te comparto *Cliente consentido Merkalimentos*, nuestro catálogo${Object.keys(c.preciosEspeciales||{}).length ? ' con tus precios especiales' : ''}. Desde ahí puedes hacer tu pedido y lo puedes agregar a tu pantalla de inicio:\n${linkCatalogo(tok)}`));
   if(fbListo() && fbCfg().publica !== false){ if(!nubePendiente()) return abrir(); return publicarNubeConAviso(abrir); }
   if(fbListo()) return abrir();
   const publicado = (ghCfg().tokens || []).includes(tok);
@@ -6414,7 +6420,7 @@ function detallePedidoRec(id){
       <button class="btn ghost" data-a="x">Cerrar</button>
     </div>`);
   const act = (a, f)=>{ const b = bg.querySelector(`[data-a="${a}"]`); if(b) b.onclick = ()=>{ bg.remove(); f(); }; };
-  act('x', ()=>{}); act('wa', ()=> window.open(urlWa(p.cliente.telefono, `Hola ${p.cliente.nombre}, recibimos tu pedido por ${fmt(totalPedRec(p))}. ¡Gracias!`), '_blank'));
+  act('x', ()=>{}); act('wa', ()=> abrirWa(urlWa(p.cliente.telefono, `Hola ${p.cliente.nombre}, recibimos tu pedido por ${fmt(totalPedRec(p))}. ¡Gracias!`)));
   act('desc', ()=>{ marcarPedRec(p.id, 'Descartado'); current==='catalogo' ? renderCatalogo() : renderVenta(); });
   act('pre', ()=> cargarPedidoRec(p, 'preventa')); act('venta', ()=> cargarPedidoRec(p, 'venta'));
 }
@@ -6901,7 +6907,7 @@ function compartirOC(c){
     <div class="cd-acts"><button class="btn" data-a="pdf">${svg('share')}Compartir PDF</button><button class="btn ghost" data-a="wa">${svg('whatsapp')}Enviar por WhatsApp (texto)</button><button class="btn ghost" data-a="x">Listo</button></div>
     <p class="note-sm" style="text-align:left">La orden queda pendiente. Cuando llegue la mercancía, cárgala con su botón y toca "Registrar compra".</p>`);
   bg.querySelector('[data-a="x"]').onclick = ()=> bg.remove();
-  bg.querySelector('[data-a="wa"]').onclick = ()=> window.open(urlWa('', textoOC(c)), '_blank');
+  bg.querySelector('[data-a="wa"]').onclick = ()=> abrirWa(urlWa('', textoOC(c)));
   bg.querySelector('[data-a="pdf"]').onclick = async ()=>{
     let doc; try{ doc = pdfOrdenCompra(c); }catch(e){ toast('No se pudo generar el PDF'); return; }
     const nombre = limpiarNombreArchivo(`Orden de compra ${c.folio} ${c.proveedor}`) + '.pdf', blob = doc.output('blob'), file = new File([blob], nombre, {type:'application/pdf'});
@@ -7855,7 +7861,16 @@ function textoRecordatorio(cid){
     d.recibos.map(r=> `• Ticket ${r.folio} (${new Date(r.fecha).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}): ${fmt(r.saldo)}${r.credito?.fechaPago ? (diasVencido(r)>0 ? ' – vencido desde ' + dm(r.credito.fechaPago) : ' – vence ' + dm(r.credito.fechaPago)) : ''}`).join('\n') +
     `\nTotal: ${fmt(d.total)}\n¡Gracias por su preferencia!`;
 }
-const urlWa = (tel, txt) => `https://wa.me/${tel ? '52'+soloDigitos(tel) : ''}?text=${encodeURIComponent(txt)}`;
+/* WhatsApp: en Android se puede forzar WhatsApp Business (paquete com.whatsapp.w4b) */
+const waApp = ()=> store.get('config').waApp || 'business';
+const WA_PKG = {business:'com.whatsapp.w4b', normal:'com.whatsapp'};
+function urlWa(tel, txt){
+  const num = tel ? '52' + soloDigitos(tel) : '', web = `https://wa.me/${num}${txt ? '?text=' + encodeURIComponent(txt) : ''}`;
+  if(!/Android/i.test(navigator.userAgent) || !WA_PKG[waApp()]) return web;
+  const q = [num ? 'phone=' + num : '', txt ? 'text=' + encodeURIComponent(txt) : ''].filter(Boolean).join('&');
+  return `intent://send/?${q}#Intent;scheme=whatsapp;package=${WA_PKG[waApp()]};S.browser_fallback_url=${encodeURIComponent(web)};end`;
+}
+function abrirWa(url){ if(url.startsWith('intent:')) location.href = url; else window.open(url, '_blank'); }
 
 /* Estado de cuenta en PDF */
 function pdfEstadoCuenta(cid){
@@ -8071,7 +8086,7 @@ function renderCreditos(){
   if(credVista==='cliente'){
     const cid = credCli, c = cliDe(cid);
     $('ecAbono').onclick = ()=>{ credTicket = null; credVista = 'abono'; renderCreditos(); };
-    $('ecWa').onclick = ()=> window.open(urlWa(c.telefono, textoRecordatorio(cid)), '_blank');
+    $('ecWa').onclick = ()=> abrirWa(urlWa(c.telefono, textoRecordatorio(cid)));
     $('ecPdf').onclick = ()=> compartirEstadoCuenta(cid);
     $('ecProm').onclick = ()=> dialogoPromesa(cid);
     const cond = $('ecCond'); if(cond) cond.onclick = ()=>{ if(!clientes().some(x=>x.id===cid)){ toast('Este cliente ya no está en Clientes'); return; } credVista = 'condiciones'; renderCreditos(); };
@@ -8094,7 +8109,7 @@ function renderCreditos(){
   if(credVista==='hecho'){
     const a = ultimoAbono;
     $('ahPrint').onclick = ()=> imprimirRecibo(a);
-    const wa = $('ahWa'); if(wa) wa.onclick = ()=> window.open(urlWa(a.cliente.telefono, textoAbonoWa(a)), '_blank');
+    const wa = $('ahWa'); if(wa) wa.onclick = ()=> abrirWa(urlWa(a.cliente.telefono, textoAbonoWa(a)));
     $('ahOk').onclick = ()=>{ credCli = a.cliente.id; credVista = deudaCliente(a.cliente.id).total > 0 ? 'cliente' : 'inicio'; renderCreditos(); };
   }
   if(credVista==='reportes'){
