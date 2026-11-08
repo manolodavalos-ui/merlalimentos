@@ -194,6 +194,7 @@ main.flush{padding:0}
 .rl-t{display:flex;flex-direction:column}.rl-t small{color:var(--muted)}.rl-q{display:flex;flex-direction:column;align-items:flex-end;gap:3px}.rl-q b{font-size:1.05rem}
 .rl-det{grid-column:1/-1;margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--bg);font-size:.88rem}.rl-det div{display:flex;justify-content:space-between;padding:3px 0}.rl-det small{color:var(--muted)}
 .rl-fecha{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}.rl-fecha input{border:0;background:transparent;font:inherit;color:inherit;width:auto;max-width:130px}
+.cg-src{margin:0 0 8px}.cg-src.on{border-color:var(--brand);background:var(--brand-soft)}
 .rc-cli{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#f3f0ff}
 .rc-cli span{display:flex;flex-direction:column}.rc-cli small{color:var(--muted,#666)}
 .cg-tk{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;font:inherit;cursor:pointer}
@@ -1954,7 +1955,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.40';
+const APP_VERSION = '0.41';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3379,6 +3380,7 @@ function formClienteHTML(c){
     <div class="gfield"><label>Día de visita</label>
       <div class="dias" id="fDias">${DIAS.map(([k,t])=>`<button type="button" class="dia${dias.includes(k) && c.canal!=='FS'?' on':''}" data-d="${k}">${t}</button>`).join('')}<button type="button" class="dia fs${c.canal==='FS'?' on':''}" data-d="FS" title="Foodservice">FS</button></div>
       <p class="note-sm" style="text-align:left;margin-top:6px">FS = foodservice: se atiende solo cuando hace pedido, sin día de visita.</p>
+      <label class="nb-sw" style="margin-top:10px"><input type="checkbox" id="fRuta" ${c.ventaRuta?'checked':''}><span><b>Venta en ruta</b><small>No hace pedidos de preventa: se sube mercancía extra a la camioneta según su promedio de compra.</small></span></label>
     </div>
     <div class="cf-row">
       <div class="gfield"><label for="fNum">Número de cliente</label><input id="fNum" inputmode="numeric" maxlength="10" value="${esc(c.numero||'')}"></div>
@@ -3412,6 +3414,7 @@ function leerFormCliente(){
   return {
     diasVisita:[...document.querySelectorAll('#fDias .dia.on')].map(b=>b.dataset.d).filter(d=> d!=='FS'),
     canal: document.querySelector('#fDias .dia.fs.on') ? 'FS' : '',
+    ventaRuta: !!document.getElementById('fRuta')?.checked,
     numero:soloDigitos(v('fNum')), telefono:soloDigitos(v('fTel')), nombre:v('fNom'), tienda:v('fTien'),
     direccion:v('fDir'), colonia:v('fCol'), ciudad:v('fCiu'), estado:v('fEdo'), cp:soloDigitos(v('fCp')), referencia:v('fRef'),
     lat:cliBorrador.lat ?? null, lng:cliBorrador.lng ?? null,
@@ -4139,6 +4142,7 @@ function viewRelacion(){
         <label class="dia rl-fecha">Otro día <input type="date" id="rlFecha" value="${relDia}"></label></div>
       <div class="rl-res"><b>${fechaCorta(relDia)}</b><span>${R.peds.length} ${R.peds.length===1?'venta programada':'ventas programadas'} · ${fmt(R.total)} · ${R.ls.length} productos</span>
         ${R.ls.length ? (faltan.length ? `<span class="neg"><b>Faltan ${faltan.length} ${faltan.length===1?'producto':'productos'}</b> para cubrir el día</span>` : `<span class="pos"><b>El inventario alcanza para todo el día ✓</b></span>`) : ''}</div>
+      ${R.ls.length ? `<button class="btn" id="rlCargar" style="margin:12px 0 0">${svg('inventario')}Cargar a la camioneta</button>` : ''}
       ${R.ls.length ? `<div class="tk-acts" style="margin:10px 0 4px"><button class="btn ghost" id="rlFalta">${relSoloFalta ? 'Ver todos' : 'Solo faltantes'}</button><button class="btn ghost" id="rlShare">${svg('share')}Compartir</button></div>` : ''}
     </div>
     ${R.ls.length ? (filas || '<div class="rc-empty"><p>Todo alcanza ✓</p></div>') + `<p class="note-sm" style="padding:0 16px">"Hay" es el inventario actual de almacén más camioneta. Toca un producto para ver a qué clientes va.</p>`
@@ -4153,6 +4157,9 @@ function textoRelacion(){
 function bindRelacion(){
   document.querySelectorAll('[data-rd]').forEach(b=> b.onclick = ()=>{ relDia = b.dataset.rd; relAbierto = null; renderVenta(); });
   const f = document.getElementById('rlFecha'); if(f) f.onchange = ()=>{ if(f.value){ relDia = f.value; relAbierto = null; renderVenta(); } };
+  const rc = document.getElementById('rlCargar'); if(rc) rc.onclick = ()=>{
+    if(!turnoActual()){ toast('Abre un turno para registrar la carga'); return; }
+    const dia = relDia; go('inventario'); invVista = 'carga'; cargaDia = dia; invBorr = {}; alternarFuente('ped'); renderInventario(); window.scrollTo(0,0); };
   const sf = document.getElementById('rlFalta'); if(sf) sf.onclick = ()=>{ relSoloFalta = !relSoloFalta; renderVenta(); };
   const sh = document.getElementById('rlShare'); if(sh) sh.onclick = async ()=>{ const t = textoRelacion();
     try{ if(navigator.share){ await navigator.share({title:'Productos a entregar', text:t}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
@@ -5758,25 +5765,53 @@ function dialogoExistencia(pid, modo){
   pintar();
 }
 /* ----- Carga de camioneta ----- */
-function sugeridoPedidos(){
-  const out = {}, hoy = hoyClave();
-  DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega===hoy).forEach(p=> (p.lineas||[]).forEach(l=> out[l.pid] = r3((out[l.pid]||0) + l.cantidad)));
+function sugeridoPedidos(dia = hoyClave()){
+  const out = {};
+  DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega===dia).forEach(p=> (p.lineas||[]).forEach(l=> out[l.pid] = r3((out[l.pid]||0) + l.cantidad)));
   return out;
+}
+/* Venta en ruta: promedio de compra por visita (últimas 8 compras) de los clientes que no usan preventa */
+const claveDiaSemana = clave => { const [y,m,d] = clave.split('-').map(Number); return DIA_IDX[new Date(y, m-1, d).getDay()]; };
+function promedioCompra(cid, n = 8){
+  const rs = DB.recibos.filter(r=> r.cliente && r.cliente.id===cid && !anulado(r) && (r.lineas||[]).length).sort((a,b)=> fechaRec(b).localeCompare(fechaRec(a))).slice(0, n);
+  const out = {}; if(!rs.length) return {prom:out, visitas:0};
+  rs.forEach(r=> r.lineas.forEach(l=> out[l.pid] = (out[l.pid]||0) + Number(l.cantidad||0)));
+  Object.keys(out).forEach(pid=> out[pid] = out[pid] / rs.length);
+  return {prom:out, visitas:rs.length};
+}
+function extraRuta(dia = hoyClave()){
+  const k = claveDiaSemana(dia), cls = clientes().filter(c=> c.ventaRuta && (c.diasVisita||[]).includes(k)), out = {};
+  let conHist = 0;
+  cls.forEach(c=>{ const {prom, visitas} = promedioCompra(c.id); if(visitas) conHist++; Object.entries(prom).forEach(([pid, q])=> out[pid] = (out[pid]||0) + q); });
+  Object.keys(out).forEach(pid=>{ out[pid] = esKg(pid) ? Math.ceil(out[pid]*10)/10 : Math.ceil(out[pid] - 0.05); if(!(out[pid] > 0)) delete out[pid]; });
+  return {ext:out, clientes:cls.length, conHist};
+}
+let cargaDia = null, cargaFuentes = {ped:false, ruta:false};
+function alternarFuente(f){
+  const src = f==='ped' ? sugeridoPedidos(cargaDia) : extraRuta(cargaDia).ext, signo = cargaFuentes[f] ? -1 : 1;
+  invBorr = invBorr || {};
+  Object.entries(src).forEach(([pid, q])=>{ const v = r3((Number(invBorr[pid])||0) + signo*q); if(v > 0) invBorr[pid] = v; else delete invBorr[pid]; });
+  cargaFuentes[f] = !cargaFuentes[f];
 }
 function viewCarga(){
   const t = turnoActual();
   if(!t) return `<div class="card empty"><div class="big-icon">${svg('turno')}</div><h2>Abre un turno</h2><p class="sub">La carga de la camioneta se registra dentro del turno.</p><button class="btn" id="ivTurno">Abrir turno</button></div>`;
-  const sug = sugeridoPedidos(), nPed = DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega===hoyClave()).length;
+  if(!cargaDia) cargaDia = hoyClave();
+  const sug = sugeridoPedidos(cargaDia), nPed = DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega===cargaDia).length;
+  const ER = extraRuta(cargaDia), ext = ER.ext, nomDia = cargaDia===hoyClave() ? 'hoy' : cargaDia===manana() ? 'mañana' : fechaCorta(cargaDia);
   invBorr = invBorr || {};
   const q = invQ.trim().toLowerCase();
-  const arts = invArts().filter(a=> !q || nombreTicket(a).toLowerCase().includes(q) || invBorr[a.id] || sug[a.id]).sort((a,b)=> (!!(sug[b.id]||invBorr[b.id]) - !!(sug[a.id]||invBorr[a.id])));
+  const arts = invArts().filter(a=> !q || nombreTicket(a).toLowerCase().includes(q) || invBorr[a.id] || sug[a.id] || ext[a.id]).sort((a,b)=> (!!(sug[b.id]||ext[b.id]||invBorr[b.id]) - !!(sug[a.id]||ext[a.id]||invBorr[a.id])));
   return `<div class="rc-wrap inv">
     <div class="cr-pad" style="padding-top:12px">
       <p class="sub" style="margin:0 0 8px">Pasa mercancía del <b>almacén</b> a la <b>camioneta</b>. Las ventas de este turno se descontarán de la camioneta.</p>
-      ${nPed ? `<button class="btn ghost" id="cgPed" style="margin-top:0">${svg('preventa')}Llenar con ${nPed} ${nPed===1?'pedido':'pedidos'} de hoy</button>` : `<p class="note-sm" style="text-align:left;margin:0">No hay pedidos de preventa para entregar hoy.</p>`}
+      <div class="dias filtro" style="padding:0 0 10px;border:0">${[[hoyClave(),'Para hoy'],[manana(),'Para mañana']].map(([k,t])=>`<button class="dia${cargaDia===k?' on':''}" data-cd="${k}">${t}</button>`).join('')}</div>
+      <label class="nb-sw cg-src${cargaFuentes.ped?' on':''}"><input type="checkbox" id="cgPed" ${cargaFuentes.ped?'checked':''} ${nPed?'':'disabled'}><span><b>Ventas programadas de ${nomDia}</b><small>${nPed ? `${nPed} ${nPed===1?'venta':'ventas'} · ${Object.keys(sug).length} productos` : 'No hay ventas programadas para ese día'}</small></span></label>
+      <label class="nb-sw cg-src${cargaFuentes.ruta?' on':''}"><input type="checkbox" id="cgRuta" ${cargaFuentes.ruta?'checked':''} ${Object.keys(ext).length?'':'disabled'}><span><b>Extra para venta en ruta</b><small>${ER.clientes ? `${ER.clientes} ${ER.clientes===1?'cliente':'clientes'} de ruta ese día · promedio de sus últimas compras${ER.conHist < ER.clientes ? ` (${ER.clientes - ER.conHist} sin historial)` : ''}` : 'Marca en Clientes quiénes compran en ruta (no usan preventa)'}</small></span></label>
+      <p class="note-sm" style="text-align:left;margin:6px 0 0">Puedes cambiar cualquier cantidad a mano antes de cargar.</p>
     </div>
     <div class="rc-search">${svg('search')}<input id="ivQ" placeholder="Buscar producto" value="${esc(invQ)}" autocomplete="off"></div>
-    ${arts.map(a=>`<div class="inv-in"><span><b>${esc(nombreTicket(a))}</b><small>almacén ${fmtCant(a.id, stockEn('almacen', a.id))}${sug[a.id]?` · <span class="pos">pedidos ${fmtCant(a.id, sug[a.id])}</span>`:''}${stockEn('camioneta', a.id)?` · a bordo ${fmtCant(a.id, stockEn('camioneta', a.id))}`:''}</small></span>
+    ${arts.map(a=>`<div class="inv-in"><span><b>${esc(nombreTicket(a))}</b><small>almacén ${fmtCant(a.id, stockEn('almacen', a.id))}${sug[a.id]?` · <span class="pos">pedidos ${fmtCant(a.id, sug[a.id])}</span>`:''}${ext[a.id]?` · <span class="pos">ruta ${fmtCant(a.id, ext[a.id])}</span>`:''}${stockEn('camioneta', a.id)?` · a bordo ${fmtCant(a.id, stockEn('camioneta', a.id))}`:''}</small></span>
       <input type="number" inputmode="decimal" min="0" step="${a.porKilo?'0.001':'1'}" data-pid="${a.id}" value="${invBorr[a.id]||''}" placeholder="0"></div>`).join('')}
     <div class="inv-foot"><span id="cgRes"></span><button class="btn" id="cgOk">Cargar</button></div>
   </div>`;
@@ -5793,7 +5828,7 @@ function confirmarCarga(){
     const ref = `Carga ${(t.cargas||[]).length+1} · turno ${t.folio}`;
     moverStock(ls.flatMap(([pid,q])=> [{ub:'almacen', pid, cant:-q}, {ub:'camioneta', pid, cant:q}]), 'carga', ref);
     t.camioneta = true; t.cargas = [...(t.cargas||[]), {fecha:new Date().toISOString(), usuario:session.usuario, lineas:ls.map(([pid,q])=>({pid, cantidad:q}))}];
-    store.set('turno', t); invBorr = null; invQ = ''; invVista = 'inicio'; renderInventario(); toast(`Camioneta cargada · ${ls.length} productos`);
+    store.set('turno', t); invBorr = null; invQ = ''; invVista = 'inicio'; cargaDia = null; cargaFuentes = {ped:false, ruta:false}; renderInventario(); toast(`Camioneta cargada · ${ls.length} productos`);
   };
   if(falta.length) return confirmar({titulo:'Más de lo que hay en almacén', ok:'Cargar de todos modos',
     texto:`${falta.length===1?'Este producto queda':'Estos productos quedan'} en negativo en almacén:<br>${falta.slice(0,6).map(([pid,q])=> `• ${esc(nombreTicket(artPorId(pid)))}: hay ${fmtCant(pid, stockEn('almacen',pid))}`).join('<br>')}<br><br>Revisa o haz un conteo del almacén.`, alAceptar: hacer});
@@ -6108,7 +6143,9 @@ function renderInventario(){
     on('ivTurno', ()=> go('turno')); buscar();
     const pinta = ()=>{ const r = resumenBorr(); $('cgRes').innerHTML = r.n ? `${r.n} productos · ${fmt(r.valor)}` : 'Nada por cargar'; };
     document.querySelectorAll('.inv-in input').forEach(i=> i.oninput = ()=>{ leerBorr(); pinta(); });
-    on('cgPed', ()=>{ const s = sugeridoPedidos(); invBorr = {...invBorr, ...s}; renderInventario(); toast('Cantidades de pedidos cargadas'); });
+    const cp = $('cgPed'); if(cp) cp.onchange = ()=>{ leerBorr(); alternarFuente('ped'); renderInventario(); };
+    const cr = $('cgRuta'); if(cr) cr.onchange = ()=>{ leerBorr(); alternarFuente('ruta'); renderInventario(); };
+    document.querySelectorAll('[data-cd]').forEach(b=> b.onclick = ()=>{ if(b.dataset.cd===cargaDia) return; leerBorr(); if(cargaFuentes.ped) alternarFuente('ped'); if(cargaFuentes.ruta) alternarFuente('ruta'); cargaDia = b.dataset.cd; renderInventario(); });
     on('cgOk', ()=>{ leerBorr(); confirmarCarga(); }); if($('cgRes')) pinta();
   }
   if(invVista==='liquidacion'){
@@ -8144,7 +8181,7 @@ function go(id){
   else if(id==='mapa'){ mapaDia = null; renderMapa(); }
   else if(id==='compras'){ compDia = compDia || hoyClave(); renderCompras(); }
   else if(id==='informes'){ infTab = 'resumen'; infAbierto = null; renderInformes(); }
-  else if(id==='inventario'){ invVista = 'inicio'; invBorr = null; invQ = ''; invFiltro = 'todos'; renderInventario(); }
+  else if(id==='inventario'){ invVista = 'inicio'; invBorr = null; invQ = ''; invFiltro = 'todos'; cargaDia = null; cargaFuentes = {ped:false, ruta:false}; renderInventario(); }
   else if(id==='creditos'){ credVista = 'inicio'; credCli = null; credFiltro = 'todos'; credQ = ''; renderCreditos(); }
   else if(esVenta){ ventaVista = id==='preventa' ? 'inicioPre' : id==='cotizar' ? 'inicioCot' : 'grid'; renderVenta(); }
   else{
