@@ -1946,7 +1946,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.39.1';
+const APP_VERSION = '0.39.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -6303,11 +6303,14 @@ function fbEscucharPedidos(){
   if(fbUnsub || !fbUser) return;
   const q = FB.query(FB.collection(fbDb, 'pedidos'), FB.where('creado', '>=', FB.Timestamp.fromMillis(Date.now() - 7*864e5)));
   fbUnsub = FB.onSnapshot(q, snap=>{
-    fbVivo = true; fbError = '';
+    const antes = fbVivo; fbVivo = true; fbError = '';
+    if(!antes && current==='config' && cfgVista==='nube') renderConfig(true);
     const nuevos = [];
     snap.docChanges().forEach(ch=>{ if(ch.type==='removed') return; const r = recibirPedidoNube(ch.doc.data()); if(r) nuevos.push(r); });
     if(nuevos.length) avisarPedidos(nuevos);
-  }, e=>{ fbVivo = false; fbUnsub = null; fbError = fbMsgError(e); if(current==='config' && cfgVista==='nube') renderConfig(true); });
+  }, e=>{ fbVivo = false; fbUnsub = null; fbError = fbMsgError(e); console.warn('pedidos nube', e);
+    if(current==='config' && cfgVista==='nube') renderConfig(true);
+    clearTimeout(fbEscucharPedidos.t); fbEscucharPedidos.t = setTimeout(fbEscucharPedidos, 30000); });
 }
 function recibirPedidoNube(d){
   if(!d || !d.id || !Array.isArray(d.l)) return null;
