@@ -195,6 +195,7 @@ main.flush{padding:0}
 .rl-det{grid-column:1/-1;margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--bg);font-size:.88rem}.rl-det div{display:flex;justify-content:space-between;padding:3px 0}.rl-det small{color:var(--muted)}
 .rl-fecha{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}.rl-fecha input{border:0;background:transparent;font:inherit;color:inherit;width:auto;max-width:130px}
 .cg-src{margin:0 0 8px}.cg-src.on{border-color:var(--brand);background:var(--brand-soft)}
+.ec-dias{padding:0 0 10px;margin:0 -4px;border:0}
 .rc-cli{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#f3f0ff}
 .rc-cli span{display:flex;flex-direction:column}.rc-cli small{color:var(--muted,#666)}
 .cg-tk{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;font:inherit;cursor:pointer}
@@ -1955,7 +1956,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.41.1';
+const APP_VERSION = '0.41.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -6328,13 +6329,21 @@ async function publicarConAviso(despues){
 }
 
 /* ----- Enviar catálogo ----- */
+let ecDia = '';
 function elegirClienteSimple(cb){
-  const bg = dialogo(`<h3>Enviar catálogo a…</h3><input class="field" id="ecQ" placeholder="Buscar cliente" autocomplete="off"><div class="ea-list" id="ecL"></div>`);
+  const bg = dialogo(`<h3>Enviar catálogo a…</h3>
+    <div class="dias filtro ec-dias" id="ecDias">${[['','Todos'], ...DIAS, ['FS','FS']].map(([k,t])=>`<button class="dia${k===ecDia?' on':''}${k==='FS'?' fs':''}" data-d="${k}">${t}${k && k===diaHoy()?' ·':''}</button>`).join('')}</div>
+    <input class="field" id="ecQ" placeholder="Buscar cliente" autocomplete="off"><div class="ea-list" id="ecL"></div>`);
   const pintar = ()=>{ const q = bg.querySelector('#ecQ').value;
-    bg.querySelector('#ecL').innerHTML = clientes().filter(c=> coincideBusqueda([c.nombre, c.tienda, c.numero, c.colonia].filter(Boolean).join(' '), q)).sort((a,b)=> (a.tienda||a.nombre).localeCompare(b.tienda||b.nombre,'es')).slice(0,80)
-      .map(c=>`<button class="ea-row" data-id="${c.id}"><b>${esc(c.tienda || c.nombre)}</b><small>${c.tienda?esc(c.nombre)+' · ':''}${c.telefono ? esc(c.telefono) : 'sin teléfono'}${Object.keys(c.preciosEspeciales||{}).length ? ' · precios especiales' : ''}</small></button>`).join('') || '<p class="note-sm">Sin resultados</p>';
+    const ls = clientes().filter(c=> !ecDia || (ecDia==='FS' ? c.canal==='FS' : (c.diasVisita||[]).includes(ecDia)))
+      .filter(c=> coincideBusqueda([c.nombre, c.tienda, c.numero, c.colonia].filter(Boolean).join(' '), q))
+      .sort((a,b)=> ecDia && ecDia!=='FS' ? ((a.orden||999)-(b.orden||999)) || (a.tienda||a.nombre).localeCompare(b.tienda||b.nombre,'es') : (a.tienda||a.nombre).localeCompare(b.tienda||b.nombre,'es'));
+    bg.querySelector('#ecL').innerHTML = (ecDia ? `<p class="note-sm" style="text-align:left;margin:4px 0">${ls.length} ${ls.length===1?'cliente':'clientes'}${ecDia!=='FS' ? ' en orden de ruta' : ''}</p>` : '') + (ls.slice(0, ecDia ? 300 : 80)
+      .map(c=>`<button class="ea-row" data-id="${c.id}"><b>${esc(c.tienda || c.nombre)}</b><small>${c.tienda?esc(c.nombre)+' · ':''}${c.telefono ? esc(c.telefono) : 'sin teléfono'}${Object.keys(c.preciosEspeciales||{}).length ? ' · precios especiales' : ''}</small></button>`).join('') || '<p class="note-sm">Sin resultados</p>');
     bg.querySelectorAll('.ea-row').forEach(r=> r.onclick = ()=>{ bg.remove(); cb(r.dataset.id); }); };
-  bg.querySelector('#ecQ').oninput = pintar; pintar(); setTimeout(()=> bg.querySelector('#ecQ').focus(), 50);
+  bg.querySelectorAll('#ecDias .dia').forEach(b=> b.onclick = ()=>{ ecDia = b.dataset.d; bg.querySelectorAll('#ecDias .dia').forEach(x=> x.classList.toggle('on', x===b)); pintar(); });
+  bg.querySelector('#ecQ').oninput = pintar; pintar();
+  setTimeout(()=>{ const on = bg.querySelector('#ecDias .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'}); }, 30);
 }
 function enviarCatalogo(id){
   const tok = tokenCliente(id), c = clientes().find(x=> x.id===id); if(!c) return;
