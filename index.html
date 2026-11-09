@@ -202,6 +202,9 @@ main.flush{padding:0}
 .sc-bar{height:6px;border-radius:9px;background:var(--bg);margin:8px 0;overflow:hidden}.sc-bar i{display:block;height:100%;background:var(--brand)}
 .sc-sig span{display:flex;flex-direction:column;font-size:.82rem;color:var(--muted)}.sc-sig b{font-size:1.05rem;color:var(--ink,#111)}
 .sc-acts{display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:10px}.sc-acts .btn{margin:0;display:flex;align-items:center;justify-content:center;gap:8px}.sc-acts .btn svg{width:20px;height:20px;stroke:currentColor}.sc-acts:has(#scFin){grid-template-columns:1fr}
+.cl-prog{display:inline-block;margin-top:5px;font-size:.74rem;font-weight:600;padding:3px 9px;border-radius:20px;background:#eef0ef;color:#8a918d;width:fit-content}
+.cl-prog.on{background:#fff1d6;color:#9a5b00;border:1px solid #f3c56b;cursor:pointer}
+.cl-gps-t{display:block;font-size:.72rem;color:var(--muted);margin-top:1px}
 .rc-cli{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#f3f0ff}
 .rc-cli span{display:flex;flex-direction:column}.rc-cli small{color:var(--muted,#666)}
 .cg-tk{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;font:inherit;cursor:pointer}
@@ -1962,7 +1965,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.42';
+const APP_VERSION = '0.42.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2786,7 +2789,10 @@ function renderVenta(){
     else if(ventaVista==='programado') bindProgramado();
     else if(ventaVista==='inicioPre') bindInicioPre();
     else if(ventaVista==='relacion') bindRelacion();
-    else if(ventaVista==='pedidoDet'){ const e = document.getElementById('pdEditar'); if(e) e.onclick = ()=> editarPedidoProg(pedidoSel); const c = document.getElementById('pdCancelar'); if(c) c.onclick = ()=> cancelarPedidoProg(pedidoSel); }
+    else if(ventaVista==='pedidoDet'){ const e = document.getElementById('pdEditar'); if(e) e.onclick = ()=> editarPedidoProg(pedidoSel); const c = document.getElementById('pdCancelar'); if(c) c.onclick = ()=> cancelarPedidoProg(pedidoSel);
+      const pp = ()=> ({...DB.pedidos.find(x=> x.id===pedidoSel), esPedido:true});
+      const im = document.getElementById('pdImprimir'); if(im) im.onclick = ()=> imprimirRecibo(pp());
+      const cm = document.getElementById('pdCompartir'); if(cm) cm.onclick = ()=> compartirRecibo(pp()); }
     else if(ventaVista==='recibidos'){ document.querySelectorAll('.pr-row').forEach(b=> b.onclick = ()=> detallePedidoRec(b.dataset.id)); document.getElementById('prPegar').onclick = pegarPedido; }
     else if(ventaVista==='pedidos'){
       document.querySelectorAll('[data-ped]').forEach(el=> el.onclick = ()=>{ pedidoSel = el.dataset.ped; ventaVista = 'pedidoDet'; renderVenta(); });
@@ -3282,11 +3288,18 @@ function abrirSelectorCliente({alElegir, alCancelar} = {}){
     const conUb = clientes().filter(tieneUbicacion).length;
     if(!clientes().length) return '';
     if(!conUb) return `${svg('geocerca')}Ningún cliente tiene ubicación marcada; se ordenan por nombre.`;
-    if(estadoPos==='ok') return `${svg('gps')}Más cercanos primero (${conUb} con ubicación)`;
+    if(estadoPos==='ok'){ const min = ultimaPos ? Math.floor((Date.now() - ultimaPos.t)/60000) : 0;
+      return `${svg('gps')}<span>Más cercanos primero (${conUb} con ubicación)<small class="cl-gps-t">${min < 1 ? 'ubicación de hace un momento' : `ubicación de hace ${min} min`}${ultimaPos && ultimaPos.prec ? ` · ±${Math.round(ultimaPos.prec)} m` : ''}</small></span><b class="cl-near-go">⟳ Actualizar GPS</b>`; }
     if(estadoPos==='buscando' || estadoPos==='pendiente') return `${svg('gps')}Buscando tu ubicación para ordenar por cercanía…`;
     if(estadoPos==='denegado') return `${svg('gps')}<span>Activa el permiso de ubicación para ver primero los clientes cercanos.</span><b class="cl-near-go">Activar</b>`;
     return `${svg('gps')}<span>No se pudo obtener tu ubicación; se ordenan por nombre.</span><b class="cl-near-go">Reintentar</b>`;
   };
+  const progDe = {}; DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega >= hoyClave()).sort((a,b)=> a.fechaEntrega.localeCompare(b.fechaEntrega))
+    .forEach(p=>{ const k = p.cliente?.id; if(k) (progDe[k] = progDe[k] || []).push(p); });
+  const chipProg = c=>{ const ps = progDe[c.id];
+    if(!ps) return `<span class="cl-prog">Sin venta programada</span>`;
+    const p = ps[0], cuando = p.fechaEntrega===hoyClave() ? 'hoy' : p.fechaEntrega===manana() ? 'mañana' : fechaCorta(p.fechaEntrega);
+    return `<span class="cl-prog on" data-ped="${p.id}" role="button">Venta programada · ${cuando} · ${fmt(p.total)}${ps.length > 1 ? ` (+${ps.length-1})` : ''}</span>`; };
   const lista = ()=>{
     const qq = q.trim().toLowerCase();
     const pos = estadoPos==='ok' ? ultimaPos : null;
@@ -3294,7 +3307,7 @@ function abrirSelectorCliente({alElegir, alCancelar} = {}){
       .map(c=> ({c, d: pos && tieneUbicacion(c) ? distanciaKm(pos, {lat:Number(c.lat), lng:Number(c.lng)}) : null}))
       .sort((a,b)=> (a.d==null) - (b.d==null) || (a.d!=null ? a.d - b.d : 0) || a.c.nombre.localeCompare(b.c.nombre,'es'));
     return ls.length ? ls.map(({c,d})=>`<button class="cl-row" data-id="${c.id}"><span class="cl-av">${esc(c.nombre.trim()[0]||'?').toUpperCase()}</span>
-        <span class="cl-txt"><b>${esc(c.nombre)}${c.tienda?' · '+esc(c.tienda):''}</b><small>${esc([c.numero?'#'+c.numero:'', c.telefono, c.colonia||c.direccion].filter(Boolean).join(' · ') || 'Sin datos de contacto')}</small></span>
+        <span class="cl-txt"><b>${esc(c.nombre)}${c.tienda?' · '+esc(c.tienda):''}</b><small>${esc([c.numero?'#'+c.numero:'', c.telefono, c.colonia||c.direccion].filter(Boolean).join(' · ') || 'Sin datos de contacto')}</small>${chipProg(c)}</span>
         ${d!=null ? `<span class="cl-dist">${fmtDist(d)}</span>` : ''}</button>`).join('')
       : `<div class="cl-empty">${clientes().length ? 'No hay clientes que coincidan.' : 'Aún no tienes clientes registrados.'}</div>`;
   };
@@ -3307,9 +3320,10 @@ function abrirSelectorCliente({alElegir, alCancelar} = {}){
     inp.oninput = ()=>{ q = inp.value; body.querySelector('#clList').innerHTML = lista(); bindRows(); };
     body.querySelector('#clNuevo').onclick = ()=> pintarForm(q);
     body.querySelector('#clNear').onclick = ()=>{
-      if(estadoPos==='ok' || !clientes().some(tieneUbicacion)) return;
+      if(!clientes().some(tieneUbicacion) || estadoPos==='buscando') return;
       const n = body.querySelector('#clNear'); estadoPos = 'buscando'; n.innerHTML = estadoCercania();
       pedirPermisoUbicacion(()=>{
+        const l0 = body.querySelector('#clList'); if(l0) l0.scrollTop = 0;
         if(!bg.isConnected) return;
         n.innerHTML = estadoCercania();
         const l = body.querySelector('#clList'); if(l){ l.innerHTML = lista(); bindRows(); }
@@ -3317,9 +3331,11 @@ function abrirSelectorCliente({alElegir, alCancelar} = {}){
     };
     bindRows();
   };
-  const bindRows = ()=> body.querySelectorAll('.cl-row').forEach(r=> r.onclick = ()=>{
-    asignarCliente(clientes().find(c=>c.id===r.dataset.id)); cerrar(true);
-  });
+  const bindRows = ()=>{ body.querySelectorAll('.cl-row').forEach(r=> r.onclick = e=>{
+      const ch = e.target.closest('.cl-prog.on');
+      if(ch){ e.stopPropagation(); bg.remove(); pedidoSel = ch.dataset.ped; ventaVista = 'pedidoDet'; if(!enVenta()) go('preventa'); renderVenta(); return; }
+      asignarCliente(clientes().find(c=>c.id===r.dataset.id)); cerrar(true);
+    }); };
   const pintarForm = (nombreInicial='')=>{
     body.innerHTML = `<div class="cl-form">
       <p class="sub" style="margin-bottom:14px">Alta rápida. Completa los demás datos después en Clientes.</p>
@@ -4201,6 +4217,7 @@ function viewPedidoDet(){
     <div class="rd-lines">${lineas}</div>${lineasDevHTML(p)}
     <div class="rd-tot"><span>Total</span><b>${fmt(p.total)}</b></div>
     ${p.estado==='Programado' ? `<div class="tk-acts" style="margin:16px 0 8px"><button class="btn ghost" id="pdEditar">Editar venta</button><button class="btn ghost danger-o" id="pdCancelar">Cancelar venta</button></div>` : ''}
+    <div class="tk-acts" style="margin:${p.estado==='Programado' ? '0' : '16px'} 0 8px"><button class="btn ghost" id="pdImprimir">${svg('recibos')}Imprimir</button><button class="btn ghost" id="pdCompartir">${svg('share')}Compartir</button></div>
   </div>`;
 }
 let pedVerCanc = false;
@@ -4656,7 +4673,8 @@ function lineasTicket(r){
   if(c.sub) L.push({t:centro(c.sub)});
   if(c.tel) L.push({t:centro('WhatsApp ' + c.tel)});
   L.push({t:sep});
-  L.push({t:dos('Recibo', '#' + r.folio)});
+  L.push({t:dos(r.esPedido ? 'Venta programada' : 'Recibo', '#' + r.folio)});
+  if(r.esPedido && r.fechaEntrega){ L.push({t:dos('Entrega', r.fechaEntrega.split('-').reverse().join('/'))}); if(r.horario && !/cualquier/i.test(r.horario)) L.push({t:dos('Horario', r.horario.slice(0, W-9))}); }
   if(r.version > 1) L.push({t:dos('Version', String(r.version))});
   L.push({t:dos('Fecha', new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'}))});
   L.push({t:dos('Vendedor', (r.vendedor||'').slice(0, W-10))});
