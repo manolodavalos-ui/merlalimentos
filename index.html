@@ -1971,7 +1971,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.44';
+const APP_VERSION = '0.44.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -5556,7 +5556,8 @@ function fechaDeDia(k){   /* fecha de ese día en la semana actual (lunes a domi
 function atendidoEn(c, clave){
   const venta = DB.recibos.find(r=> r.cliente && r.cliente.id===c.id && !r.cancelado && !r.reemplazadoPor && hoyClave(new Date(r.fecha))===clave);
   const pedido = DB.pedidos.find(p=> p.cliente && p.cliente.id===c.id && p.estado!=='Cancelado' && hoyClave(new Date(p.fecha))===clave);
-  return venta ? {tipo:'Venta', ref:venta} : pedido ? {tipo:'Pedido', ref:pedido} : null;
+  const visita = !venta && !pedido && DB.visitas.find(v=> v.cliente && v.cliente.id===c.id && hoyClave(new Date(v.fecha))===clave);
+  return venta ? {tipo:'Venta', ref:venta} : pedido ? {tipo:'Pedido', ref:pedido} : visita ? {tipo:'Visitado', ref:visita} : null;
 }
 function clientesDelDia(k){
   const clave = hoyClave(fechaDeDia(k));
@@ -5592,7 +5593,7 @@ function viewMapa(){
     <div class="mp-list">
       ${ls.map(x=>`<button class="mp-row" data-cid="${x.c.id}">
         <span class="mp-n" style="background:${x.color}">${x.n}</span>
-        <span class="mp-t"><b>${esc(x.c.tienda || x.c.nombre)}</b><small>${esc([x.c.tienda?x.c.nombre:'', x.c.colonia].filter(Boolean).join(' · '))}${x.at?` · <span class="pos">${x.at.tipo} ${fmt(x.at.ref.total)}</span>`:''}${x.cobro?` · <b style="color:${x.color}">debe ${fmt(x.cobro.saldo)}</b>`:''}</small></span>
+        <span class="mp-t"><b>${esc(x.c.tienda || x.c.nombre)}</b><small>${esc([x.c.tienda?x.c.nombre:'', x.c.colonia].filter(Boolean).join(' · '))}${x.at?` · <span class="pos">${x.at.tipo} ${x.at.tipo==='Visitado' ? esc(x.at.ref.motivo) : fmt(x.at.ref.total)}</span>`:''}${x.cobro?` · <b style="color:${x.color}">debe ${fmt(x.cobro.saldo)}</b>`:''}</small></span>
         ${tieneUbicacion(x.c) ? '' : `<span class="mp-sin">Sin ubicación</span>`}
       </button>`).join('')}
     </div>
@@ -5618,7 +5619,7 @@ function popupCliente(x){
   if(x.cobro) return popupCobro(x);
   const c = x.c;
   return `<div class="mp-pop">
-    <span class="mp-est" style="background:${x.at?COLOR_OK:COLOR_PEND}">${x.at ? 'Atendido · '+x.at.tipo+' '+fmt(x.at.ref.total) : 'Por atender'}</span>
+    <span class="mp-est" style="background:${x.at?COLOR_OK:COLOR_PEND}">${x.at ? (x.at.tipo==='Visitado' ? 'Visitado · ' + esc(x.at.ref.motivo) : 'Atendido · '+x.at.tipo+' '+fmt(x.at.ref.total)) : 'Por atender'}</span>
     <b>${x.n}. ${esc(c.tienda || c.nombre)}</b>
     ${c.tienda ? `<small>${esc(c.nombre)}</small>` : ''}
     <small>${esc([c.direccion, c.colonia].filter(Boolean).join(', ') || 'Sin dirección')}</small>
