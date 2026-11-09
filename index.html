@@ -1965,7 +1965,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.42.1';
+const APP_VERSION = '0.42.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2981,8 +2981,9 @@ function avisoSinExistencia(lineas){
   bg.innerHTML = `<div class="dialog" role="alertdialog" aria-labelledby="dlgT">
     <div class="dlg-icon">${svg('alert')}</div>
     <h3 id="dlgT">${lineas.length===1 ? 'Producto sin existencia' : 'Productos sin existencia'}</h3>
-    <p class="sub">${lineas.length===1 ? 'Este producto tiene' : 'Estos productos tienen'} existencia 0 en el inventario:</p>
-    <ul class="dlg-list">${lineas.map(l=>`<li><span>${esc(l.nombre)}</span><b>${fmtExist(existencia(l.pid))}</b></li>`).join('')}</ul>
+    <p class="sub">${ubVenta()==='camioneta' ? `La camioneta está cargada, así que se vende desde la <b>camioneta</b>, y ahí no hay existencia:` : `${lineas.length===1 ? 'Este producto tiene' : 'Estos productos tienen'} existencia 0 en el <b>almacén</b>:`}</p>
+    <ul class="dlg-list">${lineas.map(l=>`<li><span>${esc(nombreTk(l))}${ubVenta()==='camioneta' && stockEn('almacen', l.pid) > 0 ? `<small class="pos" style="display:block">hay ${fmtCant(l.pid, stockEn('almacen', l.pid))} en almacén</small>` : ''}</span><b>${fmtExist(existencia(l.pid))}</b></li>`).join('')}</ul>
+    ${ubVenta()==='camioneta' && lineas.some(l=> stockEn('almacen', l.pid) > 0) ? `<p class="note-sm" style="text-align:left">Si lo vas a vender del almacén, súbelo a la camioneta en Inventario → Agregar carga, o liquida la camioneta si ya regresaste.</p>` : ''}
     <p class="q">¿Deseas continuar con el cobro?</p>
     <div class="sheet-actions">
       <button class="btn ghost" id="dCancel">Cancelar</button>
