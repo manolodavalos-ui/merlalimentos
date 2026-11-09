@@ -205,6 +205,7 @@ main.flush{padding:0}
 .cl-prog{display:inline-block;margin-top:5px;font-size:.74rem;font-weight:600;padding:3px 9px;border-radius:20px;background:#eef0ef;color:#8a918d;width:fit-content}
 .cl-prog.on{background:#fff1d6;color:#9a5b00;border:1px solid #f3c56b;cursor:pointer}
 .cl-gps-t{display:block;font-size:.72rem;color:var(--muted);margin-top:1px}
+.pd-ent{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:var(--brand-soft);color:var(--brand);font-size:.9rem}
 .rc-cli{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#f3f0ff}
 .rc-cli span{display:flex;flex-direction:column}.rc-cli small{color:var(--muted,#666)}
 .cg-tk{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;font:inherit;cursor:pointer}
@@ -1965,7 +1966,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.42.2';
+const APP_VERSION = '0.43';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2758,6 +2759,7 @@ function viewTicket(){
       <div>${fmt(importeLinea(l))}</div>
     </div>`).join('');
   return `<div class="ticket-wrap">
+    ${t.entregaPedido ? `<div class="pd-edit">Entregando la venta programada <b>#${esc(t.entregaFolio || '')}</b>: puedes ajustar cantidades antes de cobrar. <button class="lnk" id="tkDescartarEnt">Dejarla pendiente</button></div>` : ''}
     ${t.editPedido ? `<div class="pd-edit">Editando la venta <b>#${esc(t.editFolio || '')}</b>: agrega, quita o cambia cantidades y toca Programar. <button class="lnk" id="tkDescartarEd">Descartar cambios</button></div>` : ''}
     ${t.nombre ? `<div class="tk-name">${svg('recibos')}<div><b>${esc(t.nombre)}</b>${t.comentario?`<small>${esc(t.comentario)}</small>`:''}</div></div>` : ''}
     <div class="tk-cli">${barraCliente()}</div>
@@ -2790,6 +2792,7 @@ function renderVenta(){
     else if(ventaVista==='inicioPre') bindInicioPre();
     else if(ventaVista==='relacion') bindRelacion();
     else if(ventaVista==='pedidoDet'){ const e = document.getElementById('pdEditar'); if(e) e.onclick = ()=> editarPedidoProg(pedidoSel); const c = document.getElementById('pdCancelar'); if(c) c.onclick = ()=> cancelarPedidoProg(pedidoSel);
+      const en = document.getElementById('pdEntregar'); if(en) en.onclick = ()=> entregarPedidoProg(pedidoSel);
       const pp = ()=> ({...DB.pedidos.find(x=> x.id===pedidoSel), esPedido:true});
       const im = document.getElementById('pdImprimir'); if(im) im.onclick = ()=> imprimirRecibo(pp());
       const cm = document.getElementById('pdCompartir'); if(cm) cm.onclick = ()=> compartirRecibo(pp()); }
@@ -2822,6 +2825,7 @@ function renderVenta(){
   bindAccionesTicket();
   if(ventaVista==='ticket'){
     const dEd = document.getElementById('tkDescartarEd'); if(dEd) dEd.onclick = cancelarEdicionPedido;
+    const dEn = document.getElementById('tkDescartarEnt'); if(dEn) dEn.onclick = ()=> confirmar({titulo:'Dejar pendiente', ok:'Dejar pendiente', texto:'Se vacía este ticket y la venta programada sigue sin entregar.', alAceptar:()=>{ guardarTicket({lineas:[]}); renderVenta(); }});
     view.querySelectorAll('.tline:not(.dev)').forEach(el=> el.onclick = ()=> editarLinea(el.dataset.lid));
     view.querySelectorAll('.tline.dev').forEach(el=> el.onclick = ()=> quitarDevolucion(el.dataset.did));
     const da = document.getElementById('devAdd'); if(da) da.onclick = abrirDevolucion;
@@ -3105,12 +3109,13 @@ function registrarVenta(metodo, recibido, credito, opts = {}){
     const ab = abonarDevolucion(recibo, -total);
     if(ab){ recibo.devAbonada = ab.monto; recibo.abonoDevId = ab.id; recibo.cambio = r2(-total - ab.monto); }
   }
+  if(t.entregaPedido) cerrarEntregaPedido(t, recibo);
   DB.guardarRecibo(recibo);
   descontarInventario(t.lineas, recibo);
   moverDevoluciones(recibo.devoluciones, 1, '#' + recibo.folio);
   guardarTicket({lineas:[]});
   ultimoRecibo = recibo;
-  if(impCfg().auto) setTimeout(()=> imprimirRecibo(recibo, {cajon: metodo==='Efectivo'}), 400);
+  if(impCfg().auto || t.entregaPedido) setTimeout(()=> imprimirRecibo(recibo, {cajon: metodo==='Efectivo'}), 400);
   else if(metodo==='Efectivo') abrirCajonSiAplica();
   ventaVista = 'hecho'; renderVenta();
 }
@@ -3119,8 +3124,8 @@ function viewHecho(){
   const r = ultimoRecibo;
   return `<div class="cobro">
     <div class="hecho-ok">${svg('check')}</div>
-    <h2 class="hecho-t">Venta registrada</h2>
-    <p class="hecho-f">Recibo ${esc(r.folio)}</p>
+    <h2 class="hecho-t">${r.pedido ? 'Venta entregada' : 'Venta registrada'}</h2>
+    <p class="hecho-f">Recibo ${esc(r.folio)}${r.pedido ? ` · venta programada #${esc(r.pedido)}` : ''}</p>
     ${r.metodo==='Efectivo' && r.cambio > 0 ? `<div class="cobro-total"><span class="lbl">${r.total < 0 ? 'Devuelve al cliente' : 'Cambio'}</span><span class="big">${fmt(r.cambio)}</span></div>` : ''}
     <dl class="meta">
       <dt>Forma de pago</dt><dd>${esc(r.metodo)}</dd>
@@ -4095,6 +4100,24 @@ function editarPedidoProg(id){
   }
   ventaVista = 'ticket'; renderVenta(); toast(`Editando la venta #${p.folio}: agrega o cambia productos y toca Programar`);
 }
+/* Entregar: la venta programada pasa al ticket de venta, se cobra, descuenta inventario y se imprime */
+function entregarPedidoProg(id){
+  const p = DB.pedidos.find(x=> x.id===id); if(!p || p.estado!=='Programado') return;
+  if(!turnoActual()){ toast('Abre un turno para entregar la venta'); return; }
+  const tv = store.get('ticket', {lineas:[]});
+  if(tv.lineas.length && tv.entregaPedido !== p.id){ toast('Tienes un ticket de venta en curso: cóbralo, guárdalo o vacíalo primero'); return; }
+  const lineas = (p.lineas||[]).map(l=>{ const {costo, ...x} = l; if(!x.especial) delete x.promoRegla; return x; });
+  store.set('ticket', {lineas, cliente:p.cliente, devoluciones:JSON.parse(JSON.stringify(p.devoluciones||[])), preguntado:true, nombre:p.ticketNombre || null,
+    comentario:p.comentario || '', entregaPedido:p.id, entregaFolio:p.folio});
+  go('venta'); ventaVista = 'ticket'; renderVenta(); iniciarCobro();
+}
+function cerrarEntregaPedido(t, recibo){
+  const p = DB.pedidos.find(x=> x.id===t.entregaPedido); if(!p) return;
+  moverDevoluciones(p.devoluciones, -1, '#' + p.folio + ' entregada');   /* la devolución ya entra con el recibo */
+  p.estado = 'Entregado'; p.entregado = {fecha:recibo.fecha, recibo:recibo.folio, metodo:recibo.metodo, total:recibo.total, usuario:session.usuario, vendedor:session.nombre};
+  p.sincronizado = false; DB.guardarPedido(p);
+  recibo.pedido = p.folio;
+}
 function guardarEdicionPedido(){
   const t = ticket(), p = DB.pedidos.find(x=> x.id===t.editPedido);
   if(!p){ toast('No se encontró la venta original'); return null; }
@@ -4205,7 +4228,7 @@ function viewPedidoDet(){
       <dt>Cliente</dt><dd>${esc(c.nombre||'')}</dd>
       ${c.tienda?`<dt>Tienda</dt><dd>${esc(c.tienda)}</dd>`:''}
       <dt>Horario</dt><dd>${esc(p.horario)}</dd>
-      <dt>Estado</dt><dd>${p.estado==='Cancelado' ? `<b class="neg">Cancelada</b>` : esc(p.estado)}</dd>
+      <dt>Estado</dt><dd>${p.estado==='Cancelado' ? `<b class="neg">Cancelada</b>` : p.estado==='Entregado' ? `<b class="pos">Entregada</b>` : esc(p.estado)}</dd>
       <dt>Programó</dt><dd>${esc(p.vendedor||'')} · ${fecha(p.fecha)}</dd>
       ${p.editado ? `<dt>Modificó</dt><dd>${esc(p.editado.usuario||'')} · ${fecha(p.editado.fecha)}${(p.historial||[]).length ? ` · antes ${fmt(p.historial[p.historial.length-1].total)}` : ''}</dd>` : ''}
       ${p.cancelado ? `<dt>Canceló</dt><dd>${esc(p.cancelado.usuario||'')} · ${fecha(p.cancelado.fecha)} · ${esc(p.cancelado.motivo)}${p.cancelado.nota ? ' · ' + esc(p.cancelado.nota) : ''}</dd>` : ''}
@@ -4217,7 +4240,9 @@ function viewPedidoDet(){
     </div>` : ''}
     <div class="rd-lines">${lineas}</div>${lineasDevHTML(p)}
     <div class="rd-tot"><span>Total</span><b>${fmt(p.total)}</b></div>
-    ${p.estado==='Programado' ? `<div class="tk-acts" style="margin:16px 0 8px"><button class="btn ghost" id="pdEditar">Editar venta</button><button class="btn ghost danger-o" id="pdCancelar">Cancelar venta</button></div>` : ''}
+    ${p.estado==='Programado' ? `<button class="btn" id="pdEntregar" style="margin:16px 0 0">${svg('check')}Entregar y cobrar</button>` : ''}
+    ${p.entregado ? `<div class="pd-ent">Entregada ${fecha(p.entregado.fecha)} · recibo <b>#${esc(p.entregado.recibo)}</b> · ${esc(p.entregado.metodo)} · ${esc(p.entregado.vendedor||'')}</div>` : ''}
+    ${p.estado==='Programado' ? `<div class="tk-acts" style="margin:10px 0 8px"><button class="btn ghost" id="pdEditar">Editar venta</button><button class="btn ghost danger-o" id="pdCancelar">Cancelar venta</button></div>` : ''}
     <div class="tk-acts" style="margin:${p.estado==='Programado' ? '0' : '16px'} 0 8px"><button class="btn ghost" id="pdImprimir">${svg('recibos')}Imprimir</button><button class="btn ghost" id="pdCompartir">${svg('share')}Compartir</button></div>
   </div>`;
 }
@@ -4231,7 +4256,7 @@ function viewPedidos(){
   ls.forEach(p=>{
     if(p.fechaEntrega!==dia){ dia = p.fechaEntrega; html += `<div class="rc-day">Entrega: ${fechaCorta(dia)}</div>`; }
     html += `<div class="ab-row${p.estado==='Cancelado' ? ' pd-canc' : ''}"><div class="ab-main" role="button" data-ped="${p.id}">
-      <span class="ab-t"><b>${esc(p.cliente.nombre)}${p.cliente.tienda?` <i class="muted">· ${esc(p.cliente.tienda)}</i>`:''}${p.estado==='Cancelado' ? ' <i class="tag-c">Cancelada</i>' : p.editado ? ' <i class="tag-v">Modificada</i>' : ''}</b><span>${fmt(p.total)}</span></span>
+      <span class="ab-t"><b>${esc(p.cliente.nombre)}${p.cliente.tienda?` <i class="muted">· ${esc(p.cliente.tienda)}</i>`:''}${p.estado==='Cancelado' ? ' <i class="tag-c">Cancelada</i>' : p.estado==='Entregado' ? ' <i class="tag-v">Entregada ✓</i>' : p.editado ? ' <i class="tag-v">Modificada</i>' : ''}</b><span>${fmt(p.total)}</span></span>
       <span class="ab-m">#${esc(p.folio)} · ${esc(p.horario)} · ${cuentaTicket(p)} ${cuentaTicket(p)===1?'producto':'productos'}</span>
       ${p.comentario?`<span class="ab-c">${esc(p.comentario)}</span>`:''}
     </div></div>`;
