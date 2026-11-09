@@ -206,6 +206,11 @@ main.flush{padding:0}
 .cl-prog.on{background:#fff1d6;color:#9a5b00;border:1px solid #f3c56b;cursor:pointer}
 .cl-gps-t{display:block;font-size:.72rem;color:var(--muted);margin-top:1px}
 .pd-ent{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:var(--brand-soft);color:var(--brand);font-size:.9rem}
+.cli-vis{color:#6b5a00!important;background:#fff6dd!important}
+.vis-mot{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.vis-mot .dia{flex:none}
+.cl-prog.vis{background:#eef3ff;color:#3550a0;margin-left:4px}
+.vis-bar{position:relative;padding:8px 10px;margin:6px 0;border-radius:10px;background:var(--bg);overflow:hidden}.vis-bar span{position:relative;z-index:1;display:flex;justify-content:space-between;gap:10px;font-weight:600}.vis-bar small{color:var(--muted);font-weight:400}
+.vis-bar i{position:absolute;left:0;top:0;bottom:0;background:#cfe8da}.vis-bar i.neg{background:#f6d3cf}
 .rc-cli{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#f3f0ff}
 .rc-cli span{display:flex;flex-direction:column}.rc-cli small{color:var(--muted,#666)}
 .cg-tk{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;font:inherit;cursor:pointer}
@@ -1966,7 +1971,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.43';
+const APP_VERSION = '0.44';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2520,13 +2525,13 @@ const articulos = ()=> store.get('articulos', []).filter(a=> a.activo !== false 
 /* ================= Base de datos local (IndexedDB) ================= */
 /* Los recibos se guardan en IndexedDB; si el navegador no lo permite, se usa el almacenamiento simple */
 const DB = {
-  idb:null, recibos:[], pedidos:[], cotizaciones:[], abonos:[], movimientos:[], compras:[], conteos:[], egresos:[],
-  TABLAS:['recibos','pedidos','cotizaciones','abonos','movimientos','compras','conteos','egresos'],
+  idb:null, recibos:[], pedidos:[], cotizaciones:[], abonos:[], movimientos:[], compras:[], conteos:[], egresos:[], visitas:[],
+  TABLAS:['recibos','pedidos','cotizaciones','abonos','movimientos','compras','conteos','egresos','visitas'],
   init(){
     return new Promise(resolve=>{
       const fallback = ()=>{ this.idb = null; this.TABLAS.forEach(n=> this[n] = store.get(n, [])); resolve(); };
       let req;
-      try{ req = indexedDB.open('merkalimentos', 6); }catch(e){ return fallback(); }
+      try{ req = indexedDB.open('merkalimentos', 7); }catch(e){ return fallback(); }
       const t = setTimeout(fallback, 2500);
       req.onupgradeneeded = ()=>{
         const db = req.result;
@@ -3180,7 +3185,30 @@ function barraCliente(){
   const c = ticket().cliente;
   if(!c) return esPre() ? '' : '';
   return `<div class="cli-bar">${svg('clientes')}<span><b>${esc(c.nombre)}${c.tienda?' · '+esc(c.tienda):''}</b>${c.telefono||c.numero?`<small>${esc([c.numero?'#'+c.numero:'', c.telefono].filter(Boolean).join(' · '))}</small>`:''}</span>
+    ${!esCot() && !ticket().lineas.length && !ticket().editPedido && !ticket().entregaPedido ? `<button class="cli-x cli-vis" id="cliVisitado">Visitado</button>` : ''}
     <button class="cli-x" id="cliCambiar">Cambiar</button></div>`;
+}
+/* ----- Visita sin compra ----- */
+const MOTIVOS_VISITA = ['Local cerrado','Tiene productos','No cuenta con efectivo','Ya no va a seguir comprando','Otros'];
+const visitaHoy = cid => DB.visitas.filter(v=> v.cliente?.id===cid && hoyClave(new Date(v.fecha))===hoyClave()).sort((a,b)=> b.fecha.localeCompare(a.fecha))[0];
+function registrarVisita(){
+  const t = ticket(), c = t.cliente; if(!c) return;
+  let mot = '';
+  const bg = dialogo(`<h3>Cliente visitado</h3><p class="sub">${esc(c.tienda || c.nombre)} · se le atendió pero no compró. ¿Por qué?</p>
+    <div class="vis-mot">${MOTIVOS_VISITA.map(m=>`<button class="dia" data-m="${m}">${m}</button>`).join('')}</div>
+    <textarea class="field" id="visNota" rows="2" maxlength="160" placeholder="Comentario (opcional)" style="margin-top:10px"></textarea>
+    <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si" disabled>Guardar visita</button></div>`);
+  const ok = bg.querySelector('[data-a="si"]'), nota = bg.querySelector('#visNota');
+  bg.querySelectorAll('.vis-mot .dia').forEach(b=> b.onclick = ()=>{ mot = b.dataset.m; bg.querySelectorAll('.vis-mot .dia').forEach(x=> x.classList.toggle('on', x===b));
+    ok.disabled = false; nota.placeholder = mot==='Otros' ? 'Escribe el motivo' : 'Comentario (opcional)'; if(mot==='Otros') nota.focus(); });
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  ok.onclick = ()=>{
+    const n = nota.value.trim(); if(mot==='Otros' && !n){ toast('Escribe el motivo'); nota.focus(); return; }
+    const tu = turnoActual(), pos = ultimaPos && Date.now() - ultimaPos.t < 600000 ? {lat:ultimaPos.lat, lng:ultimaPos.lng} : null;
+    DB.guardar('visitas', {id:'V'+Date.now(), fecha:new Date().toISOString(), cliente:c, motivo:mot, nota:n, usuario:session.usuario, vendedor:session.nombre,
+      turno:tu?.folio || null, dispositivo:store.get('config').dispositivo || '', modo: esPre() ? 'preventa' : 'venta', ubicacion:pos, sincronizado:false});
+    bg.remove(); guardarTicket({lineas:[]}); toast(`Visita registrada · ${mot}`); ventaVista = esPre() ? 'inicioPre' : 'grid'; renderVenta();
+  };
 }
 function asignarCliente(c){
   const t = ticket(); t.cliente = c ? clienteRef(c) : null; t.preguntado = true; if(!esCot()) repreciarTicket(t); guardarTicket(t);
@@ -3302,10 +3330,10 @@ function abrirSelectorCliente({alElegir, alCancelar} = {}){
   };
   const progDe = {}; DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega >= hoyClave()).sort((a,b)=> a.fechaEntrega.localeCompare(b.fechaEntrega))
     .forEach(p=>{ const k = p.cliente?.id; if(k) (progDe[k] = progDe[k] || []).push(p); });
-  const chipProg = c=>{ const ps = progDe[c.id];
-    if(!ps) return `<span class="cl-prog">Sin venta programada</span>`;
+  const chipProg = c=>{ const ps = progDe[c.id], vh = visitaHoy(c.id), vis = vh ? ` <span class="cl-prog vis">Visitado hoy · ${esc(vh.motivo)}</span>` : '';
+    if(!ps) return `<span class="cl-prog">Sin venta programada</span>${vis}`;
     const p = ps[0], cuando = p.fechaEntrega===hoyClave() ? 'hoy' : p.fechaEntrega===manana() ? 'mañana' : fechaCorta(p.fechaEntrega);
-    return `<span class="cl-prog on" data-ped="${p.id}" role="button">Venta programada · ${cuando} · ${fmt(p.total)}${ps.length > 1 ? ` (+${ps.length-1})` : ''}</span>`; };
+    return `<span class="cl-prog on" data-ped="${p.id}" role="button">Venta programada · ${cuando} · ${fmt(p.total)}${ps.length > 1 ? ` (+${ps.length-1})` : ''}</span>${vis}`; };
   const lista = ()=>{
     const qq = q.trim().toLowerCase();
     const pos = estadoPos==='ok' ? ultimaPos : null;
@@ -4417,6 +4445,7 @@ function renderHeader(){
     document.getElementById('ticketBtn').onclick = ()=>{ ventaVista = 'ticket'; renderVenta(); };
     const hc = document.getElementById('hCliente'); if(hc) hc.onclick = ()=> abrirSelectorCliente({alElegir:()=> renderVenta()});
     const cc = document.getElementById('cliCambiar'); if(cc) cc.onclick = ()=> abrirSelectorCliente({alElegir:()=> renderVenta()});
+    const cv = document.getElementById('cliVisitado'); if(cv) cv.onclick = registrarVisita;
     document.getElementById('hMas').onclick = abrirMas;
   } else {
     const m = MENU.find(x=>x.id===current);
@@ -7545,8 +7574,8 @@ function serieTiempo(recs, a, b){
 function viewInformes(){
   if(!infDesde){ infHasta = hoyClave(); infDesde = lunesDe(infHasta); }
   const comp = rangoComp();
-  const tabs = [['resumen','Resumen'],['productos','Productos'],['proveedores','Proveedores'],['clientes','Clientes'],['tendencia','Año']];
-  const cuerpo = {resumen:infResumen, productos:infProductos, proveedores:infProveedores, clientes:infClientes, tendencia:infTendencia}[infTab](comp);
+  const tabs = [['resumen','Resumen'],['productos','Productos'],['proveedores','Proveedores'],['clientes','Clientes'],['visitas','Visitas'],['tendencia','Año']];
+  const cuerpo = {resumen:infResumen, productos:infProductos, proveedores:infProveedores, clientes:infClientes, visitas:infVisitas, tendencia:infTendencia}[infTab](comp);
   return `<div class="rc-wrap inf">
     ${infTab!=='tendencia' ? `<div class="inf-top">
       <button class="inf-rango" id="infCal">${svg('turno')}<span><b>${fRango(infDesde, infHasta)}</b><small>${nDias(infDesde, infHasta)} ${nDias(infDesde, infHasta)===1?'día':'días'}${comp ? ' · vs ' + fRango(comp[0], comp[1]) : ''}</small></span>${svg('chev')}</button>
@@ -7624,6 +7653,38 @@ function infProveedores(comp){
         <span class="rc-main"><b>${esc(p)}</b><small>ventas ${fmt(x.ventas)} · margen ${pct(margen(x))}${incompleto(x)?' · costo incompleto':''} · ${new Set(Object.keys(prodA).filter(kk=> kk.startsWith(p+'|'))).size} productos</small><i class="cr-bar"><i style="width:${totU ? Math.max(1, Math.round(Math.max(0,util(x))/totU*100)) : 0}%"></i></i></span>
         <span class="cr-amt"><b>${fmt(util(x))}</b>${comp ? delta(util(x), y ? util(y) : 0) : ''}</span></button>
         ${abierto ? `<div class="inf-sub">${prods.map(o=>`<div class="cj-row"><span>${esc(artPorId(o.pid) ? nombreTicket(artPorId(o.pid)) : o.pid)}<small class="ir-s">${fmtCant(o.pid, o.v.cant)} · ${fmt(o.v.ventas)} · ${o.v.conCosto ? pct(margen(o.v)) : 'sin costo'}</small></span><b>${fmt(util(o.v))}</b></div>`).join('')}</div>` : ''}`; }).join('')}`;
+}
+const visRango = (a, b) => DB.visitas.filter(v=> (k => k >= a && k <= b)(hoyClave(new Date(v.fecha))));
+function infVisitas(comp){
+  const vA = visRango(infDesde, infHasta), vB = comp ? visRango(comp[0], comp[1]) : null;
+  const cA = recVigentes(infDesde, infHasta).filter(r=> r.cliente?.id && r.total > 0), cB = comp ? recVigentes(comp[0], comp[1]).filter(r=> r.cliente?.id && r.total > 0) : null;
+  const efec = (c, v) => (c + v) ? c / (c + v) : null;
+  if(!vA.length && !(vB && vB.length)) return `<div class="rc-empty">${svg('clientes')}<p>No hay visitas sin compra registradas en este periodo.</p><p class="note-sm">Se registran con el botón <b>Visitado</b> al elegir un cliente en Venta o Preventa.</p></div>`;
+  const porMot = {}; vA.forEach(v=> porMot[v.motivo] = (porMot[v.motivo]||0) + 1);
+  const porMotB = {}; (vB||[]).forEach(v=> porMotB[v.motivo] = (porMotB[v.motivo]||0) + 1);
+  const maxM = Math.max(1, ...Object.values(porMot));
+  const porCli = {}; vA.forEach(v=>{ const id = v.cliente?.id || '?'; const x = porCli[id] || (porCli[id] = {id, nombre: v.cliente ? (v.cliente.tienda || v.cliente.nombre) : '—', n:0, mot:{}, ult:''}); x.n++; x.mot[v.motivo] = (x.mot[v.motivo]||0) + 1; if(v.fecha > x.ult) x.ult = v.fecha; });
+  const comprasCli = {}; cA.forEach(r=> comprasCli[r.cliente.id] = (comprasCli[r.cliente.id]||0) + 1);
+  const top = Object.values(porCli).sort((a,b)=> b.n - a.n).slice(0, 15);
+  const noSigue = Object.values(porCli).filter(x=> x.mot['Ya no va a seguir comprando']);
+  const pctFmt = x => x==null ? '—' : Math.round(x*100) + '%';
+  return `<div class="cr-pad inf-pad">
+    <div class="inf-kpis">
+      ${kpi('Visitas sin compra', vA.length, vB ? vB.length : undefined, n=> String(n))}
+      ${kpi('Ventas a clientes', cA.length, cB ? cB.length : undefined, n=> String(n))}
+      ${kpi('Efectividad', efec(cA.length, vA.length), undefined, pctFmt, cB && efec(cB.length, vB.length)!=null && efec(cA.length, vA.length)!=null ? `<span class="dl ${efec(cA.length, vA.length) >= efec(cB.length, vB.length) ? 'up' : 'down'}">${efec(cA.length, vA.length) >= efec(cB.length, vB.length) ? '▲' : '▼'} ${Math.abs(Math.round((efec(cA.length, vA.length) - efec(cB.length, vB.length))*100))} pts</span>` : '')}
+      ${kpi('Clientes sin compra', Object.keys(porCli).length, undefined, n=> String(n))}
+    </div>
+    <p class="note-sm" style="text-align:left">Efectividad = ventas a clientes ÷ (ventas + visitas sin compra).</p>
+    <h3 class="cf-h">Motivos</h3>
+    ${MOTIVOS_VISITA.filter(m=> porMot[m] || porMotB[m]).map(m=>`<div class="vis-bar"><span>${esc(m)}<small>${porMot[m]||0} · ${Math.round((porMot[m]||0)/vA.length*100)||0}%${vB ? ` · antes ${porMotB[m]||0}` : ''}</small></span><i style="width:${Math.round((porMot[m]||0)/maxM*100)}%" class="${m==='Ya no va a seguir comprando'?'neg':''}"></i></div>`).join('')}
+    ${noSigue.length ? `<h3 class="cf-h neg">Dijeron que ya no seguirán comprando (${noSigue.length})</h3>
+      ${noSigue.map(x=>`<div class="cj-row"><span>${esc(x.nombre)}<small class="ir-s">${new Date(x.ult).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}${(vA.filter(v=> v.cliente?.id===x.id && v.motivo==='Ya no va a seguir comprando' && v.nota).slice(-1)[0]||{}).nota ? ' · ' + esc(vA.filter(v=> v.cliente?.id===x.id && v.motivo==='Ya no va a seguir comprando' && v.nota).slice(-1)[0].nota) : ''}</small></span><b class="neg">${x.mot['Ya no va a seguir comprando']}</b></div>`).join('')}` : ''}
+    <h3 class="cf-h">Clientes con más visitas sin compra</h3>
+    ${top.map(x=>`<div class="cj-row"><span>${esc(x.nombre)}<small class="ir-s">${Object.entries(x.mot).sort((a,b)=> b[1]-a[1]).map(([m,n])=> `${esc(m)} ${n}`).join(' · ')}${comprasCli[x.id] ? ` · compró ${comprasCli[x.id]} ${comprasCli[x.id]===1?'vez':'veces'}` : ' · <b class="neg">sin compras en el periodo</b>'}</small></span><b>${x.n}</b></div>`).join('')}
+    <h3 class="cf-h">Últimas visitas</h3>
+    ${vA.slice().sort((a,b)=> b.fecha.localeCompare(a.fecha)).slice(0, 30).map(v=>`<div class="cj-row"><span>${esc(v.cliente?.tienda || v.cliente?.nombre || '')}<small class="ir-s">${new Date(v.fecha).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${esc(v.vendedor||'')}${v.nota ? ' · ' + esc(v.nota) : ''}</small></span><b>${esc(v.motivo)}</b></div>`).join('')}
+  </div>`;
 }
 function infClientes(comp){
   const rA = recVigentes(infDesde, infHasta), rB = comp ? recVigentes(comp[0], comp[1]) : [];
