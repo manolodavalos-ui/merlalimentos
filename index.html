@@ -1971,7 +1971,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.44.1';
+const APP_VERSION = '0.44.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -5553,10 +5553,17 @@ function fechaDeDia(k){   /* fecha de ese día en la semana actual (lunes a domi
   const hoy = new Date(); const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
   const d = new Date(lunes); d.setDate(lunes.getDate() + ['lun','mar','mie','jue','vie','sab','dom'].indexOf(k)); return d;
 }
+/* Mismo cliente: por id, o por número de cliente, o por nombre + tienda (por si se capturó duplicado) */
+const normN = x => String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+function esMismoCliente(ref, c){
+  if(!ref) return false; if(ref.id===c.id) return true;
+  if(ref.numero && c.numero && String(ref.numero).replace(/\D/g,'').replace(/^0+/,'')===String(c.numero).replace(/\D/g,'').replace(/^0+/,'')) return true;
+  return !!normN(ref.nombre) && normN(ref.nombre)===normN(c.nombre) && normN(ref.tienda)===normN(c.tienda);
+}
 function atendidoEn(c, clave){
-  const venta = DB.recibos.find(r=> r.cliente && r.cliente.id===c.id && !r.cancelado && !r.reemplazadoPor && hoyClave(new Date(r.fecha))===clave);
-  const pedido = DB.pedidos.find(p=> p.cliente && p.cliente.id===c.id && p.estado!=='Cancelado' && hoyClave(new Date(p.fecha))===clave);
-  const visita = !venta && !pedido && DB.visitas.find(v=> v.cliente && v.cliente.id===c.id && hoyClave(new Date(v.fecha))===clave);
+  const venta = DB.recibos.find(r=> esMismoCliente(r.cliente, c) && !r.cancelado && !r.reemplazadoPor && hoyClave(new Date(r.fecha))===clave);
+  const pedido = DB.pedidos.find(p=> esMismoCliente(p.cliente, c) && p.estado!=='Cancelado' && hoyClave(new Date(p.fecha))===clave);
+  const visita = !venta && !pedido && DB.visitas.find(v=> esMismoCliente(v.cliente, c) && hoyClave(new Date(v.fecha))===clave);
   return venta ? {tipo:'Venta', ref:venta} : pedido ? {tipo:'Pedido', ref:pedido} : visita ? {tipo:'Visitado', ref:visita} : null;
 }
 function clientesDelDia(k){
