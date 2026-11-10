@@ -1971,7 +1971,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.45';
+const APP_VERSION = '0.45.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2378,7 +2378,7 @@ function bindTurno(){
       dispositivo:cfg.dispositivo, numDispositivo:cfg.numDispositivo,
       abierto:new Date().toISOString(), efectivoInicial:v
     });
-    updateShiftPill(); toast('Turno abierto'); go('venta');
+    updateShiftPill(); toast('Turno abierto'); marcarEnReparto(); go('venta');
   };
   if(turnoVista==='tesoreria' && turnoActual()){ bindTesoreria(); return; }
   const sell = document.getElementById('goSell');
@@ -4069,7 +4069,7 @@ function bindProgramar(){
       ticketNombre:t.nombre || null, sincronizado:false, ...(t.origenRec ? {origenRec:t.origenRec} : {})
     };
     DB.guardarPedido(pedido);
-    if(pedido.origenRec) fbSeguimiento(pedido.origenRec, {estado:'Programado', entrega:fechaEntrega, horario:pedido.horario});
+    if(pedido.origenRec){ fbSeguimiento(pedido.origenRec, {estado:'Programado', entrega:fechaEntrega, horario:pedido.horario}); if(fechaEntrega===hoyClave()) setTimeout(marcarEnReparto, 800); }
     moverDevoluciones(pedido.devoluciones, 1, '#' + pedido.folio);
     guardarTicket({lineas:[]});
     ultimoPedido = pedido; ventaVista = 'programado'; renderVenta();
@@ -4162,7 +4162,7 @@ function guardarEdicionPedido(){
   DB.guardarPedido(p);
   moverDevoluciones(p.devoluciones, 1, '#' + p.folio);
   guardarTicket({lineas:[]});
-  if(p.origenRec) fbSeguimiento(p.origenRec, {estado:'Programado', entrega:p.fechaEntrega, horario:p.horario});
+  if(p.origenRec){ delete p.repartoMarcado; DB.guardarPedido(p); fbSeguimiento(p.origenRec, {estado:'Programado', entrega:p.fechaEntrega, horario:p.horario}); if(p.fechaEntrega===hoyClave()) setTimeout(marcarEnReparto, 800); }
   return p;
 }
 function cancelarEdicionPedido(){
@@ -6621,7 +6621,7 @@ function fbCargar(){
     fbAuth = FB.getAuth(app);
     await new Promise(res=> FB.onAuthStateChanged(fbAuth, u=>{
       fbUser = u; res();
-      if(u){ fbEscucharPedidos(); fbProgramarPublicar(2000); }
+      if(u){ fbEscucharPedidos(); fbProgramarPublicar(2000); setTimeout(marcarEnReparto, 1500); }
       else { if(fbUnsub) fbUnsub(); fbUnsub = null; fbVivo = false; }
       if(current==='config' && cfgVista==='nube') renderConfig(true);
     }));
@@ -6667,6 +6667,14 @@ function recibirPedidoNube(d){
 function fbSeguimiento(id, datos){
   if(!fbListo() || !id) return;
   FB.setDoc(FB.doc(fbDb, 'seguimiento', id), {...datos, actualizado:new Date().toISOString()}, {merge:true}).catch(e=> console.warn('seguimiento', e));
+}
+/* Al abrir turno (o al abrir la app con turno abierto), los pedidos del catálogo programados para hoy pasan a "En reparto" */
+function marcarEnReparto(){
+  if(!fbListo() || !turnoActual()) return;
+  DB.pedidos.filter(p=> p.estado==='Programado' && p.origenRec && p.fechaEntrega===hoyClave() && p.repartoMarcado!==hoyClave()).forEach(p=>{
+    fbSeguimiento(p.origenRec, {estado:'En reparto', entrega:p.fechaEntrega, horario:p.horario || '', reparto:new Date().toISOString()});
+    p.repartoMarcado = hoyClave(); DB.guardarPedido(p);
+  });
 }
 function fbMarcarPedido(id, estado){
   if(!fbListo()) return;

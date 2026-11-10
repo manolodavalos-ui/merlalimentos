@@ -35,6 +35,19 @@ header.cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;pa
 .cab p{opacity:.85;font-size:.86rem;margin-top:3px}
 .seg{display:flex;align-items:center;gap:8px;margin:12px auto 0;max-width:420px;background:#fff;color:#1d3b2c;border-radius:12px;padding:9px 12px;font-size:.86rem;text-align:left;box-shadow:0 4px 14px rgba(0,0,0,.15)}
 .seg i{font-style:normal;font-size:1.15rem}.seg small{display:block;color:#6b7a72;font-size:.76rem}.seg.ok{border-left:5px solid #1f9d55}.seg.esp{border-left:5px solid #e0a800}.seg.prog{border-left:5px solid #2f6fd6}.seg.can{border-left:5px solid #c0392b}
+.sgbar{margin:12px auto 0;max-width:460px;background:#fff;color:#1d3b2c;border-radius:14px;padding:12px 10px 10px;box-shadow:0 4px 14px rgba(0,0,0,.15);text-align:center}
+.sgbar h4{font-size:.8rem;font-weight:700;color:#5b6b63;margin-bottom:10px}
+.pasos{display:grid;grid-template-columns:repeat(5,1fr);position:relative}
+.paso{display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;font-size:.62rem;line-height:1.15;color:#8a958f;padding:0 1px}
+.paso:before{content:"";position:absolute;top:10px;left:-50%;width:100%;height:5px;background:#e3e6e4;z-index:0}
+.paso:first-child:before{display:none}
+.paso .pt{width:24px;height:24px;border-radius:50%;background:#e3e6e4;display:grid;place-items:center;color:#fff;font-size:.8rem;font-weight:800;z-index:1;position:relative}
+.paso.hecho:before,.paso.act:before{background:#1597a6}.paso.hecho .pt,.paso.act .pt{background:#1597a6}
+.paso.act{color:#1d3b2c;font-weight:800}.paso.act .pt{box-shadow:0 0 0 4px #1597a633}
+.paso.hecho{color:#1d3b2c}
+.sgbar.can .paso:before,.sgbar.can .paso .pt{background:#d9534f}.sgbar.can .paso{color:#b03a35}
+.sgbar .can-t{margin-top:10px;font-weight:800;color:#c0392b;font-size:.92rem}.sgbar .can-s{font-size:.76rem;color:#8a5a57}
+.hoja .sgbar{box-shadow:none;border:1px solid #e3e6e4;margin-top:10px}
 .pseg{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#fff8e1;color:#7a5600;font-size:.88rem;text-align:center}.pseg.ok{background:#e6f5ec;color:#1f6f4a}
 .cab .hola{display:inline-block;margin-top:12px;background:rgba(255,255,255,.14);padding:6px 12px;border-radius:999px;font-size:.88rem}
 .secnav{position:sticky;top:0;z-index:10;display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:var(--bg);scrollbar-width:none;max-width:860px;margin:0 auto}
@@ -536,13 +549,21 @@ function textoSeg(sg){
   if(sg.estado==='Cancelado') return ['can', '✖️', 'Cancelado · escríbenos si tienes dudas'];
   return ['ok', '✓', `Recibido por ${D?.negocio?.nombre || 'Merkalimentos'}${sg.recibido ? ' · ' + new Date(sg.recibido).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) : ''}`];
 }
+function barraSeg(sg, u){
+  const corta = k => { const d = new Date(k + 'T12:00'); return d.getDate() + '/' + d.toLocaleDateString('es-MX',{month:'short'}).replace('.','') + '/' + String(d.getFullYear()).slice(2); };
+  const idx = !sg ? 0 : ({Recibido:1, Programado:2, 'En reparto':3, Entregado:4})[sg.estado] ?? 1, can = sg && sg.estado==='Cancelado';
+  const nom = D?.negocio?.nombre ? D.negocio.nombre.charAt(0) + D.negocio.nombre.slice(1).toLowerCase() : 'Merkalimentos';
+  const etq = ['Enviado a ' + nom, 'Recibido', sg && sg.entrega ? 'Programado para el día ' + corta(sg.entrega) : 'Programado', 'En reparto', 'Entregado'];
+  return `<div class="sgbar${can ? ' can' : ''}">${u ? `<h4>Tu pedido · ${new Date(u.f).toLocaleDateString('es-MX',{day:'numeric',month:'short'})} · ${fmt(u.total)}</h4>` : ''}
+    <div class="pasos">${etq.map((t,i)=>`<div class="paso${can ? '' : i < idx ? ' hecho' : i===idx ? ' act' : ''}"><span class="pt">${can ? '✕' : i <= idx ? '✓' : ''}</span>${esc(t)}</div>`).join('')}</div>
+    ${can ? `<div class="can-t">Pedido cancelado</div><div class="can-s">Escríbenos si tienes dudas</div>` : ''}</div>`;
+}
 async function pintarUltimo(){
   const u = ls.get(K + '_ultimo'), el = document.getElementById('ultPed'); if(!el || !u || !u.id) return;
   if(Date.now() - new Date(u.f).getTime() > 10*864e5) return;
   const sg = await leerSeguimiento(u.id); if(sg === undefined) return;
   if(sg && sg.estado==='Entregado' && Date.now() - new Date(sg.entregado || sg.actualizado).getTime() > 3*864e5) return;
-  const [c, ic, tx] = textoSeg(sg);
-  el.innerHTML = `<div class="seg ${c}"><i>${ic}</i><span><small>Tu último pedido · ${new Date(u.f).toLocaleDateString('es-MX',{day:'numeric',month:'short'})} · ${fmt(u.total)}</small><b>${tx}</b></span></div>`;
+  el.innerHTML = barraSeg(sg, u);
 }
 const conLimite = (p, ms) => Promise.race([p, new Promise((_, rej)=> setTimeout(()=> rej(new Error('tiempo')), ms))]);
 const tok = (()=>{ const q = new URLSearchParams(location.search).get('c'); try{ if(q){ localStorage.setItem('mkcat_tok', q); return q; } return localStorage.getItem('mkcat_tok') || ''; }catch(_){ return q || ''; } })();
@@ -690,7 +711,7 @@ async function enviar(cli, nota){
   const waTexto = enNube ? `https://wa.me/${D.negocio?.wa || '529611080808'}?text=${encodeURIComponent(`Hola, acabo de enviar mi pedido desde el catálogo (${cli.t || cli.n}) por ${fmt(total)}.`)}` : wa;
   const h = hoja(enNube ? `<div class="ok">✓</div><h3 style="text-align:center">¡Pedido enviado!</h3>
     <p class="sub" style="text-align:center">${lineas.length} productos · <b>${fmt(total)}</b></p>
-    <div class="pseg" id="pSeg">⏳ Esperando confirmación de ${esc(D.negocio?.nombre || 'Merkalimentos')}…</div>
+    <div id="pSeg">${barraSeg(null)}</div>
     <div class="acts">
       ${pdf ? '<button class="btn sec" id="pPdf">Compartir o guardar PDF del pedido</button>' : ''}
       <a class="btn sec" id="pWa" href="${waTexto}" target="_blank" rel="noopener" style="text-decoration:none">Avisar también por WhatsApp</a>
@@ -706,8 +727,8 @@ async function enviar(cli, nota){
   h.querySelector('#pWa').onclick = ()=>{ if(!enNube) ls.set(K + '_ultimo', {id:pedido.id, f:pedido.f, total}); };
   if(enNube){ let n = 0; const vig = async ()=>{ const el = h.querySelector('#pSeg'); if(!el || !document.body.contains(h)) return;
       const sg = await leerSeguimiento(pedido.id);
-      if(sg){ const [c, ic, tx] = textoSeg(sg); el.className = 'pseg ok'; el.textContent = ic + ' ' + tx; pintarUltimo(); return; }
-      if(++n < 25) setTimeout(vig, 4000); else el.textContent = '✓ Pedido enviado. Te confirmamos en cuanto lo revisemos.'; };
+      if(sg){ el.innerHTML = barraSeg(sg); pintarUltimo(); return; }
+      if(++n < 25) setTimeout(vig, 4000); };
     setTimeout(vig, 2500); }
   const pp = h.querySelector('#pPdf'); if(pp) pp.onclick = async ()=>{
     const blob = pdf.output('blob'), file = new File([blob], nombreArch, {type:'application/pdf'});
