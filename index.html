@@ -442,8 +442,8 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .tk-prev{margin:6px 0 14px}
 .tk-prev b{display:block;font-size:.85rem;color:var(--brand);margin-bottom:6px}
 .tk-prev pre{background:#fffdf5;border:1px dashed var(--line);border-radius:8px;padding:10px;font-size:11px;line-height:1.35;overflow-x:auto;white-space:pre;font-family:ui-monospace,monospace}
-#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare,#avisarCli{display:flex;align-items:center;justify-content:center;gap:8px}
-#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg,#avisarCli svg{width:20px;height:20px;stroke:currentColor}
+#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare,#avisarCli,#avisarImg{display:flex;align-items:center;justify-content:center;gap:8px}
+#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg,#avisarCli svg,#avisarImg svg{width:20px;height:20px;stroke:currentColor}
 .tk-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 12px}.tk-acts .btn{display:flex;align-items:center;justify-content:center;gap:8px}.tk-acts .btn svg{width:20px;height:20px;flex:none;stroke:currentColor}.tk-acts .btn{margin:0}
 
 .add-prod{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em}
@@ -1971,7 +1971,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.45.1';
+const APP_VERSION = '0.45.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4088,13 +4088,16 @@ function viewProgramado(){
       <dt>Horario</dt><dd>${esc(p.horario)}</dd>
       <dt>Importe</dt><dd>${fmt(p.total)}</dd>
     </dl>
-    ${telPedidoProg(p) ? `<button class="btn" id="avisarCli" data-tel="${esc(telPedidoProg(p))}" style="margin-bottom:0">${svg('whatsapp')}Avisar al cliente por WhatsApp</button>` : ''}
+    ${telPedidoProg(p) ? `<button class="btn" id="avisarCli" data-tel="${esc(telPedidoProg(p))}" style="margin-bottom:0">${svg('whatsapp')}Avisar al cliente por WhatsApp</button>
+      <p class="note-sm" style="margin:6px 0 0">Se abre su chat con el mensaje y el detalle del pedido.</p>` : ''}
+    <button class="btn ghost" id="avisarImg">${svg('share')}Enviar ticket como imagen</button>
     <button class="btn${telPedidoProg(p) ? ' ghost' : ''}" id="nuevoPedido">Programar otra venta</button>
     <button class="btn ghost" id="verProgramadas">Ver ventas programadas</button>
   </div>`;
 }
 function bindProgramado(){
-  const av = document.getElementById('avisarCli'); if(av) av.onclick = ()=>{ const p = ultimoPedido; abrirWa(urlWa(av.dataset.tel, msgConfirmacion(p.cliente.nombre, p.total, p.fechaEntrega, p.horario))); };
+  const av = document.getElementById('avisarCli'); if(av) av.onclick = ()=>{ const p = ultimoPedido; abrirWa(urlWa(av.dataset.tel, msgConfirmacion(p.cliente.nombre, p.total, p.fechaEntrega, p.horario) + detalleTextoWa(p.lineas, p.total, p.folio))); };
+  const ai = document.getElementById('avisarImg'); if(ai) ai.onclick = ()=>{ const p = ultimoPedido; compartirRecibo({...p, esPedido:true}, msgConfirmacion(p.cliente.nombre, p.total, p.fechaEntrega, p.horario)); };
   document.getElementById('nuevoPedido').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
   document.getElementById('verProgramadas').onclick = ()=>{ ventaVista = 'pedidos'; renderVenta(); };
 }
@@ -4862,8 +4865,8 @@ function imagenTicket(r){
     const t = String(l.t), w = g.measureText(t).width, k = w > W - pad*2 ? (W - pad*2)/w : 1; g.save(); g.translate(pad, 0); g.scale(k, 1); g.fillText(t, 0, y + (altos[i]-f)/2); g.restore(); y += altos[i]; });
   return new Promise(res=> cv.toBlob(res, 'image/png'));
 }
-async function compartirRecibo(r){
-  const nombre = `Ticket ${r.folio}${r.version>1 ? ' v'+r.version : ''}.png`, texto = `Ticket ${r.folio} · ${impCfg().encabezado || 'Merkalimentos'} · Total ${fmt(Math.abs(r.total))}`;
+async function compartirRecibo(r, textoExtra){
+  const nombre = `${r.esPedido ? 'Pedido' : 'Ticket'} ${r.folio}${r.version>1 ? ' v'+r.version : ''}.png`, texto = textoExtra || `Ticket ${r.folio} · ${impCfg().encabezado || 'Merkalimentos'} · Total ${fmt(Math.abs(r.total))}`;
   let blob = null; try{ blob = await imagenTicket(r); }catch(_){}
   if(blob){ const file = new File([blob], nombre, {type:'image/png'});
     try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:nombre, text:texto}); return; } }catch(e){ if(e && e.name==='AbortError') return; } }
@@ -6580,11 +6583,16 @@ function detallePedidoRec(id){
       <button class="btn ghost" data-a="x">Cerrar</button>
     </div>`);
   const act = (a, f)=>{ const b = bg.querySelector(`[data-a="${a}"]`); if(b) b.onclick = ()=>{ bg.remove(); f(); }; };
-  act('x', ()=>{}); act('wa', ()=> abrirWa(urlWa(telPedRec(p), msgConfirmacion(p.cliente.nombre, totalPedRec(p), (DB.pedidos.find(x=> x.origenRec===p.id && x.estado==='Programado')||{}).fechaEntrega))));
+  act('x', ()=>{}); act('wa', ()=>{ const pr = DB.pedidos.find(x=> x.origenRec===p.id && x.estado==='Programado') || {};
+    abrirWa(urlWa(telPedRec(p), msgConfirmacion(p.cliente.nombre, totalPedRec(p), pr.fechaEntrega, pr.horario) + detalleTextoWa(p.lineas, totalPedRec(p), pr.folio))); });
   act('desc', ()=>{ marcarPedRec(p.id, 'Descartado'); current==='catalogo' ? renderCatalogo() : renderVenta(); });
   act('pre', ()=> cargarPedidoRec(p, 'preventa')); act('venta', ()=> cargarPedidoRec(p, 'venta'));
 }
 const telPedRec = p => p.cliente.telefono || (p.clienteId && (clientes().find(c=> c.id===p.clienteId)||{}).telefono) || '';
+/* Detalle del pedido en texto para WhatsApp */
+function detalleTextoWa(lineas, total, folio){
+  return `\n\n*Pedido${folio ? ' ' + folio : ''}*\n` + lineas.map(l=>{ const q = l.porKilo ? fmtKg(l.cantidad) + ' kg' : l.cantidad; return `${q} x ${nombreTk(l)} — ${fmt(r2(l.precio * l.cantidad))}`; }).join('\n') + `\n*Total: ${fmt(total)}*`;
+}
 function msgConfirmacion(nombre, total, entrega, horario){
   const neg = (store.get('config').negocio || impCfg().encabezado || 'Merkalimentos');
   const cuando = entrega ? new Date(entrega + 'T12:00').toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long'}) : '';
