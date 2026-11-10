@@ -442,8 +442,8 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .tk-prev{margin:6px 0 14px}
 .tk-prev b{display:block;font-size:.85rem;color:var(--brand);margin-bottom:6px}
 .tk-prev pre{background:#fffdf5;border:1px dashed var(--line);border-radius:8px;padding:10px;font-size:11px;line-height:1.35;overflow-x:auto;white-space:pre;font-family:ui-monospace,monospace}
-#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare{display:flex;align-items:center;justify-content:center;gap:8px}
-#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg{width:20px;height:20px;stroke:currentColor}
+#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare,#avisarCli{display:flex;align-items:center;justify-content:center;gap:8px}
+#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg,#avisarCli svg{width:20px;height:20px;stroke:currentColor}
 .tk-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 12px}.tk-acts .btn{display:flex;align-items:center;justify-content:center;gap:8px}.tk-acts .btn svg{width:20px;height:20px;flex:none;stroke:currentColor}.tk-acts .btn{margin:0}
 
 .add-prod{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em}
@@ -1971,7 +1971,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.44.2';
+const APP_VERSION = '0.45';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3115,6 +3115,7 @@ function registrarVenta(metodo, recibido, credito, opts = {}){
     if(ab){ recibo.devAbonada = ab.monto; recibo.abonoDevId = ab.id; recibo.cambio = r2(-total - ab.monto); }
   }
   if(t.entregaPedido) cerrarEntregaPedido(t, recibo);
+  { const org = t.origenRec || (t.entregaPedido && (DB.pedidos.find(x=> x.id===t.entregaPedido)||{}).origenRec); if(org) fbSeguimiento(org, {estado:'Entregado', entregado:recibo.fecha}); }
   DB.guardarRecibo(recibo);
   descontarInventario(t.lineas, recibo);
   moverDevoluciones(recibo.devoluciones, 1, '#' + recibo.folio);
@@ -4065,14 +4066,16 @@ function bindProgramar(){
       comentario:document.getElementById('pCom').value.trim(),
       cliente:t.cliente, lineas:congelarLineas(t.lineas), devoluciones:t.devoluciones||[], total:totalTicket(t), estado:'Programado',
       turno:turno.folio, dispositivo:turno.dispositivo, usuario:session.usuario, vendedor:session.nombre,
-      ticketNombre:t.nombre || null, sincronizado:false
+      ticketNombre:t.nombre || null, sincronizado:false, ...(t.origenRec ? {origenRec:t.origenRec} : {})
     };
     DB.guardarPedido(pedido);
+    if(pedido.origenRec) fbSeguimiento(pedido.origenRec, {estado:'Programado', entrega:fechaEntrega, horario:pedido.horario});
     moverDevoluciones(pedido.devoluciones, 1, '#' + pedido.folio);
     guardarTicket({lineas:[]});
     ultimoPedido = pedido; ventaVista = 'programado'; renderVenta();
   };
 }
+const telPedidoProg = p => p.cliente?.telefono || (clientes().find(c=> c.id===p.cliente?.id)||{}).telefono || (p.origenRec ? telPedRec(pedidosRecibidos().find(x=> x.id===p.origenRec) || {cliente:{}}) : '');
 function viewProgramado(){
   const p = ultimoPedido;
   return `<div class="cobro">
@@ -4085,11 +4088,13 @@ function viewProgramado(){
       <dt>Horario</dt><dd>${esc(p.horario)}</dd>
       <dt>Importe</dt><dd>${fmt(p.total)}</dd>
     </dl>
-    <button class="btn" id="nuevoPedido">Programar otra venta</button>
+    ${telPedidoProg(p) ? `<button class="btn" id="avisarCli" data-tel="${esc(telPedidoProg(p))}" style="margin-bottom:0">${svg('whatsapp')}Avisar al cliente por WhatsApp</button>` : ''}
+    <button class="btn${telPedidoProg(p) ? ' ghost' : ''}" id="nuevoPedido">Programar otra venta</button>
     <button class="btn ghost" id="verProgramadas">Ver ventas programadas</button>
   </div>`;
 }
 function bindProgramado(){
+  const av = document.getElementById('avisarCli'); if(av) av.onclick = ()=>{ const p = ultimoPedido; abrirWa(urlWa(av.dataset.tel, msgConfirmacion(p.cliente.nombre, p.total, p.fechaEntrega, p.horario))); };
   document.getElementById('nuevoPedido').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
   document.getElementById('verProgramadas').onclick = ()=>{ ventaVista = 'pedidos'; renderVenta(); };
 }
@@ -4157,6 +4162,7 @@ function guardarEdicionPedido(){
   DB.guardarPedido(p);
   moverDevoluciones(p.devoluciones, 1, '#' + p.folio);
   guardarTicket({lineas:[]});
+  if(p.origenRec) fbSeguimiento(p.origenRec, {estado:'Programado', entrega:p.fechaEntrega, horario:p.horario});
   return p;
 }
 function cancelarEdicionPedido(){
@@ -4179,6 +4185,7 @@ function cancelarPedidoProg(id){
     const motivo = bg.querySelector('#cpMot .dia.on').dataset.m, nota = bg.querySelector('#cpNota').value.trim(), dev = bg.querySelector('#cpDev');
     if(dev && dev.checked) moverDevoluciones(p.devoluciones, -1, 'Cancelación #' + p.folio);
     p.estado = 'Cancelado'; p.cancelado = {fecha:new Date().toISOString(), usuario:session.nombre, motivo, nota, devolucionQuitada: !!(dev && dev.checked)}; p.sincronizado = false;
+    if(p.origenRec) fbSeguimiento(p.origenRec, {estado:'Cancelado'});
     DB.guardarPedido(p); bg.remove(); toast(`Venta #${p.folio} cancelada`); renderVenta();
   };
 }
@@ -6518,6 +6525,7 @@ function importarObjPedido(o, extra = {}){
     lineas:o.l.map(([pid, cant, precio, nombre])=> ({pid, cantidad:Number(cant), precio:Number(precio), nombre: nombre || nombreTicket(artPorId(pid) || {nombre:pid}), porKilo: !!artPorId(pid)?.porKilo})),
     nota:o.nota || '', estado:'Nuevo', ...extra});
   store.set('pedidosRecibidos', ls);
+  if((extra.estado || 'Nuevo')==='Nuevo') fbSeguimiento(o.id, {estado:'Recibido', recibido:new Date().toISOString()});
   return {id:o.id, repetido:false};
 }
 (function recibirPedidoDeLink(){
@@ -6567,16 +6575,22 @@ function detallePedidoRec(id){
     ${p.nota ? `<p class="sub"><b>Nota:</b> ${esc(p.nota)}</p>` : ''}
     <div class="cd-acts">
       ${p.estado!=='Atendido' ? `<button class="btn" data-a="pre">${svg('preventa')}Pasar a preventa</button><button class="btn ghost" data-a="venta">${svg('venta')}Pasar a venta</button>` : ''}
-      ${p.cliente.telefono ? `<button class="btn ghost" data-a="wa">${svg('whatsapp')}Escribir al cliente</button>` : ''}
+      ${telPedRec(p) ? `<button class="btn ghost" data-a="wa">${svg('whatsapp')}Confirmar por WhatsApp</button>` : ''}
       ${p.estado==='Nuevo' ? `<button class="btn ghost danger-o" data-a="desc">Descartar</button>` : ''}
       <button class="btn ghost" data-a="x">Cerrar</button>
     </div>`);
   const act = (a, f)=>{ const b = bg.querySelector(`[data-a="${a}"]`); if(b) b.onclick = ()=>{ bg.remove(); f(); }; };
-  act('x', ()=>{}); act('wa', ()=> abrirWa(urlWa(p.cliente.telefono, `Hola ${p.cliente.nombre}, recibimos tu pedido por ${fmt(totalPedRec(p))}. ¡Gracias!`)));
+  act('x', ()=>{}); act('wa', ()=> abrirWa(urlWa(telPedRec(p), msgConfirmacion(p.cliente.nombre, totalPedRec(p), (DB.pedidos.find(x=> x.origenRec===p.id && x.estado==='Programado')||{}).fechaEntrega))));
   act('desc', ()=>{ marcarPedRec(p.id, 'Descartado'); current==='catalogo' ? renderCatalogo() : renderVenta(); });
   act('pre', ()=> cargarPedidoRec(p, 'preventa')); act('venta', ()=> cargarPedidoRec(p, 'venta'));
 }
-function marcarPedRec(id, estado){ store.set('pedidosRecibidos', pedidosRecibidos().map(x=> x.id===id ? {...x, estado, atendido: new Date().toISOString()} : x)); fbMarcarPedido(id, estado); renderMenu(); }
+const telPedRec = p => p.cliente.telefono || (p.clienteId && (clientes().find(c=> c.id===p.clienteId)||{}).telefono) || '';
+function msgConfirmacion(nombre, total, entrega, horario){
+  const neg = (store.get('config').negocio || impCfg().encabezado || 'Merkalimentos');
+  const cuando = entrega ? new Date(entrega + 'T12:00').toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long'}) : '';
+  return `Hola ${nombre}, recibimos tu pedido por ${fmt(total)}.` + (cuando ? ` Te lo entregamos el *${cuando}*${horario && !/cualquier/i.test(horario) ? ` (${horario})` : ''}.` : ' En breve te confirmamos el día de entrega.') + ` ¡Gracias por tu preferencia! — ${neg}`;
+}
+function marcarPedRec(id, estado){ store.set('pedidosRecibidos', pedidosRecibidos().map(x=> x.id===id ? {...x, estado, atendido: new Date().toISOString()} : x)); fbMarcarPedido(id, estado); if(estado==='Descartado') fbSeguimiento(id, {estado:'Cancelado'}); renderMenu(); }
 function cargarPedidoRec(p, modo){
   if(!turnoActual()){ toast('Abre un turno para pasar el pedido'); return; }
   go(modo);
@@ -6584,7 +6598,7 @@ function cargarPedidoRec(p, modo){
   const c = p.clienteId ? clientes().find(x=> x.id===p.clienteId) : null;
   const lineas = p.lineas.map(l=>{ const a = artPorId(l.pid);
     return {lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:l.pid, nombre:l.nombre, precio:l.precio, porKilo:l.porKilo, cantidad:l.cantidad, ...(a && a.precio !== l.precio ? {especial:true, promoRegla:null} : {})}; });
-  guardarTicket({lineas, cliente: c ? clienteRef(c) : null, preguntado:true, nombre:`Pedido catálogo · ${p.cliente.tienda || p.cliente.nombre}`, comentario:p.nota || ''});
+  guardarTicket({lineas, cliente: c ? clienteRef(c) : null, preguntado:true, nombre:`Pedido catálogo · ${p.cliente.tienda || p.cliente.nombre}`, comentario:p.nota || '', origenRec:p.id});
   marcarPedRec(p.id, 'Atendido');
   ventaVista = 'ticket'; renderVenta();
   toast(c ? 'Pedido cargado: revisa y ' + (modo==='preventa' ? 'programa la entrega' : 'cobra') : 'Pedido cargado: asigna el cliente');
@@ -6648,6 +6662,11 @@ function recibirPedidoNube(d){
   }
   const r = importarObjPedido({id:d.id, f:d.f, c:d.c, cli:d.cli, nota:d.nota, l:d.l.map(x=> [x.id, x.q, x.p, x.n])}, {nube:true, estado: d.estado || 'Nuevo'});
   return r && !r.repetido && (d.estado || 'Nuevo')==='Nuevo' ? pedidosRecibidos().find(p=> p.id===d.id) : null;
+}
+/* Seguimiento que ve el cliente en su catálogo (sin datos personales) */
+function fbSeguimiento(id, datos){
+  if(!fbListo() || !id) return;
+  FB.setDoc(FB.doc(fbDb, 'seguimiento', id), {...datos, actualizado:new Date().toISOString()}, {merge:true}).catch(e=> console.warn('seguimiento', e));
 }
 function fbMarcarPedido(id, estado){
   if(!fbListo()) return;
@@ -6718,6 +6737,10 @@ service cloud.firestore {
       allow list, write: if staff();
     }
     match /clientesCat/{tok} {
+      allow get: if true;
+      allow list, write: if staff();
+    }
+    match /seguimiento/{pid} {
       allow get: if true;
       allow list, write: if staff();
     }
