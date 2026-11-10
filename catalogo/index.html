@@ -567,9 +567,10 @@ function barraSeg(sg, u){
 const misPedidos = ()=>{ let l = ls.get(K + '_pedidos') || []; const u = ls.get(K + '_ultimo'); if(u && u.id && !l.some(x=> x.id===u.id)) l = [u, ...l]; return l; };
 function guardarEnHistorial(o){ const l = misPedidos().filter(x=> x.id!==o.id); l.unshift(o); ls.set(K + '_pedidos', l.slice(0, 30)); pintarBotonMis(); }
 function pintarBotonMis(){ const el = document.getElementById('misPed'); if(!el) return; const n = misPedidos().length;
-  el.innerHTML = n ? `<button class="mis-btn" id="btnMis">📋 Mis pedidos <i>${n}</i></button>` : ''; const b = el.querySelector('#btnMis'); if(b) b.onclick = verMisPedidos; }
+  el.innerHTML = `<button class="mis-btn" id="btnMis">📋 Mis pedidos${n ? ` <i>${n}</i>` : ''}</button>`; const b = el.querySelector('#btnMis'); if(b) b.onclick = verMisPedidos; }
 async function verMisPedidos(){
   const l = misPedidos();
+  if(!l.length){ const h0 = hoja(`<h3>Mis pedidos</h3><p class="sub">Aquí verás tus pedidos y en qué paso va cada uno: recibido, programado, en reparto y entregado.</p><p class="sub">Todavía no has hecho pedidos desde este celular. Toca <b>Realizar pedido</b> para empezar.</p><div class="acts"><button class="btn" id="mpX">Entendido</button></div>`); h0.querySelector('#mpX').onclick = ()=> h0.remove(); return; }
   const h = hoja(`<h3>Mis pedidos</h3><p class="sub">Pedidos hechos desde este celular. Toca un pedido para ver sus productos.</p><div id="mpL">${l.map(o=>`<div class="mp-item" data-id="${o.id}"><div class="sgbar" style="box-shadow:none;margin:0;padding:0"><h4>${new Date(o.f).toLocaleDateString('es-MX',{weekday:'short', day:'numeric',month:'short'})} · ${fmt(o.total)}</h4><p class="sub" style="margin:0">Consultando estado…</p></div></div>`).join('')}</div>
     <div class="acts"><button class="btn sec" id="mpX">Cerrar</button></div>`);
   h.querySelector('#mpX').onclick = ()=> h.remove();
