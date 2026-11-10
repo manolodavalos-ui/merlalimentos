@@ -564,17 +564,26 @@ function barraSeg(sg, u){
     ${can ? `<div class="can-t">Pedido cancelado</div><div class="can-s">Escríbenos si tienes dudas</div>` : ''}</div>`;
 }
 /* Historial de pedidos de este celular */
-const misPedidos = ()=>{ let l = ls.get(K + '_pedidos') || []; const u = ls.get(K + '_ultimo'); if(u && u.id && !l.some(x=> x.id===u.id)) l = [u, ...l]; return l; };
+/* Lista = pedidos de la nube (todas sus ventas, aunque las haya programado el vendedor) + los hechos en este celular */
+const misPedidos = ()=>{
+  let l = ls.get(K + '_pedidos') || []; const u = ls.get(K + '_ultimo'); if(u && u.id && !l.some(x=> x.id===u.id)) l = [u, ...l];
+  const nube = (CLI && CLI.ped) || {};
+  l = l.map(x=> nube[x.id] ? {...x, ...nube[x.id], id:x.id, sg:nube[x.id]} : x);
+  Object.entries(nube).forEach(([id, e])=>{ if(!l.some(x=> x.id===id)) l.push({...e, id, sg:e}); });
+  return l.filter(x=> x.f).sort((a,b)=> String(b.f).localeCompare(String(a.f))).slice(0, 30);
+};
+async function refrescarCliNube(){ if(!tok) return; try{ const {m, db} = await conLimite(nube(), 8000); const c = await conLimite(m.getDoc(m.doc(db, 'clientesCat', tok)), 8000); if(c.exists()){ CLI = c.data(); ls.set(K + '_cli', CLI); } }catch(_){} }
 function guardarEnHistorial(o){ const l = misPedidos().filter(x=> x.id!==o.id); l.unshift(o); ls.set(K + '_pedidos', l.slice(0, 30)); pintarBotonMis(); }
 function pintarBotonMis(){ const el = document.getElementById('misPed'); if(!el) return; const n = misPedidos().length;
   el.innerHTML = `<button class="mis-btn" id="btnMis">📋 Mis pedidos${n ? ` <i>${n}</i>` : ''}</button>`; const b = el.querySelector('#btnMis'); if(b) b.onclick = verMisPedidos; }
 async function verMisPedidos(){
+  await refrescarCliNube(); pintarBotonMis();
   const l = misPedidos();
   if(!l.length){ const h0 = hoja(`<h3>Mis pedidos</h3><p class="sub">Aquí verás tus pedidos y en qué paso va cada uno: recibido, programado, en reparto y entregado.</p><p class="sub">Todavía no has hecho pedidos desde este celular. Toca <b>Realizar pedido</b> para empezar.</p><div class="acts"><button class="btn" id="mpX">Entendido</button></div>`); h0.querySelector('#mpX').onclick = ()=> h0.remove(); return; }
   const h = hoja(`<h3>Mis pedidos</h3><p class="sub">Pedidos hechos desde este celular. Toca un pedido para ver sus productos.</p><div id="mpL">${l.map(o=>`<div class="mp-item" data-id="${o.id}"><div class="sgbar" style="box-shadow:none;margin:0;padding:0"><h4>${new Date(o.f).toLocaleDateString('es-MX',{weekday:'short', day:'numeric',month:'short'})} · ${fmt(o.total)}</h4><p class="sub" style="margin:0">Consultando estado…</p></div></div>`).join('')}</div>
     <div class="acts"><button class="btn sec" id="mpX">Cerrar</button></div>`);
   h.querySelector('#mpX').onclick = ()=> h.remove();
-  const sgs = await Promise.all(l.map(o=> leerSeguimiento(o.id)));
+  const sgs = await Promise.all(l.map(o=> o.sg ? o.sg : leerSeguimiento(o.id)));
   l.forEach((o,i)=>{ const el = h.querySelector(`.mp-item[data-id="${o.id}"]`); if(!el) return;
     const sg = sgs[i];
     el.innerHTML = (sg === undefined ? `<div class="sgbar" style="box-shadow:none;margin:0;padding:0"><h4>${new Date(o.f).toLocaleDateString('es-MX',{weekday:'short', day:'numeric',month:'short'})} · ${fmt(o.total)}</h4><p class="sub" style="margin:0">Sin conexión: no se pudo consultar el estado</p></div>` : barraSeg(sg, o))
@@ -582,9 +591,9 @@ async function verMisPedidos(){
   });
 }
 async function pintarUltimo(){
-  const u = ls.get(K + '_ultimo'), el = document.getElementById('ultPed'); if(!el || !u || !u.id) return;
+  const u = misPedidos()[0], el = document.getElementById('ultPed'); if(!el || !u || !u.id) return;
   if(Date.now() - new Date(u.f).getTime() > 10*864e5) return;
-  const sg = await leerSeguimiento(u.id); if(sg === undefined) return;
+  const sg = u.sg || await leerSeguimiento(u.id); if(sg === undefined) return;
   if(sg && sg.estado==='Entregado' && Date.now() - new Date(sg.entregado || sg.actualizado).getTime() > 3*864e5) return;
   el.innerHTML = barraSeg(sg, u);
 }
