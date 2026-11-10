@@ -193,6 +193,9 @@ main.flush{padding:0}
 .rl-row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer}.rl-row.falta{background:#fff7f6}
 .rl-t{display:flex;flex-direction:column}.rl-t small{color:var(--muted)}.rl-q{display:flex;flex-direction:column;align-items:flex-end;gap:3px}.rl-q b{font-size:1.05rem}
 .rl-det{grid-column:1/-1;margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--bg);font-size:.88rem}.rl-det div{display:flex;justify-content:space-between;padding:3px 0}.rl-det small{color:var(--muted)}
+.rl-mas{grid-column:1/-1;font-size:.78rem;color:var(--brand);font-weight:600}
+.rl-sep{margin:0 0 4px;font-weight:700;color:var(--ink,#222)}.rl-n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--brand);color:#fff;font-style:normal;font-size:.72rem;margin-right:6px}
+.rl-det b{font-size:1rem}
 .rl-fecha{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}.rl-fecha input{border:0;background:transparent;font:inherit;color:inherit;width:auto;max-width:130px}
 .cg-src{margin:0 0 8px}.cg-src.on{border-color:var(--brand);background:var(--brand-soft)}
 .ec-dias{padding:0 0 10px;margin:0 -4px;border:0}
@@ -442,8 +445,8 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .tk-prev{margin:6px 0 14px}
 .tk-prev b{display:block;font-size:.85rem;color:var(--brand);margin-bottom:6px}
 .tk-prev pre{background:#fffdf5;border:1px dashed var(--line);border-radius:8px;padding:10px;font-size:11px;line-height:1.35;overflow-x:auto;white-space:pre;font-family:ui-monospace,monospace}
-#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare,#avisarCli,#avisarImg{display:flex;align-items:center;justify-content:center;gap:8px}
-#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg,#avisarCli svg,#avisarImg svg{width:20px;height:20px;stroke:currentColor}
+#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare,#avisarCli,#avisarImg,#rlCargar,#pdEntregar,#ecTodos{display:flex;align-items:center;justify-content:center;gap:8px}
+#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg,#avisarCli svg,#avisarImg svg,#rlCargar svg,#pdEntregar svg,#ecTodos svg{width:20px;height:20px;stroke:currentColor}
 .tk-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 12px}.tk-acts .btn{display:flex;align-items:center;justify-content:center;gap:8px}.tk-acts .btn svg{width:20px;height:20px;flex:none;stroke:currentColor}.tk-acts .btn{margin:0}
 
 .add-prod{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em}
@@ -1971,7 +1974,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.46';
+const APP_VERSION = '0.46.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4221,7 +4224,7 @@ function viewRelacion(){
     filas += `<div class="rl-row${x.falta > 0 ? ' falta' : ''}" data-pid="${x.pid}">
       <span class="rl-t"><b>${esc(x.nombre)}</b><small>${x.pedidos.length} ${x.pedidos.length===1?'pedido':'pedidos'} · hay ${fmtCant(x.pid, x.hay)}${x.cam ? ` (almacén ${fmtCant(x.pid, x.alm)}, camioneta ${fmtCant(x.pid, x.cam)})` : ''}</small></span>
       <span class="rl-q"><b>${fmtCant(x.pid, x.cant)}</b>${x.falta > 0 ? `<i class="tag-c">faltan ${fmtCant(x.pid, x.falta)}</i>` : `<i class="tag-v">alcanza</i>`}</span>
-      ${relAbierto===x.pid ? `<div class="rl-det">${x.pedidos.map(d=>`<div><span>${esc(d.cli)} <small>#${esc(d.folio)}</small></span><b>${fmtCant(x.pid, d.cant)}</b></div>`).join('')}</div>` : ''}
+      ${relAbierto===x.pid || (esKg(x.pid) && relAbierto!=='-'+x.pid) ? `<div class="rl-det">${esKg(x.pid) ? '<p class="rl-sep">Separar por entrega:</p>' : ''}${x.pedidos.map((d,i)=>`<div><span>${esKg(x.pid) ? `<i class="rl-n">${i+1}</i>` : ''}${esc(d.cli)} <small>#${esc(d.folio)}</small></span><b>${fmtCant(x.pid, d.cant)}</b></div>`).join('')}</div>` : `<span class="rl-mas">▾ ver a qué clientes va</span>`}
     </div>`;
   });
   return `<div class="rc-wrap">
@@ -4240,7 +4243,7 @@ function viewRelacion(){
 function textoRelacion(){
   const R = relacionDia(relDia), ls = relSoloFalta ? R.ls.filter(x=> x.falta > 0) : R.ls;
   return `*Productos a entregar · ${fechaCorta(relDia)}*\n${R.peds.length} ventas programadas · ${fmt(R.total)}\n\n` +
-    ls.map(x=> `• ${x.nombre}: ${fmtCant(x.pid, x.cant)}${x.falta > 0 ? ` (faltan ${fmtCant(x.pid, x.falta)})` : ''}`).join('\n');
+    ls.map(x=> `• ${x.nombre}: ${fmtCant(x.pid, x.cant)}${x.falta > 0 ? ` (faltan ${fmtCant(x.pid, x.falta)})` : ''}` + (esKg(x.pid) && x.pedidos.length > 1 ? '\n' + x.pedidos.map((d,i)=> `    ${i+1}) ${d.cli}: ${fmtCant(x.pid, d.cant)}`).join('\n') : '')).join('\n');
 }
 function bindRelacion(){
   document.querySelectorAll('[data-rd]').forEach(b=> b.onclick = ()=>{ relDia = b.dataset.rd; relAbierto = null; renderVenta(); });
@@ -4252,7 +4255,8 @@ function bindRelacion(){
   const sh = document.getElementById('rlShare'); if(sh) sh.onclick = async ()=>{ const t = textoRelacion();
     try{ if(navigator.share){ await navigator.share({title:'Productos a entregar', text:t}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
     copiarTexto(t, 'Lista copiada'); };
-  document.querySelectorAll('.rl-row').forEach(r=> r.onclick = ()=>{ relAbierto = relAbierto===r.dataset.pid ? null : r.dataset.pid; const y = window.scrollY; renderVenta(); window.scrollTo(0, y); });
+  document.querySelectorAll('.rl-row').forEach(r=> r.onclick = ()=>{ const id = r.dataset.pid, abierto = r.querySelector('.rl-det');
+    relAbierto = abierto ? (esKg(id) ? '-' + id : null) : id; const y = window.scrollY; renderVenta(); window.scrollTo(0, y); });
 }
 
 let pedidoSel = null;
