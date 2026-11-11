@@ -196,6 +196,9 @@ main.flush{padding:0}
 .rl-mas{grid-column:1/-1;font-size:.78rem;color:var(--brand);font-weight:600}
 .rl-sep{margin:0 0 4px;font-weight:700;color:var(--ink,#222)}.rl-n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--brand);color:#fff;font-style:normal;font-size:.72rem;margin-right:6px}
 .rl-det b{font-size:1rem}
+.rl-prov{margin:12px 12px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden}.rl-prov .rl-row{border-bottom:1px solid var(--line)}.rl-prov .rl-row:last-child{border-bottom:0}
+.rl-ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;background:var(--bg)}.rl-ph span{display:flex;flex-direction:column}.rl-ph small{color:var(--muted)}
+.rl-oc{margin:0;padding:8px 12px;font-size:.82rem;white-space:nowrap;width:auto}
 .rl-fecha{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}.rl-fecha input{border:0;background:transparent;font:inherit;color:inherit;width:auto;max-width:130px}
 .cg-src{margin:0 0 8px}.cg-src.on{border-color:var(--brand);background:var(--brand-soft)}
 .ec-dias{padding:0 0 10px;margin:0 -4px;border:0}
@@ -1974,7 +1977,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.46.2';
+const APP_VERSION = '0.47';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4204,7 +4207,16 @@ function cancelarPedidoProg(id){
 }
 
 /* ----- Relación de productos a entregar por día ----- */
-let relDia = null, relSoloFalta = false, relAbierto = null, relDesde = 'inicioPre';
+let relDia = null, relSoloFalta = false, relAbierto = null, relDesde = 'inicioPre', relModo = 'producto';
+const relEnInv = ()=> current==='inventario';
+const relRender = ()=> relEnInv() ? renderInventario() : renderVenta();
+function crearOCFaltantes(prov){
+  const R = relacionDia(relDia), ls = R.ls.filter(x=> x.falta > 0 && (x.a?.proveedor || 'Sin proveedor')===prov);
+  if(!ls.length) return;
+  compTab = 'productos'; compProv = prov; compOC = null; compQ = ''; compBorr = {};
+  ls.forEach(x=> compBorr[x.pid] = {cant: esKg(x.pid) ? Math.ceil(x.falta*10)/10 : Math.ceil(x.falta)});
+  go('compras'); toast(`${ls.length} faltantes de ${prov} listos: revisa y toca Orden de compra`);
+}
 function relacionDia(dia){
   const peds = DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega===dia), m = {};
   peds.forEach(p=> (p.lineas||[]).forEach(l=>{
@@ -4223,7 +4235,19 @@ function viewRelacion(){
   const chip = (k, t)=> `<button class="dia${relDia===k?' on':''}" data-rd="${k}">${t}</button>`;
   const pasado = (()=>{ const d = new Date(); d.setDate(d.getDate()+2); return hoyClave(d); })();
   let sec = '', filas = '';
-  ver.forEach(x=>{
+  if(relModo==='proveedor'){
+    const grupos = {}; ver.forEach(x=>{ const pv = x.a?.proveedor || 'Sin proveedor'; (grupos[pv] = grupos[pv] || []).push(x); });
+    Object.entries(grupos).sort((a,b)=> b[1].filter(x=> x.falta>0).length - a[1].filter(x=> x.falta>0).length || a[0].localeCompare(b[0],'es')).forEach(([pv, xs])=>{
+      const fl = xs.filter(x=> x.falta > 0), costo = sumar(fl, x=> x.falta * (Number(x.a?.costo)||0));
+      filas += `<div class="rl-prov"><div class="rl-ph"><span><b>${esc(pv)}</b><small>${fl.length ? `${fl.length} ${fl.length===1?'faltante':'faltantes'}${costo ? ' · aprox. ' + fmt(costo) : ''}` : 'Todo alcanza ✓'}</small></span>
+        ${fl.length && pv!=='Sin proveedor' && session.rol==='admin' ? `<button class="btn ghost rl-oc" data-prov="${esc(pv)}">Crear orden de compra</button>` : ''}</div>`;
+      xs.forEach(x=>{ filas += `<div class="rl-row${x.falta > 0 ? ' falta' : ''}" data-pid="${x.pid}">
+        <span class="rl-t"><b>${esc(x.nombre)}</b><small>pedidos ${fmtCant(x.pid, x.cant)} · hay ${fmtCant(x.pid, x.hay)}</small></span>
+        <span class="rl-q">${x.falta > 0 ? `<b class="neg">${fmtCant(x.pid, x.falta)}</b><i class="tag-c">comprar</i>` : `<i class="tag-v">alcanza</i>`}</span></div>`; });
+      filas += `</div>`;
+    });
+  }
+  else ver.forEach(x=>{
     if(x.sec !== sec){ sec = x.sec; filas += `<div class="rc-day">${esc(sec)}</div>`; }
     filas += `<div class="rl-row${x.falta > 0 ? ' falta' : ''}" data-pid="${x.pid}">
       <span class="rl-t"><b>${esc(x.nombre)}</b><small>${x.pedidos.length} ${x.pedidos.length===1?'pedido':'pedidos'} · hay ${fmtCant(x.pid, x.hay)}${x.cam ? ` (almacén ${fmtCant(x.pid, x.alm)}, camioneta ${fmtCant(x.pid, x.cam)})` : ''}</small></span>
@@ -4237,7 +4261,8 @@ function viewRelacion(){
         <label class="dia rl-fecha">Otro día <input type="date" id="rlFecha" value="${relDia}"></label></div>
       <div class="rl-res"><b>${fechaCorta(relDia)}</b><span>${R.peds.length} ${R.peds.length===1?'venta programada':'ventas programadas'} · ${fmt(R.total)} · ${R.ls.length} productos</span>
         ${R.ls.length ? (faltan.length ? `<span class="neg"><b>Faltan ${faltan.length} ${faltan.length===1?'producto':'productos'}</b> para cubrir el día</span>` : `<span class="pos"><b>El inventario alcanza para todo el día ✓</b></span>`) : ''}</div>
-      ${R.ls.length ? `<button class="btn" id="rlCargar" style="margin:12px 0 0">${svg('inventario')}Cargar a la camioneta</button>` : ''}
+      ${R.ls.length && !relEnInv() ? `<button class="btn" id="rlCargar" style="margin:12px 0 0">${svg('inventario')}Cargar a la camioneta</button>` : ''}
+      ${R.ls.length ? `<div class="dias filtro" style="padding:12px 0 0;border:0">${[['producto','Por producto'],['proveedor','Por proveedor (compras)']].map(([k,t])=>`<button class="dia${relModo===k?' on':''}" data-rm="${k}">${t}</button>`).join('')}</div>` : ''}
       ${R.ls.length ? `<div class="tk-acts" style="margin:10px 0 4px"><button class="btn ghost" id="rlFalta">${relSoloFalta ? 'Ver todos' : 'Solo faltantes'}</button><button class="btn ghost" id="rlShare">${svg('share')}Compartir</button></div>` : ''}
     </div>
     ${R.ls.length ? (filas || '<div class="rc-empty"><p>Todo alcanza ✓</p></div>') + `<p class="note-sm" style="padding:0 16px">"Hay" es el inventario actual de almacén más camioneta. Toca un producto para ver a qué clientes va.</p>`
@@ -4250,17 +4275,19 @@ function textoRelacion(){
     ls.map(x=> `• ${x.nombre}: ${fmtCant(x.pid, x.cant)}${x.falta > 0 ? ` (faltan ${fmtCant(x.pid, x.falta)})` : ''}` + (esKg(x.pid) && x.pedidos.length > 1 ? '\n' + x.pedidos.map((d,i)=> `    ${i+1}) ${d.cli}: ${fmtCant(x.pid, d.cant)}`).join('\n') : '')).join('\n');
 }
 function bindRelacion(){
-  document.querySelectorAll('[data-rd]').forEach(b=> b.onclick = ()=>{ relDia = b.dataset.rd; relAbierto = null; renderVenta(); });
-  const f = document.getElementById('rlFecha'); if(f) f.onchange = ()=>{ if(f.value){ relDia = f.value; relAbierto = null; renderVenta(); } };
+  document.querySelectorAll('[data-rm]').forEach(b=> b.onclick = ()=>{ relModo = b.dataset.rm; relRender(); });
+  document.querySelectorAll('.rl-oc').forEach(b=> b.onclick = e=>{ e.stopPropagation(); crearOCFaltantes(b.dataset.prov); });
+  document.querySelectorAll('[data-rd]').forEach(b=> b.onclick = ()=>{ relDia = b.dataset.rd; relAbierto = null; relRender(); });
+  const f = document.getElementById('rlFecha'); if(f) f.onchange = ()=>{ if(f.value){ relDia = f.value; relAbierto = null; relRender(); } };
   const rc = document.getElementById('rlCargar'); if(rc) rc.onclick = ()=>{
     if(!turnoActual()){ toast('Abre un turno para registrar la carga'); return; }
     const dia = relDia; go('inventario'); invVista = 'carga'; cargaDia = dia; invBorr = {}; alternarFuente('ped'); renderInventario(); window.scrollTo(0,0); };
-  const sf = document.getElementById('rlFalta'); if(sf) sf.onclick = ()=>{ relSoloFalta = !relSoloFalta; renderVenta(); };
+  const sf = document.getElementById('rlFalta'); if(sf) sf.onclick = ()=>{ relSoloFalta = !relSoloFalta; relRender(); };
   const sh = document.getElementById('rlShare'); if(sh) sh.onclick = async ()=>{ const t = textoRelacion();
     try{ if(navigator.share){ await navigator.share({title:'Productos a entregar', text:t}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
     copiarTexto(t, 'Lista copiada'); };
   document.querySelectorAll('.rl-row').forEach(r=> r.onclick = ()=>{ const id = r.dataset.pid, abierto = r.querySelector('.rl-det');
-    relAbierto = abierto ? (esKg(id) ? '-' + id : null) : id; const y = window.scrollY; renderVenta(); window.scrollTo(0, y); });
+    relAbierto = abierto ? (esKg(id) ? '-' + id : null) : id; const y = window.scrollY; relRender(); window.scrollTo(0, y); });
 }
 
 let pedidoSel = null;
@@ -5755,7 +5782,7 @@ function porCaducar(dias = 7){
 /* ===== Vistas ===== */
 function viewInventario(){
   const v = {articulo:viewKardex, carga:viewCarga, liquidacion:viewLiquidacion, conteo:viewConteo, conteos:viewConteos, conteoDet:viewConteoDet,
-    ajuste:viewAjusteInv, devoluciones:viewDevolInv, compras:viewCompras, compra:viewCompra, recepcion:viewRecepcion, reportes:viewReportesInv}[invVista];
+    ajuste:viewAjusteInv, devoluciones:viewDevolInv, compras:viewCompras, compra:viewCompra, recepcion:viewRecepcion, reportes:viewReportesInv, entregas:viewRelacion}[invVista];
   if(v) return v();
   const adm = session.rol==='admin', t = turnoActual(), arts = invArts();
   const bajo = arts.filter(a=>{ const p = paramInv(a.id); return p.min > 0 && stockEn('almacen', a.id) < p.min; });
@@ -5788,6 +5815,7 @@ function viewInventario(){
       ${adm ? `<button class="ub-b" id="ivCompras">${svg('compras')}Compras</button><button class="ub-b" id="ivAjuste">${svg('config')}Movimiento</button>` : ''}
       <button class="ub-b" id="ivDev">${svg('back')}Devoluciones${(n=> n ? ' · '+n : '')(Object.values(inv2().devoluciones).filter(q=> q > 0.0005).length)}</button>
       <button class="ub-b" id="ivRep">${svg('informes')}Reportes</button>
+      <button class="ub-b" id="ivEnt">${svg('preventa')}Por entregar</button>
     </div>
     ${adm ? `<div class="cr-pad" style="padding:10px 16px 2px"><button class="btn" id="ivConteo2" style="margin:0">${svg('inventario')}Capturar conteo (existencias)</button>
       <p class="note-sm" style="text-align:left;margin-top:6px">También puedes tocar un producto y usar "Agregar existencia".</p></div>` : ''}
@@ -6245,7 +6273,7 @@ function renderInventario(){
     document.querySelectorAll('.inv .dias.filtro .dia').forEach(b=> b.onclick = ()=>{ invFiltro = b.dataset.f; renderInventario(); });
     buscar();
     document.querySelectorAll('.inv-row').forEach(b=> b.onclick = ()=>{ invSel = b.dataset.pid; invVista = 'articulo'; renderInventario(); });
-    on('ivCarga', ir('carga')); on('ivLiq', ir('liquidacion')); on('ivConteo', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivConteo2', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivCompras', ir('compras')); on('ivAjuste', ir('ajuste')); on('ivRep', ir('reportes')); on('ivConteos', ir('conteos')); on('ivDev', ir('devoluciones'));
+    on('ivCarga', ir('carga')); on('ivLiq', ir('liquidacion')); on('ivConteo', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivConteo2', ()=>{ invUb = 'almacen'; ir('conteo')(); }); on('ivCompras', ir('compras')); on('ivAjuste', ir('ajuste')); on('ivRep', ir('reportes')); on('ivEnt', ()=>{ relDia = null; relModo = 'proveedor'; relSoloFalta = true; ir('entregas')(); }); on('ivConteos', ir('conteos')); on('ivDev', ir('devoluciones'));
   }
   if(invVista==='articulo'){ on('kAgregar', ()=> dialogoExistencia(invSel, 'sumar')); on('kFijar', ()=> dialogoExistencia(invSel, 'fijar'));
     on('kAjuste', ()=>{ invBorr = {tipo:'ajuste', ub:'almacen', signo:-1, pid:invSel}; invVista = 'ajuste'; renderInventario(); });
@@ -6329,6 +6357,7 @@ function renderInventario(){
       confirmar({titulo:'Pasar a merma', ok:'Pasar a merma', peligro:true, texto:`${esc(nombreTicket(artPorId(pid)||{nombre:pid}))} × ${fmtExist(q)} (${fmt(valorCosto(pid, q))} a costo) se registra como merma.`,
         alAceptar:()=>{ moverStock([{ub:'devoluciones', pid, cant:-q}], 'merma', 'Devolución sin reposición'); renderInventario(); }}); });
   }
+  if(invVista==='entregas') bindRelacion();
   if(invVista==='reportes') document.querySelectorAll('#irDias .dia').forEach(b=> b.onclick = ()=>{ invRepDias = Number(b.dataset.n); renderInventario(); });
 }
 function atrasInv(){
@@ -6339,7 +6368,7 @@ function atrasInv(){
   invBorr = null; invQ = ''; renderInventario();
 }
 const TITULOS_INV = {devoluciones:'Devoluciones de clientes', articulo:'Producto', carga:'Cargar camioneta', liquidacion:'Liquidar camioneta', conteo:'Conteo de inventario', conteos:'Conteos realizados', conteoDet:'Conteo',
-  ajuste:'Movimiento de inventario', compras:'Compras', compra:'Orden de compra', recepcion:'Recibir mercancía', reportes:'Reportes de inventario'};
+  ajuste:'Movimiento de inventario', compras:'Compras', compra:'Orden de compra', recepcion:'Recibir mercancía', reportes:'Reportes de inventario', entregas:'Productos a entregar'};
 
 /* ================= Catálogo en línea y pedidos de clientes ================= */
 const CAT_URL = 'https://manolodavalos-ui.github.io/merlalimentos/catalogo/';
