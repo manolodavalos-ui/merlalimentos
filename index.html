@@ -1974,7 +1974,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.46.1';
+const APP_VERSION = '0.46.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2051,7 +2051,7 @@ const PERMISOS = {
   admin:    MENU.filter(m=>m.id).map(m=>m.id),
   vendedor: ['venta','preventa','cotizar','recibos','turno','articulos','catalogo','clientes','mapa','creditos','inventario','compras']
 };
-const NECESITA_TURNO = ['venta','preventa'];
+const NECESITA_TURNO = ['venta'];
 
 let session = null;
 let current = 'turno';
@@ -4064,13 +4064,17 @@ function bindProgramar(){
     if(fechaEntrega < hoyClave()){ toast('La fecha de entrega no puede ser anterior a hoy'); return; }
     if(ticket().editPedido){ if(!ticket().lineas.length){ toast('La venta quedó sin productos: mejor cancélala'); return; } const ed = guardarEdicionPedido(); if(ed){ ultimoPedido = {...ed, _editado:true}; ventaVista = 'programado'; renderVenta(); } return; }
     const t = ticket(), turno = turnoActual();
-    const seq = (turno.pedidos || 0) + 1; turno.pedidos = seq; store.set('turno', turno);
+    /* Folio: con turno, P<turno>-NNN; sin turno, P<equipo>-<AAMMDD>-SNN (contador diario del equipo) */
+    let folio;
+    if(turno){ const seq = (turno.pedidos || 0) + 1; turno.pedidos = seq; store.set('turno', turno); folio = `P${turno.folio}-${String(seq).padStart(3,'0')}`; }
+    else { const hoy = hoyClave(), cs = store.get('pedSeqSinTurno', {}); const n = (cs.dia===hoy ? cs.n : 0) + 1; store.set('pedSeqSinTurno', {dia:hoy, n});
+      folio = `P${String(store.get('config').dispositivo || '').replace(/\D/g,'') || 1}-${hoy.slice(2).replace(/-/g,'')}-S${String(n).padStart(2,'0')}`; }
     const pedido = {
-      id:'P'+Date.now(), folio:`P${turno.folio}-${String(seq).padStart(3,'0')}`,
+      id:'P'+Date.now(), folio,
       fecha:new Date().toISOString(), fechaEntrega, horario:document.getElementById('pHorario').value,
       comentario:document.getElementById('pCom').value.trim(),
       cliente:t.cliente, lineas:congelarLineas(t.lineas), devoluciones:t.devoluciones||[], total:totalTicket(t), estado:'Programado',
-      turno:turno.folio, dispositivo:turno.dispositivo, usuario:session.usuario, vendedor:session.nombre,
+      turno:turno?.folio || null, dispositivo:turno?.dispositivo || store.get('config').dispositivo || '', usuario:session.usuario, vendedor:session.nombre,
       ticketNombre:t.nombre || null, sincronizado:false, ...(t.origenRec ? {origenRec:t.origenRec} : {})
     };
     DB.guardarPedido(pedido);
@@ -4131,7 +4135,7 @@ function bindInicioPre(){
 /* ----- Editar y cancelar ventas programadas ----- */
 function editarPedidoProg(id){
   const p = DB.pedidos.find(x=> x.id===id); if(!p || p.estado!=='Programado') return;
-  if(!turnoActual()){ toast('Abre un turno para editar la venta'); return; }
+
   if(current!=='preventa') go('preventa');
   const t = ticket();
   if(t.lineas.length && t.editPedido !== p.id){ toast('Tienes un pedido en curso: termínalo o vacíalo primero'); ventaVista = 'ticket'; renderVenta(); return; }
@@ -4419,7 +4423,7 @@ function editarLinea(lid){
 }
 
 /* ================= Encabezado ================= */
-function enVenta(){ return ((current==='venta' || current==='preventa') && !!turnoActual()) || current==='cotizar'; }
+function enVenta(){ return (current==='venta' && !!turnoActual()) || current==='preventa' || current==='cotizar'; }
 function renderHeader(){
   const title = document.getElementById('viewTitle');
   const pill = document.getElementById('shiftPill');
@@ -5656,7 +5660,6 @@ function popupCliente(x){
   </div>`;
 }
 function tomarPedido(cid){
-  if(!turnoActual()){ toast('Abre un turno para tomar pedidos'); return; }
   const c = clientes().find(x=> x.id===cid); if(!c) return;
   go('preventa');
   const t = ticket();
@@ -6607,7 +6610,7 @@ function msgConfirmacion(nombre, total, entrega, horario){
 }
 function marcarPedRec(id, estado){ store.set('pedidosRecibidos', pedidosRecibidos().map(x=> x.id===id ? {...x, estado, atendido: new Date().toISOString()} : x)); fbMarcarPedido(id, estado); if(estado==='Descartado'){ fbSeguimiento(id, {estado:'Cancelado'}); const rr = pedidosRecibidos().find(x=> x.id===id); if(rr && rr.token && fbListo()) FB.setDoc(FB.doc(fbDb, 'clientesCat', rr.token), {ped:{[id]: {estado:'Cancelado'}}}, {merge:true}).catch(()=>{}); } renderMenu(); }
 function cargarPedidoRec(p, modo){
-  if(!turnoActual()){ toast('Abre un turno para pasar el pedido'); return; }
+  if(modo==='venta' && !turnoActual()){ toast('Abre un turno para vender: o pásalo a Preventa para programarlo'); return; }
   go(modo);
   if(ticket().lineas.length){ toast('Tienes un ticket en curso: guárdalo o termínalo primero'); return; }
   const c = p.clienteId ? clientes().find(x=> x.id===p.clienteId) : null;
@@ -8438,7 +8441,7 @@ function go(id){
   const m = MENU.find(x=>x.id===id);
   document.getElementById('viewTitle').textContent = m.label;
   const view = document.getElementById('view');
-  const esVenta = ((id==='venta' || id==='preventa') && !!turnoActual()) || id==='cotizar';
+  const esVenta = (id==='venta' && !!turnoActual()) || id==='preventa' || id==='cotizar';
   document.querySelector('main').classList.toggle('flush', esVenta);
   view.classList.toggle('wide', esVenta);
   document.querySelector('.popover')?.remove();
