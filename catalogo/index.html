@@ -669,11 +669,19 @@ function tarjeta(p){
 const nCarrito = ()=> Object.keys(carrito).length;
 const totalCarrito = ()=> r2(Object.entries(carrito).reduce((s,[id,q])=> { const p = prodPorId(id); return s + (p ? precio(p)*q : 0); }, 0));
 function barra(){
-  if(modo==='ver') $('barra').innerHTML = `<div class="in"><button class="btn" id="bPedir">🛒 Realizar pedido${nCarrito() ? ` <b>${nCarrito()}</b>` : ''}</button></div>`;
+  if(modo==='ver') $('barra').innerHTML = `<div class="in">${nCarrito() ? `<button class="btn sec" id="bCancelar" style="flex:0 0 auto;padding:14px 18px">Cancelar</button>` : ''}<button class="btn" id="bPedir">🛒 Realizar pedido${nCarrito() ? ` <b>${nCarrito()}</b>` : ''}</button></div>`;
   else $('barra').innerHTML = `<div class="in"><button class="btn sec" id="bVer" style="flex:0 0 auto;padding:14px 16px">‹ Catálogo</button><button class="btn" id="bTicket">Ticket <b>${nCarrito()}</b> ${fmt(totalCarrito())}</button></div>`;
   const p = $('bPedir'); if(p) p.onclick = ()=>{ modo = 'pedido'; pintar(); toast('Toca los productos para agregarlos'); };
   const v = $('bVer'); if(v) v.onclick = ()=>{ modo = 'ver'; pintar(); };
   const t = $('bTicket'); if(t) t.onclick = verTicket;
+  const c = $('bCancelar'); if(c) c.onclick = cancelarPedidoEnCurso;
+}
+function cancelarPedidoEnCurso(){
+  const n = nCarrito();
+  const h = hoja(`<h3>¿Cancelar tu pedido?</h3><p class="sub">Se quitarán los ${n} ${n===1?'producto':'productos'} que llevas (${fmt(totalCarrito())}). Tus pedidos ya enviados no cambian.</p>
+    <div class="acts"><button class="btn" id="cSi">Sí, cancelar pedido</button><button class="btn sec" id="cNo">No, conservarlo</button></div>`, true);
+  h.querySelector('#cNo').onclick = ()=> h.remove();
+  h.querySelector('#cSi').onclick = ()=>{ carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); h.remove(); modo = 'ver'; pintar(); toast('Pedido cancelado'); };
 }
 function refrescarTarjeta(id){ const el = document.querySelector(`.prod[data-id="${id}"]`); if(el){ const n = document.createElement('div'); n.innerHTML = tarjeta(prodPorId(id)); const nuevo = n.firstElementChild; nuevo.onclick = el.onclick; el.replaceWith(nuevo); } barra(); }
 function agregar(id){
