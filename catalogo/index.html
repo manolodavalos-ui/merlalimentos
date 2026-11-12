@@ -729,7 +729,10 @@ function verTicket(){
   h.querySelector('#tVolver').onclick = ()=>{ h.remove(); if(modo!=='pedido'){ modo = 'pedido'; pintar(); } };
   h.querySelectorAll('[data-m]').forEach(b=> b.onclick = ()=>{ const id = b.closest('.ln').dataset.id, n = (carrito[id]||0) + Number(b.dataset.m); if(n <= 0) delete carrito[id]; else carrito[id] = n; guardarCarrito(); h.remove(); pintar(); verTicket(); });
   h.querySelectorAll('[data-kg]').forEach(b=> b.onclick = ()=>{ h.remove(); pedirKg(prodPorId(b.dataset.kg)); });
-  const vac = h.querySelector('#tVaciar'); if(vac) vac.onclick = ()=>{ if(!confirmarSimple('¿Vaciar el pedido?')) return; carrito = {}; guardarCarrito(); h.remove(); pintar(); };
+  const vac = h.querySelector('#tVaciar'); if(vac) vac.onclick = ()=>{ const n = nCarrito();
+    const c = hoja(`<h3>¿Vaciar el pedido?</h3><p class="sub">Se quitarán los ${n} ${n===1?'producto':'productos'} (${fmt(totalCarrito())}).</p><div class="acts"><button class="btn" id="vSi">Sí, vaciar</button><button class="btn sec" id="vNo">No</button></div>`, true);
+    c.querySelector('#vNo').onclick = ()=> c.remove();
+    c.querySelector('#vSi').onclick = ()=>{ carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); c.remove(); h.remove(); pintar(); toast('Pedido vaciado'); }; };
   const nota = h.querySelector('#tNota'); if(nota) nota.oninput = ()=> ls.set(K + '_nota', nota.value);
   const env = h.querySelector('#tEnviar'); if(env) env.onclick = ()=>{
     const nom = CLI ? (CLI.t || CLI.n) : h.querySelector('#tNom').value.trim(), tel = CLI ? CLI.tel : h.querySelector('#tTel').value.replace(/\D/g,'');
@@ -758,7 +761,7 @@ async function enviar(cli, nota){
   const texto = `*Pedido ${cli.t || cli.n}*\n` + lineas.map(([id,q,pr,nm])=> `• ${prodPorId(id).kg ? r3(q) + ' kg' : q} × ${nm} = ${fmt(r2(pr*q))}`).join('\n') + `\n*Total: ${fmt(total)}*` + (nota ? `\nNota: ${nota}` : '') + `\n\nAbrir en la app: ${link}`;
   const wa = `https://wa.me/${D.negocio?.wa || '529611080808'}?text=${encodeURIComponent(texto)}`;
   const nombreArch = `Pedido ${(cli.t || cli.n).replace(/[\\/:*?"<>|]+/g,' ')} ${new Date().toLocaleDateString('es-MX').replace(/\//g,'-')}.pdf`;
-  if(enNube){ ls.set(K + '_ultimo', {id:pedido.id, f:pedido.f, total}); guardarEnHistorial({id:pedido.id, f:pedido.f, total, l: lineas.map(([id, q, p, n])=> ({q, p, n}))}); carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); modo = 'ver'; pintar(); }
+  if(enNube){ ls.set(K + '_ultimo', {id:pedido.id, f:pedido.f, total}); guardarEnHistorial({id:pedido.id, f:pedido.f, total, l: lineas.map(([id, q, p, n])=> ({q, p, n}))}); carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); modo = 'ver'; pintar(); pintarBotonMis(); setTimeout(pintarUltimo, 300); }
   const waTexto = enNube ? `https://wa.me/${D.negocio?.wa || '529611080808'}?text=${encodeURIComponent(`Hola, acabo de enviar mi pedido desde el catálogo (${cli.t || cli.n}) por ${fmt(total)}.`)}` : wa;
   const h = hoja(enNube ? `<div class="ok">✓</div><h3 style="text-align:center">¡Pedido enviado!</h3>
     <p class="sub" style="text-align:center">${lineas.length} ${lineas.length===1 ? 'producto' : 'productos'} · <b>${fmt(total)}</b></p>
@@ -822,8 +825,8 @@ cargar().then(()=>{ pintarBotonMis(); setTimeout(pintarUltimo, 300); }).catch(()
 /* Botón Atrás del teléfono: cierra ventanas abiertas, luego regresa al catálogo y en la pantalla principal pregunta si desea salir */
 let saliendo = false;
 const armarAtras = ()=>{ try{ history.pushState({mk:1}, ''); }catch(_){} };
-try{ history.replaceState({mkBase:1}, ''); }catch(_){}
-armarAtras();
+/* Al recargar, el navegador ya está parado en nuestra entrada de protección: no se agrega otra */
+if(!(history.state && history.state.mk)){ try{ history.replaceState({mkBase:1}, ''); }catch(_){} armarAtras(); }
 window.addEventListener('popstate', ()=>{
   if(saliendo) return;
   const hs = document.querySelectorAll('.hoja');
