@@ -25,7 +25,7 @@
 <style>
 :root{--bg:#eef1ef;--card:#fff;--text:#1c2321;--muted:#6b7672;--line:#e2e7e5;--brand:#1f6f4a;--brand-2:#2e8b5e;--soft:#e5f2eb;--danger:#c0392b;--gold:#f2c94c}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+html,body{overscroll-behavior-y:none;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
 button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 input,textarea{font:inherit}
 .wrap{max-width:860px;margin:0 auto;padding:0 12px 120px}
@@ -53,6 +53,13 @@ header.cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;pa
 .mp-item{border:1px solid #e3e6e4;border-radius:14px;padding:10px 10px 12px;margin-bottom:12px}
 .hoja .mp-item .sgbar{box-shadow:none;border:0;margin:0;padding:0}
 .mp-det{margin-top:8px;font-size:.8rem;color:#5b6b63}.mp-det summary{cursor:pointer;font-weight:600;color:var(--brand)}.mp-det div{display:flex;justify-content:space-between;padding:2px 0}
+.hx{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;border:0;background:#eef1ef;color:#3b4a42;font-size:1.1rem;line-height:1;cursor:pointer;z-index:2}
+.hoja .pan{position:relative}.hoja .pan > h3:first-of-type{padding-right:40px}
+.salir{position:fixed;top:calc(10px + env(safe-area-inset-top));right:10px;z-index:25;display:flex;align-items:center;gap:4px;border:0;border-radius:999px;padding:7px 12px;background:rgba(0,0,0,.35);color:#fff;font-weight:700;font-size:.82rem;backdrop-filter:blur(4px)}
+.modo-pedido-on .salir{background:rgba(31,111,74,.92)}
+.adios{position:fixed;inset:0;z-index:60;background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px}
+.adios h2{font-size:1.4rem}.adios p{opacity:.85;max-width:300px}.adios .btn{background:#fff;color:var(--brand);max-width:260px}
+.volver{display:flex;align-items:center;gap:6px;margin:0 0 10px;border:0;background:none;color:var(--brand);font-weight:700;font-size:.95rem;padding:4px 0;cursor:pointer}
 .pseg{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#fff8e1;color:#7a5600;font-size:.88rem;text-align:center}.pseg.ok{background:#e6f5ec;color:#1f6f4a}
 .cab .hola{display:inline-block;margin-top:12px;background:rgba(255,255,255,.14);padding:6px 12px;border-radius:999px;font-size:.88rem}
 .secnav{position:sticky;top:0;z-index:10;display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:var(--bg);scrollbar-width:none;max-width:860px;margin:0 auto}
@@ -134,6 +141,7 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 <nav class="secnav" id="secnav"></nav>
 <main class="wrap" id="main"><div class="cargando">Cargando catálogo…</div></main>
 <div class="barra" id="barra"></div>
+<button class="salir" id="bSalir" aria-label="Salir">✕ Salir</button>
 <div class="toast" id="toast"></div>
 <script>/* jsPDF 2.5.2 — MIT */
 /** @license
@@ -642,6 +650,7 @@ function pintar(){
   $('secnav').innerHTML = secs.map((s,i)=> `<button data-i="${i}">${esc(s)}</button>`).join('');
   $('secnav').querySelectorAll('button').forEach(b=> b.onclick = ()=> document.getElementById('sec' + b.dataset.i).scrollIntoView({behavior:'smooth', block:'start'}));
   $('main').className = 'wrap' + (modo==='pedido' ? ' modo-pedido' : '');
+  document.body.classList.toggle('modo-pedido-on', modo==='pedido');
   $('main').innerHTML = secs.map((s,i)=> `<section class="pagina" id="sec${i}"><h2>${esc(s)}</h2><div class="grid">${D.productos.filter(p=> p.s===s).map(tarjeta).join('')}</div></section>`).join('')
     + `<p class="pie">${esc(D.negocio?.nombre || '')} · ${esc(D.negocio?.sub || '')}${D.negocio?.tel ? ' · WhatsApp ' + esc(D.negocio.tel) : ''}<br>Precios sujetos a cambio y a disponibilidad.</p>`;
   $('main').querySelectorAll('.prod').forEach(b=> b.onclick = ()=>{ if(modo==='pedido') agregar(b.dataset.id); else verGrande(b.dataset.id); });
@@ -661,7 +670,7 @@ const nCarrito = ()=> Object.keys(carrito).length;
 const totalCarrito = ()=> r2(Object.entries(carrito).reduce((s,[id,q])=> { const p = prodPorId(id); return s + (p ? precio(p)*q : 0); }, 0));
 function barra(){
   if(modo==='ver') $('barra').innerHTML = `<div class="in"><button class="btn" id="bPedir">🛒 Realizar pedido${nCarrito() ? ` <b>${nCarrito()}</b>` : ''}</button></div>`;
-  else $('barra').innerHTML = `<div class="in"><button class="btn sec" id="bVer" style="flex:0 0 auto;padding:14px 16px">Ver catálogo</button><button class="btn" id="bTicket">Ticket <b>${nCarrito()}</b> ${fmt(totalCarrito())}</button></div>`;
+  else $('barra').innerHTML = `<div class="in"><button class="btn sec" id="bVer" style="flex:0 0 auto;padding:14px 16px">‹ Catálogo</button><button class="btn" id="bTicket">Ticket <b>${nCarrito()}</b> ${fmt(totalCarrito())}</button></div>`;
   const p = $('bPedir'); if(p) p.onclick = ()=>{ modo = 'pedido'; pintar(); toast('Toca los productos para agregarlos'); };
   const v = $('bVer'); if(v) v.onclick = ()=>{ modo = 'ver'; pintar(); };
   const t = $('bTicket'); if(t) t.onclick = verTicket;
@@ -673,8 +682,8 @@ function agregar(id){
   carrito[id] = (carrito[id] || 0) + 1; guardarCarrito(); refrescarTarjeta(id);
 }
 function hoja(html, centro){
-  const h = document.createElement('div'); h.className = 'hoja' + (centro ? ' centro' : ''); h.innerHTML = `<div class="pan">${html}</div>`;
-  h.onclick = e=>{ if(e.target===h) h.remove(); }; document.body.appendChild(h); return h;
+  const h = document.createElement('div'); h.className = 'hoja' + (centro ? ' centro' : ''); h.innerHTML = `<div class="pan"><button class="hx" aria-label="Cerrar">✕</button>${html}</div>`;
+  h.onclick = e=>{ if(e.target===h) h.remove(); }; h.querySelector('.hx').onclick = ()=> h.remove(); document.body.appendChild(h); return h;
 }
 function pedirKg(p){
   let v = carrito[p.id] || 0.5;
@@ -699,6 +708,7 @@ function verGrande(id){
 function verTicket(){
   const ids = Object.keys(carrito);
   const h = hoja(`<h3>Tu pedido</h3>
+    <button class="volver" id="tVolver">‹ Seguir agregando del catálogo</button>
     ${ids.length ? ids.map(id=>{ const p = prodPorId(id), q = carrito[id];
       return `<div class="ln" data-id="${id}"><span class="nm">${esc(nombre(p))}<small>${fmt(precio(p))}${p.kg ? ' por kg' : ' c/u'}</small></span>
         ${p.kg ? `<button class="stp" data-kg="${id}"><span>${r3(q)} kg</span></button>` : `<span class="stp"><button data-m="-1">−</button><span>${q}</span><button data-m="1">+</button></span>`}
@@ -708,6 +718,7 @@ function verTicket(){
       <label>Tu teléfono *</label><input class="field" id="tTel" type="tel" inputmode="tel" maxlength="14" value="${esc(ls.get('mkcat_tel',''))}">`}
       <label>Comentario (opcional)</label><textarea class="field" id="tNota" rows="2" maxlength="200" placeholder="Ej. Entregar el jueves por la mañana">${esc(ls.get(K + '_nota',''))}</textarea>
       <div class="acts"><button class="btn" id="tEnviar">Enviar pedido</button><button class="btn sec" id="tVaciar">Vaciar pedido</button></div>` : ''}`);
+  h.querySelector('#tVolver').onclick = ()=>{ h.remove(); if(modo!=='pedido'){ modo = 'pedido'; pintar(); } };
   h.querySelectorAll('[data-m]').forEach(b=> b.onclick = ()=>{ const id = b.closest('.ln').dataset.id, n = (carrito[id]||0) + Number(b.dataset.m); if(n <= 0) delete carrito[id]; else carrito[id] = n; guardarCarrito(); h.remove(); pintar(); verTicket(); });
   h.querySelectorAll('[data-kg]').forEach(b=> b.onclick = ()=>{ h.remove(); pedirKg(prodPorId(b.dataset.kg)); });
   const vac = h.querySelector('#tVaciar'); if(vac) vac.onclick = ()=>{ if(!confirmarSimple('¿Vaciar el pedido?')) return; carrito = {}; guardarCarrito(); h.remove(); pintar(); };
@@ -742,14 +753,14 @@ async function enviar(cli, nota){
   if(enNube){ ls.set(K + '_ultimo', {id:pedido.id, f:pedido.f, total}); guardarEnHistorial({id:pedido.id, f:pedido.f, total, l: lineas.map(([id, q, p, n])=> ({q, p, n}))}); carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); modo = 'ver'; pintar(); }
   const waTexto = enNube ? `https://wa.me/${D.negocio?.wa || '529611080808'}?text=${encodeURIComponent(`Hola, acabo de enviar mi pedido desde el catálogo (${cli.t || cli.n}) por ${fmt(total)}.`)}` : wa;
   const h = hoja(enNube ? `<div class="ok">✓</div><h3 style="text-align:center">¡Pedido enviado!</h3>
-    <p class="sub" style="text-align:center">${lineas.length} productos · <b>${fmt(total)}</b></p>
+    <p class="sub" style="text-align:center">${lineas.length} ${lineas.length===1 ? 'producto' : 'productos'} · <b>${fmt(total)}</b></p>
     <div id="pSeg">${barraSeg(null)}</div>
     <div class="acts">
       ${pdf ? '<button class="btn sec" id="pPdf">Compartir o guardar PDF del pedido</button>' : ''}
       <a class="btn sec" id="pWa" href="${waTexto}" target="_blank" rel="noopener" style="text-decoration:none">Avisar también por WhatsApp</a>
       <button class="btn" id="pNuevo">Hacer otro pedido</button>
     </div>` : `<div class="ok">✓</div><h3 style="text-align:center">Tu pedido está listo</h3>
-    <p class="sub" style="text-align:center">${lineas.length} productos · <b>${fmt(total)}</b><br>No pudimos enviarlo directo (¿sin señal?). Envíalo por WhatsApp para que lo recibamos.</p>
+    <p class="sub" style="text-align:center">${lineas.length} ${lineas.length===1 ? 'producto' : 'productos'} · <b>${fmt(total)}</b><br>No pudimos enviarlo directo (¿sin señal?). Envíalo por WhatsApp para que lo recibamos.</p>
     <div class="acts">
       <a class="btn" id="pWa" href="${wa}" target="_blank" rel="noopener" style="text-decoration:none">Enviar pedido por WhatsApp</a>
       ${pdf ? '<button class="btn sec" id="pPdf">Compartir o guardar PDF del pedido</button>' : ''}
@@ -800,6 +811,40 @@ function pdfPedido(p, total){
   return doc;
 }
 cargar().then(()=>{ pintarBotonMis(); setTimeout(pintarUltimo, 300); }).catch(()=>{});
+/* Botón Atrás del teléfono: cierra ventanas abiertas, luego regresa al catálogo y en la pantalla principal pregunta si desea salir */
+let saliendo = false;
+const armarAtras = ()=>{ try{ history.pushState({mk:1}, ''); }catch(_){} };
+try{ history.replaceState({mkBase:1}, ''); }catch(_){}
+armarAtras();
+window.addEventListener('popstate', ()=>{
+  if(saliendo) return;
+  const hs = document.querySelectorAll('.hoja');
+  if(hs.length){ hs[hs.length-1].remove(); armarAtras(); return; }
+  if(modo==='pedido'){ modo = 'ver'; pintar(); armarAtras(); return; }
+  armarAtras(); preguntarSalir();
+});
+function preguntarSalir(){
+  if(document.querySelector('.hoja.salir-q')) return;
+  const n = nCarrito();
+  const h = hoja(`<h3>¿Deseas salir?</h3><p class="sub">${n ? `Tu pedido en curso (${n} ${n===1?'producto':'productos'}) se queda guardado para cuando regreses.` : 'Puedes volver cuando quieras desde el mismo link.'}</p>
+    <div class="acts"><button class="btn" id="sNo">Seguir en el catálogo</button><button class="btn sec" id="sSi">Salir</button></div>`, true);
+  h.classList.add('salir-q');
+  h.querySelector('#sNo').onclick = ()=> h.remove();
+  h.querySelector('#sSi').onclick = ()=>{ h.remove(); salir(); };
+}
+function salir(){
+  saliendo = true;
+  try{ window.close(); }catch(_){}
+  setTimeout(()=>{ try{ history.go(-2); }catch(_){} }, 150);
+  setTimeout(()=>{ /* si el navegador no permite cerrar la pestaña, despedida */
+    if(document.querySelector('.adios')) return;
+    const a = document.createElement('div'); a.className = 'adios';
+    a.innerHTML = `<h2>¡Gracias por tu visita!</h2><p>Ya puedes cerrar esta ventana. Para volver, abre el mismo link de tu catálogo.</p><button class="btn" id="aVolver">Volver al catálogo</button>`;
+    document.body.appendChild(a);
+    a.querySelector('#aVolver').onclick = ()=>{ a.remove(); saliendo = false; try{ history.replaceState({mkBase:1}, ''); }catch(_){} armarAtras(); };
+  }, 700);
+}
+document.getElementById('bSalir').onclick = preguntarSalir;
 try{ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js'); }catch(_){}
 </script>
 </body>
