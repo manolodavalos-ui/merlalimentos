@@ -58,7 +58,7 @@ header.cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;pa
 .salir{position:fixed;top:calc(10px + env(safe-area-inset-top));right:10px;z-index:25;display:flex;align-items:center;gap:4px;border:0;border-radius:999px;padding:7px 12px;background:rgba(0,0,0,.35);color:#fff;font-weight:700;font-size:.82rem;backdrop-filter:blur(4px)}
 .modo-pedido-on .salir{background:rgba(31,111,74,.92)}
 .adios{position:fixed;inset:0;z-index:60;background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px}
-.adios h2{font-size:1.4rem}.adios p{opacity:.85;max-width:300px}.adios .btn{background:#fff;color:var(--brand);max-width:260px}
+.adios h2{font-size:1.4rem}.adios p{opacity:.85;max-width:300px}.adios .btn{flex:0 0 auto;width:100%;background:#fff;color:var(--brand);max-width:280px;display:flex;align-items:center;justify-content:center}
 .volver{display:flex;align-items:center;gap:6px;margin:0 0 10px;border:0;background:none;color:var(--brand);font-weight:700;font-size:.95rem;padding:4px 0;cursor:pointer}
 .pseg{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#fff8e1;color:#7a5600;font-size:.88rem;text-align:center}.pseg.ok{background:#e6f5ec;color:#1f6f4a}
 .cab .hola{display:inline-block;margin-top:12px;background:rgba(255,255,255,.14);padding:6px 12px;border-radius:999px;font-size:.88rem}
@@ -843,17 +843,22 @@ function preguntarSalir(){
   h.querySelector('#sNo').onclick = ()=> h.remove();
   h.querySelector('#sSi').onclick = ()=>{ h.remove(); salir(); };
 }
+/* Salir: el navegador no deja cerrar una pestaña abierta desde un link, así que regresamos a WhatsApp y dejamos una despedida */
 function salir(){
   saliendo = true;
   try{ window.close(); }catch(_){}
-  setTimeout(()=>{ try{ history.go(-2); }catch(_){} }, 150);
-  setTimeout(()=>{ /* si el navegador no permite cerrar la pestaña, despedida */
-    if(document.querySelector('.adios')) return;
-    const a = document.createElement('div'); a.className = 'adios';
-    a.innerHTML = `<h2>¡Gracias por tu visita!</h2><p>Ya puedes cerrar esta ventana. Para volver, abre el mismo link de tu catálogo.</p><button class="btn" id="aVolver">Volver al catálogo</button>`;
-    document.body.appendChild(a);
-    a.querySelector('#aVolver').onclick = ()=>{ a.remove(); saliendo = false; try{ history.replaceState({mkBase:1}, ''); }catch(_){} armarAtras(); };
-  }, 700);
+  const num = String(D?.negocio?.wa || '529611080808').replace(/\D/g,'');
+  despedida();
+  try{ location.href = `whatsapp://send?phone=${num}`; }catch(_){}
+}
+function despedida(){
+  if(document.querySelector('.adios')) return;
+  const num = String(D?.negocio?.wa || '529611080808').replace(/\D/g,'');
+  const a = document.createElement('div'); a.className = 'adios';
+  a.innerHTML = `<h2>¡Gracias por tu visita!</h2><p>Ya puedes cerrar esta ventana. Para volver, abre el link de tu catálogo.</p>
+    <a class="btn" href="whatsapp://send?phone=${num}" style="text-decoration:none">Ir a WhatsApp</a><button class="btn" id="aVolver" style="background:transparent;color:#fff;border:2px solid #fff">Volver al catálogo</button>`;
+  document.body.appendChild(a);
+  a.querySelector('#aVolver').onclick = ()=>{ a.remove(); saliendo = false; };
 }
 document.getElementById('bSalir').onclick = preguntarSalir;
 try{ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js'); }catch(_){}
