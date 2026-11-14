@@ -185,7 +185,15 @@ main.flush{padding:0}
 .nb-est{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px}.nb-est span:last-child{display:flex;flex-direction:column}.nb-est small{color:var(--muted)}
 .nb-dot{width:12px;height:12px;border-radius:50%;background:#e0a800;flex:none}.nb-dot.on{background:#1f9d55;box-shadow:0 0 0 4px #1f9d5522}
 .nb-sw{display:flex;gap:12px;align-items:flex-start;margin:14px 0 6px;padding:12px 14px;border:1px solid var(--line);border-radius:12px}.nb-sw input[type=checkbox]{width:22px!important;height:22px!important;min-width:22px;max-width:22px;min-height:0;padding:0!important;border:0;margin:2px 0 0!important;flex:0 0 22px;accent-color:var(--brand);box-shadow:none;background:none}
-.nb-sw > span{flex:1 1 auto;min-width:0}.nb-sw span{display:flex;flex-direction:column}.nb-sw small{color:var(--muted)}
+.nb-sw > span{flex:1 1 auto;min-width:0}
+.rp-ls{max-height:46vh;overflow:auto;margin:6px 0 4px;display:flex;flex-direction:column;gap:8px}
+.rp-row{margin:0}
+.rp-av{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line,#eee)}
+.rp-av span{display:flex;flex-direction:column;min-width:0}
+.rp-av .btn{width:auto;flex:0 0 auto;margin:0;padding:8px 12px;min-height:0}
+.rp-av .btn svg{width:18px!important;height:18px!important;flex:0 0 18px}
+.rp-fin{grid-template-columns:1fr!important}.rp-fin .btn{flex:1 1 100%;grid-column:1/-1}
+.rp-av .btn.hecho{color:var(--ok,#1a7f37);border-color:currentColor}.nb-sw span{display:flex;flex-direction:column}.nb-sw small{color:var(--muted)}
 .nb-reglas{margin-top:16px}.nb-reglas summary{font-weight:700;cursor:pointer;padding:6px 0}.nb-reglas pre{font-size:.68rem;background:#f4f6f5;border-radius:10px;padding:10px;overflow-x:auto;white-space:pre;margin:8px 0}
 .pd-edit{margin:10px 16px 0;padding:10px 12px;border-radius:12px;background:#fff6dd;color:#7a5600;font-size:.9rem}.cobro .pd-edit{margin:0 0 14px}
 .lnk{background:none;border:0;color:var(--brand);font-weight:700;text-decoration:underline;padding:0;font:inherit;cursor:pointer}
@@ -1978,7 +1986,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.47.2';
+const APP_VERSION = '0.48.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2403,6 +2411,8 @@ function bindTurno(){
       return confirmar({titulo:'Primero liquida la camioneta', ok:'Liquidar', texto:'Cuenta lo que regresa en la camioneta para descargarlo al almacén. Después se cierra el turno.',
         alAceptar:()=>{ invTrasLiq = true; irInv('liquidacion')(); }});
     }
+    if(!reprogRevisado && pendientesEntrega().length) return dialogoReprogramar(()=>{ reprogRevisado = true; close.onclick(); });
+    reprogRevisado = false;
     confirmar({
       titulo:`Cerrar turno ${esc(t.folio)}`, peligro:true, ok:'Cerrar turno',
       texto:`Efectivo teórico en caja: <b>${fmt(c.teorico)}</b><br>Ventas netas: <b>${fmt(c.netas)}</b> en ${c.nRecibos} ${c.nRecibos===1?'recibo':'recibos'}.`,
@@ -2812,7 +2822,7 @@ function renderVenta(){
     else if(ventaVista==='programado') bindProgramado();
     else if(ventaVista==='inicioPre') bindInicioPre();
     else if(ventaVista==='relacion') bindRelacion();
-    else if(ventaVista==='pedidoDet'){ const e = document.getElementById('pdEditar'); if(e) e.onclick = ()=> editarPedidoProg(pedidoSel); const c = document.getElementById('pdCancelar'); if(c) c.onclick = ()=> cancelarPedidoProg(pedidoSel);
+    else if(ventaVista==='pedidoDet'){ const e = document.getElementById('pdEditar'); if(e) e.onclick = ()=> editarPedidoProg(pedidoSel); const c = document.getElementById('pdCancelar'); if(c) c.onclick = ()=> cancelarPedidoProg(pedidoSel); const ar = document.getElementById('pdAvisoRep'); if(ar) ar.onclick = ()=>{ const p = DB.pedidos.find(x=> x.id===pedidoSel); if(p && avisarReprogramacion(p)) renderVenta(); };
       const en = document.getElementById('pdEntregar'); if(en) en.onclick = ()=> entregarPedidoProg(pedidoSel);
       const pp = ()=> ({...DB.pedidos.find(x=> x.id===pedidoSel), esPedido:true});
       const im = document.getElementById('pdImprimir'); if(im) im.onclick = ()=> imprimirRecibo(pp());
@@ -4216,6 +4226,57 @@ function cancelarPedidoProg(id){
   };
 }
 
+/* ----- Reprogramar entregas pendientes al cerrar turno ----- */
+let reprogRevisado = false;
+const pendientesEntrega = ()=> DB.pedidos.filter(p=> p.estado==='Programado' && (p.fechaEntrega||'') <= hoyClave()).sort((a,b)=> (a.fechaEntrega+a.fecha).localeCompare(b.fechaEntrega+b.fecha));
+function msgReprogramacion(p){
+  const neg = (store.get('config').negocio || impCfg().encabezado || 'Merkalimentos');
+  const cuando = new Date(p.fechaEntrega + 'T12:00').toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long'});
+  return `Hola ${p.cliente?.nombre || ''}, le ofrecemos una disculpa: no nos fue posible entregarle hoy su pedido #${p.folio} por ${fmt(p.total)}. ` +
+    `Lo reprogramamos para el *${cuando}*${p.horario && !/cualquier/i.test(p.horario) ? ` (${p.horario})` : ''}. ` +
+    `Gracias por su comprensión y por su preferencia. — ${neg}`;
+}
+function avisarReprogramacion(p){
+  const tel = telPedidoProg(p); if(!tel){ toast('El cliente no tiene teléfono registrado'); return false; }
+  abrirWa(urlWa(tel, msgReprogramacion(p)));
+  p.reprogramado = {...(p.reprogramado||{}), avisado:new Date().toISOString()}; DB.guardarPedido(p);
+  return true;
+}
+function dialogoReprogramar(alTerminar){
+  const ls = pendientesEntrega(), hoy = hoyClave(), def = manana();
+  const bg = dialogo(`<h3>${ls.length} ${ls.length===1 ? 'pedido pendiente' : 'pedidos pendientes'} de entregar</h3>
+    <p class="sub">Marca los que quieres reprogramar y elige la nueva fecha.</p>
+    <div class="rp-ls">${ls.map(p=> `<label class="nb-sw rp-row"><input type="checkbox" data-id="${p.id}" checked><span><b>${esc(p.cliente?.tienda || p.cliente?.nombre || '')}</b>
+      <small>#${esc(p.folio)} · ${fmt(p.total)}${p.fechaEntrega < hoy ? ` · <i class="tag-c">atrasada (${fechaCorta(p.fechaEntrega)})</i>` : ''}</small></span></label>`).join('')}</div>
+    <label class="cj-l">Nueva fecha de entrega</label>
+    <input class="field" id="rpFecha" type="date" min="${def}" value="${def}">
+    <div class="sheet-actions"><button class="btn ghost" data-a="no">Cerrar sin reprogramar</button><button class="btn" data-a="si">Reprogramar</button></div>`);
+  bg.querySelector('[data-a="no"]').onclick = ()=>{ bg.remove(); alTerminar(); };
+  bg.querySelector('[data-a="si"]').onclick = ()=>{
+    const fechaN = bg.querySelector('#rpFecha').value;
+    if(!fechaN || fechaN <= hoy){ toast('Elige una fecha posterior a hoy'); return; }
+    const ids = [...bg.querySelectorAll('.rp-row input:checked')].map(x=> x.dataset.id);
+    if(!ids.length){ toast('Marca al menos un pedido'); return; }
+    const hechos = ids.map(id=> DB.pedidos.find(x=> x.id===id)).filter(Boolean).map(p=>{
+      p.historial = [...(p.historial||[]), {fecha:new Date().toISOString(), usuario:session.nombre, total:p.total, productos:cuentaTicket(p), fechaEntrega:p.fechaEntrega, motivo:'Reprogramada al cerrar turno'}];
+      p.reprogramado = {fecha:new Date().toISOString(), de:p.fechaEntrega, a:fechaN, usuario:session.nombre};
+      p.fechaEntrega = fechaN; delete p.repartoMarcado; p.sincronizado = false;
+      DB.guardarPedido(p); pushPedidoNube(p); return p;
+    });
+    bg.remove(); toast(`${hechos.length} ${hechos.length===1 ? 'pedido reprogramado' : 'pedidos reprogramados'} al ${fechaCorta(fechaN)}`);
+    dialogoAvisosReprog(hechos, alTerminar);
+  };
+}
+function dialogoAvisosReprog(ps, alTerminar){
+  const bg = dialogo(`<h3>Avisar a los clientes</h3>
+    <p class="sub">Se envía una disculpa con la nueva fecha de entrega por WhatsApp.</p>
+    <div class="rp-ls">${ps.map(p=> `<div class="rp-av"><span><b>${esc(p.cliente?.tienda || p.cliente?.nombre || '')}</b><small>#${esc(p.folio)} · ${fmt(p.total)}</small></span>
+      ${telPedidoProg(p) ? `<button class="btn ghost" data-av="${p.id}">${svg('whatsapp')}Avisar</button>` : '<small class="muted">Sin teléfono</small>'}</div>`).join('')}</div>
+    <div class="sheet-actions rp-fin"><button class="btn" data-a="ok">Continuar con el cierre</button></div>`);
+  bg.querySelectorAll('[data-av]').forEach(b=> b.onclick = ()=>{ const p = DB.pedidos.find(x=> x.id===b.dataset.av); if(p && avisarReprogramacion(p)){ b.classList.add('hecho'); b.innerHTML = '✓ Avisado'; } });
+  bg.querySelector('[data-a="ok"]').onclick = ()=>{ bg.remove(); alTerminar(); };
+}
+
 /* ----- Relación de productos a entregar por día ----- */
 let relDia = null, relSoloFalta = false, relAbierto = null, relDesde = 'inicioPre', relModo = 'producto';
 const relEnInv = ()=> current==='inventario';
@@ -4328,6 +4389,8 @@ function viewPedidoDet(){
     <div class="rd-tot"><span>Total</span><b>${fmt(p.total)}</b></div>
     ${p.estado==='Programado' ? `<button class="btn" id="pdEntregar" style="margin:16px 0 0">${svg('check')}Entregar y cobrar</button>` : ''}
     ${p.entregado ? `<div class="pd-ent">Entregada ${fecha(p.entregado.fecha)} · recibo <b>#${esc(p.entregado.recibo)}</b> · ${esc(p.entregado.metodo)} · ${esc(p.entregado.vendedor||'')}</div>` : ''}
+    ${p.estado==='Programado' && p.reprogramado ? `<div class="pd-ent">Reprogramada de ${fechaCorta(p.reprogramado.de)} a ${fechaCorta(p.reprogramado.a)}${p.reprogramado.avisado ? ' · cliente avisado ✓' : ''}</div>
+      ${telPedidoProg(p) ? `<button class="btn ghost" id="pdAvisoRep" style="margin:10px 0 0">${svg('whatsapp')}${p.reprogramado.avisado ? 'Avisar otra vez' : 'Avisar al cliente (disculpa y nueva fecha)'}</button>` : ''}` : ''}
     ${p.estado==='Programado' ? `<div class="tk-acts" style="margin:10px 0 8px"><button class="btn ghost" id="pdEditar">Editar venta</button><button class="btn ghost danger-o" id="pdCancelar">Cancelar venta</button></div>` : ''}
     <div class="tk-acts" style="margin:${p.estado==='Programado' ? '0' : '16px'} 0 8px"><button class="btn ghost" id="pdImprimir">${svg('recibos')}Imprimir</button><button class="btn ghost" id="pdCompartir">${svg('share')}Compartir</button></div>
   </div>`;
@@ -4342,7 +4405,7 @@ function viewPedidos(){
   ls.forEach(p=>{
     if(p.fechaEntrega!==dia){ dia = p.fechaEntrega; html += `<div class="rc-day">Entrega: ${fechaCorta(dia)}</div>`; }
     html += `<div class="ab-row${p.estado==='Cancelado' ? ' pd-canc' : ''}"><div class="ab-main" role="button" data-ped="${p.id}">
-      <span class="ab-t"><b>${esc(p.cliente.nombre)}${p.cliente.tienda?` <i class="muted">· ${esc(p.cliente.tienda)}</i>`:''}${p.estado==='Cancelado' ? ' <i class="tag-c">Cancelada</i>' : p.estado==='Entregado' ? ' <i class="tag-v">Entregada ✓</i>' : p.editado ? ' <i class="tag-v">Modificada</i>' : ''}</b><span>${fmt(p.total)}</span></span>
+      <span class="ab-t"><b>${esc(p.cliente.nombre)}${p.cliente.tienda?` <i class="muted">· ${esc(p.cliente.tienda)}</i>`:''}${p.estado==='Cancelado' ? ' <i class="tag-c">Cancelada</i>' : p.estado==='Entregado' ? ' <i class="tag-v">Entregada ✓</i>' : p.reprogramado ? ' <i class="tag-c">Reprogramada</i>' : p.editado ? ' <i class="tag-v">Modificada</i>' : ''}</b><span>${fmt(p.total)}</span></span>
       <span class="ab-m">#${esc(p.folio)} · ${esc(p.horario)} · ${cuentaTicket(p)} ${cuentaTicket(p)===1?'producto':'productos'}</span>
       ${p.comentario?`<span class="ab-c">${esc(p.comentario)}</span>`:''}
     </div></div>`;
