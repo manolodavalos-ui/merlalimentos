@@ -1977,7 +1977,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.47';
+const APP_VERSION = '0.47.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2520,6 +2520,15 @@ const nombreTk = l => { const a = artPorId(l.pid); return (a && (a.nombreTk || n
   const N = {"p001": "Jamón pavo FUD 170g", "p002": "Jamón pavo/cerdo FUD", "p003": "Jamón Marietta 190g", "p004": "Jamón cocido Chimex", "p005": "Jamón pierna Chimex", "p006": "Jamón pavo Aros 1kg", "p007": "Jamón Virginia FUD", "p008": "Jamón S.Rafael 250g", "p009": "Salchicha Chimex 400g", "p010": "Salchicha FUD 266g", "p011": "Salch. asar Chimex", "p012": "Salch. asar S.Antonio", "p013": "Salchicha Yossi 2kg", "p014": "Chuleta Nayar 550g", "p015": "Chorizo regional 1kg", "p016": "Carne adobada 1kg", "p017": "Chorizo pavo FUD 200g", "p018": "Deshebrada Guten 350g", "p019": "Chistorra Gus 500g", "p020": "Chorizo arg. Gus 500g", "p021": "Tocino Nayar 170g", "p022": "Tocineta 200g", "p022k": "Tocineta granel", "p023": "Q. amarillo Villita", "p024": "Q. manchego Villita", "p025": "Q. amarillo Castell", "p026": "Q. amarillo S.Antonio", "p027": "Medias lunas Villita", "p028": "Manchego reb. 200g", "p029": "Manchego rallado 170g", "p030": "Q. panela FUD 200g", "p031": "Quesillo B 5x200g", "p032": "Quesillo crem 5x200g", "p033": "Quesillo B 4x250g", "p034": "Quesillo B 1kg", "p035": "Quesillo crem 1kg", "p036": "Q. doble crema 1.1kg", "p037": "Crema 5x200g", "p038": "Philadelphia 180g", "p039": "Philadelphia 120g", "p040": "Margarina Villita 90g", "p041": "Margarina Delicia 90g", "p042": "Mantequilla N.Buena", "p043": "Crema Yoplait 180g", "p044": "Yoplait fresa 220g", "p045": "Yoplait fresa 330g", "p046": "Yoplait fresa 470g", "p047": "Yoplait licuado 470g", "p048": "Disfruta bebible 307g", "p049": "Disfruta batido 442g", "p050": "Disfruta fresa choco", "p051": "Disfruta plátano choco", "p052": "Yoplix natural 121g", "p053": "Yoplix chocolate 121g", "p054": "Yakult 10 pzas", "p055": "Yakult 40LT 10 pzas", "p056": "Pay de queso 2 pzas", "p057": "Flan Yoplait 4 pzas", "p058": "Bebible Kids 100g", "p059": "Café Olé clásico", "p060": "Café Olé espresso", "p061": "Café Olé moka", "p062": "Café Olé vainilla", "p063": "Yoplait fresa 1kg", "p064": "Yoplait natural 1kg", "p065": "Yoplait griego 1kg"};
   const ls = store.get('articulos', []);
   ls.forEach(a=>{ if(N[a.id] && !a.nombreTk){ a.nombreTk = N[a.id]; a.editado = true; } });
+  store.set('articulos', ls); store.set('migraciones', [...store.get('migraciones', []), CLAVE]);
+})();
+/* Catálogo de clientes: en Lácteos regionales solo se muestran 5 productos (14 nov 2026) */
+(function catalogoLacteosNov2026(){
+  const CLAVE = 'catalogo-lacteos-2026-11-14';
+  if(store.get('migraciones', []).includes(CLAVE)) return;
+  const VISIBLES = ['p031','p032','p033','p036','p037'];
+  const ls = store.get('articulos', []);
+  ls.forEach(a=>{ if(a.seccion==='Lácteos regionales'){ a.enCatalogo = VISIBLES.includes(a.id); a.editado = true; } });
   store.set('articulos', ls); store.set('migraciones', [...store.get('migraciones', []), CLAVE]);
 })();
 const fotoSrc = p => p.foto ? (FOTOS[p.foto] || p.foto) : '';
@@ -5314,6 +5323,7 @@ function formArticuloHTML(a){
       </div>
     </div>
     <label class="sw-row"><span><b>Mostrar en venta</b><small>Si lo desactivas, el producto se oculta en Venta, Preventa y Cotizar</small></span><input type="checkbox" id="aActivo" ${a.activo!==false?'checked':''}></label>
+    <label class="sw-row"><span><b>Mostrar en catálogo de clientes</b><small>Cliente consentido: si lo desactivas, tus clientes no lo ven en el catálogo, pero lo sigues vendiendo</small></span><input type="checkbox" id="aEnCat" ${a.enCatalogo!==false?'checked':''}></label>
     <button class="btn" id="aGuardar">${a.id ? 'Guardar cambios' : 'Guardar producto'}</button>
     ${a.id ? '<button class="btn danger" id="aEliminar">Eliminar producto</button>' : ''}
   </div>`;
@@ -5324,7 +5334,7 @@ function leerArticulo(){
   const num = x => x==='' || x==null ? null : r2(parseFloat(x));
   const precios = [...document.querySelectorAll('#aPrecios .pr-row')].map((r,i)=>({etiqueta:r.querySelector('.pr-et').value.trim() || `Precio ${i+2}`, valor:num(r.querySelector('.pr-v').value)})).filter(x=> x.valor!=null && x.valor>0);
   return {nombre:v('aNom').value.trim(), nombreForm:v('aNom').value, nombreTk:v('aTk').value.trim(), seccion:v('aCat').value, proveedor:v('aProv').value.trim(), precio:num(v('aPrecio').value), costo:num(v('aCosto').value),
-          promo: leerPromo(), porKilo:document.querySelector('#aVend .on')?.dataset.v==='kg', sku:v('aSku').value.trim().toUpperCase(), codigo:v('aCod').value.trim(), precios, activo:v('aActivo').checked};
+          promo: leerPromo(), porKilo:document.querySelector('#aVend .on')?.dataset.v==='kg', sku:v('aSku').value.trim().toUpperCase(), codigo:v('aCod').value.trim(), precios, activo:v('aActivo').checked, enCatalogo:v('aEnCat').checked};
 }
 function bindFormArticulo(){
   const cat = document.getElementById('aCat');
@@ -6426,7 +6436,7 @@ function bindPreciosEsp(){
 function datosCatalogo(){
   const c = impCfg();
   return {v:1, publicado:new Date().toISOString(), negocio:{nombre:c.encabezado, sub:c.sub, tel:c.tel, wa:WA_NEGOCIO}, secciones:categorias(),
-    productos: articulos().filter(p=> p.precio != null).map(p=>({id:p.id, s:p.seccion, m:p.marca||'', n:p.nombre, pr:p.pres||'', p:p.precio, kg:!!p.porKilo,
+    productos: articulos().filter(p=> p.precio != null && p.enCatalogo !== false).map(p=>({id:p.id, s:p.seccion, m:p.marca||'', n:p.nombre, pr:p.pres||'', p:p.precio, kg:!!p.porKilo,
       may:p.mayoreo||'', et:p.etiqueta||'', promo: promoActiva(p) ? textoPromo(p.promo) : '', f: p.foto ? (FOTOS[p.foto] ? p.foto : p.foto) : ''}))};
 }
 const datosClienteCat = c => ({n:c.nombre, t:c.tienda||'', tel:c.telefono||'', dir:[c.direccion, c.colonia].filter(Boolean).join(', '), precios:c.preciosEspeciales||{}});
