@@ -1986,7 +1986,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.48.1';
+const APP_VERSION = '0.48.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2829,7 +2829,7 @@ function renderVenta(){
       const cm = document.getElementById('pdCompartir'); if(cm) cm.onclick = ()=> compartirRecibo(pp()); }
     else if(ventaVista==='recibidos'){ document.querySelectorAll('.pr-row').forEach(b=> b.onclick = ()=> detallePedidoRec(b.dataset.id)); document.getElementById('prPegar').onclick = pegarPedido; }
     else if(ventaVista==='pedidos'){
-      document.querySelectorAll('[data-ped]').forEach(el=> el.onclick = ()=>{ pedidoSel = el.dataset.ped; ventaVista = 'pedidoDet'; renderVenta(); });
+      document.querySelectorAll('[data-ped]').forEach(el=> el.onclick = ()=>{ pedDesdeSel = null; pedidoSel = el.dataset.ped; ventaVista = 'pedidoDet'; renderVenta(); });
       const vp = document.getElementById('vacioProg'); if(vp) vp.onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
       const rl = document.getElementById('pdRel'); if(rl) rl.onclick = ()=>{ relDesde = 'pedidos'; ventaVista = 'relacion'; renderVenta(); };
       const vc = document.getElementById('pdVerCanc'); if(vc) vc.onclick = ()=>{ pedVerCanc = !pedVerCanc; renderVenta(); };
@@ -3332,7 +3332,8 @@ function distanciaKm(a, b){
 const fmtDist = km => km < 1 ? `${Math.max(10, Math.round(km*1000/10)*10)} m` : `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 const tieneUbicacion = c => c.lat != null && c.lng != null && c.lat !== '' && !isNaN(c.lat);
 
-function abrirSelectorCliente({alElegir, alCancelar} = {}){
+let pedDesdeSel = null;   /* venta programada abierta desde la etiqueta del selector de clientes: Atrás regresa al selector */
+function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
   document.querySelector('.cl-sheet')?.remove();
   const bg = document.createElement('div');
   bg.className = 'sheet-bg cl-sheet';
@@ -3342,7 +3343,7 @@ function abrirSelectorCliente({alElegir, alCancelar} = {}){
   </div>`;
   document.body.appendChild(bg);
   const body = bg.querySelector('.cl-body');
-  let q = '';
+  let q = q0;
   const cerrar = (elegido)=>{ bg.remove(); if(elegido) alElegir && alElegir(); else alCancelar && alCancelar(); };
   bg.querySelector('.cl-close').onclick = ()=> cerrar(false);
   bg.onclick = e=>{ if(e.target===bg) cerrar(false); };
@@ -3396,7 +3397,7 @@ function abrirSelectorCliente({alElegir, alCancelar} = {}){
   };
   const bindRows = ()=>{ body.querySelectorAll('.cl-row').forEach(r=> r.onclick = e=>{
       const ch = e.target.closest('.cl-prog.on');
-      if(ch){ e.stopPropagation(); bg.remove(); pedidoSel = ch.dataset.ped; ventaVista = 'pedidoDet'; if(!enVenta()) go('preventa'); renderVenta(); return; }
+      if(ch){ e.stopPropagation(); bg.remove(); pedDesdeSel = {pantalla: enVenta() ? current : 'preventa', vista: ventaVista, opts:{alElegir, alCancelar}, q}; pedidoSel = ch.dataset.ped; ventaVista = 'pedidoDet'; if(!enVenta()) go('preventa'); renderVenta(); return; }
       asignarCliente(clientes().find(c=>c.id===r.dataset.id)); cerrar(true);
     }); };
   const pintarForm = (nombreInicial='')=>{
@@ -4157,6 +4158,7 @@ function bindInicioPre(){
 }
 /* ----- Editar y cancelar ventas programadas ----- */
 function editarPedidoProg(id){
+  pedDesdeSel = null;
   const p = DB.pedidos.find(x=> x.id===id); if(!p || p.estado!=='Programado') return;
 
   if(current!=='preventa') go('preventa');
@@ -4171,6 +4173,7 @@ function editarPedidoProg(id){
 }
 /* Entregar: la venta programada pasa al ticket de venta, se cobra, descuenta inventario y se imprime */
 function entregarPedidoProg(id){
+  pedDesdeSel = null;
   const p = DB.pedidos.find(x=> x.id===id); if(!p || p.estado!=='Programado') return;
   if(!turnoActual()){ toast('Abre un turno para entregar la venta'); return; }
   const tv = store.get('ticket', {lineas:[]});
@@ -8539,7 +8542,7 @@ function viewPendiente(id){
 
 function go(id){
   if(!puede(id)){ toast('No tienes permiso para esta sección'); return; }
-  if(current !== id) seccionPrevia = current;
+  if(current !== id){ seccionPrevia = current; pedDesdeSel = null; }
   current = id;
   if(id!=='mapa') cerrarMapa();
   document.querySelector('.cl-sheet')?.remove();
@@ -8637,6 +8640,7 @@ document.getElementById('menuBtn').onclick = ()=>{
   if(current==='clientes' && cliVista!=='inicio'){ cliVista = cliVista==='editar' ? 'lista' : 'inicio'; cliSel = null; cliBorrador = null; renderClientes(); return; }
   if(enVenta() && ventaVista==='cotizacion'){ ventaVista = 'ticket'; renderVenta(); return; }
   if(enVenta() && ventaVista==='programar'){ ventaVista = 'ticket'; renderVenta(); return; }
+  if(enVenta() && ventaVista==='pedidoDet' && pedDesdeSel){ const o = pedDesdeSel; pedDesdeSel = null; if(current!==o.pantalla) go(o.pantalla); ventaVista = o.vista; renderVenta(); abrirSelectorCliente({...o.opts, q0:o.q}); return; }
   if(enVenta() && ventaVista==='pedidoDet'){ ventaVista = 'pedidos'; renderVenta(); return; }
   if(enVenta() && ventaVista==='relacion'){ ventaVista = relDesde; renderVenta(); return; }
   if(enVenta() && ventaVista==='recibidos'){ ventaVista = 'inicioPre'; renderVenta(); return; }
