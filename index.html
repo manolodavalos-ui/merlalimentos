@@ -211,6 +211,8 @@ main.flush{padding:0}
 .rl-fecha{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}.rl-fecha input{border:0;background:transparent;font:inherit;color:inherit;width:auto;max-width:130px}
 .cg-src{margin:0 0 8px}.cg-src.on{border-color:var(--brand);background:var(--brand-soft)}
 .ec-dias{padding:0 0 10px;margin:0 -4px;border:0}
+.cl-dias{flex:0 0 auto;padding:10px 16px!important;margin:0!important;border-bottom:1px solid var(--line,#eee)!important;overflow-x:auto;overflow-y:hidden;min-height:max-content}
+.cl-dias .dia{flex:0 0 auto}
 .serie-cat{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:900;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:12px 14px;max-width:520px;margin:0 auto}
 .sc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.sc-top span{display:flex;flex-direction:column}.sc-top small{color:var(--muted)}
 .serie-cat .icon-btn{color:#555;background:var(--bg);width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none}.serie-cat .icon-btn svg{width:18px;height:18px;stroke:currentColor}
@@ -1986,7 +1988,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.48.2';
+const APP_VERSION = '0.49.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3332,7 +3334,7 @@ function distanciaKm(a, b){
 const fmtDist = km => km < 1 ? `${Math.max(10, Math.round(km*1000/10)*10)} m` : `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 const tieneUbicacion = c => c.lat != null && c.lng != null && c.lat !== '' && !isNaN(c.lat);
 
-let pedDesdeSel = null;   /* venta programada abierta desde la etiqueta del selector de clientes: Atrás regresa al selector */
+let pedDesdeSel = null, selDia = '';   /* venta programada abierta desde la etiqueta del selector de clientes: Atrás regresa al selector */
 function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
   document.querySelector('.cl-sheet')?.remove();
   const bg = document.createElement('div');
@@ -3367,7 +3369,7 @@ function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
   const lista = ()=>{
     const qq = q.trim().toLowerCase();
     const pos = estadoPos==='ok' ? ultimaPos : null;
-    const ls = clientes().filter(c=> !qq || textoCliente(c).includes(qq))
+    const ls = clientes().filter(c=> !selDia || (selDia==='FS' ? c.canal==='FS' : (c.diasVisita||[]).includes(selDia))).filter(c=> !qq || textoCliente(c).includes(qq))
       .map(c=> ({c, d: pos && tieneUbicacion(c) ? distanciaKm(pos, {lat:Number(c.lat), lng:Number(c.lng)}) : null}))
       .sort((a,b)=> (a.d==null) - (b.d==null) || (a.d!=null ? a.d - b.d : 0) || a.c.nombre.localeCompare(b.c.nombre,'es'));
     return ls.length ? ls.map(({c,d})=>`<button class="cl-row" data-id="${c.id}"><span class="cl-av">${esc(c.nombre.trim()[0]||'?').toUpperCase()}</span>
@@ -3378,10 +3380,13 @@ function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
   const pintarLista = ()=>{
     body.innerHTML = `<div class="rc-search cl-search">${svg('search')}<input id="clQ" placeholder="Buscar por nombre, tienda, número o teléfono" value="${esc(q)}" autocomplete="off"></div>
       <button class="cl-new" id="clNuevo">${svg('userAdd')}Nuevo cliente</button>
+      <div class="dias filtro ec-dias cl-dias" id="clDias">${[['','Todos'], ...DIAS, ['FS','FS']].map(([k,t])=>`<button class="dia${k===selDia?' on':''}${k==='FS'?' fs':''}" data-d="${k}">${t}${k && k===diaHoy()?' ·':''}</button>`).join('')}</div>
       <div class="cl-near" id="clNear" role="button" tabindex="0">${estadoCercania()}</div>
       <div class="cl-list" id="clList">${lista()}</div>`;
     const inp = body.querySelector('#clQ');
     inp.oninput = ()=>{ q = inp.value; body.querySelector('#clList').innerHTML = lista(); bindRows(); };
+    body.querySelectorAll('#clDias .dia').forEach(b=> b.onclick = ()=>{ selDia = b.dataset.d; body.querySelectorAll('#clDias .dia').forEach(x=> x.classList.toggle('on', x===b)); body.querySelector('#clList').innerHTML = lista(); bindRows(); });
+    setTimeout(()=>{ const on = body.querySelector('#clDias .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'}); }, 30);
     body.querySelector('#clNuevo').onclick = ()=> pintarForm(q);
     body.querySelector('#clNear').onclick = ()=>{
       if(!clientes().some(tieneUbicacion) || estadoPos==='buscando') return;
@@ -8627,35 +8632,59 @@ document.getElementById('logoutBtn').onclick = ()=>{
 
 /* ================= Utilidades ================= */
 const drawer = document.getElementById('drawer'), scrim = document.getElementById('scrim');
+/* Atrás de la app: regresa un nivel; devuelve false si ya está en la pantalla principal de la sección */
+function atrasApp(){
+  if(current==='articulos' && artVista==='editar'){ artVista = 'lista'; artSel = null; artBorrador = null; if(volverACompras){ volverACompras = false; go('compras'); return true; } renderArticulos(); return true; }
+  if(current==='config' && cfgVista!=='inicio'){ cfgVista = (cfgVista==='impEdit' || cfgVista==='ticketDatos') ? 'impresoras' : 'inicio'; renderConfig(); return true; }
+  if(current==='creditos' && credVista!=='inicio'){ atrasCreditos(); return true; }
+  if(current==='inventario' && invVista!=='inicio'){ atrasInv(); return true; }
+  if(current==='catalogo' && catVista!=='ver'){ catVista = 'ver'; renderCatalogo(); return true; }
+  if(current==='turno' && turnoVista==='tesoreria'){ turnoVista = 'resumen'; go('turno'); return true; }
+  if(current==='turno' && turnoVista==='histDet'){ turnoVista = 'historial'; go('turno'); return true; }
+  if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return true; }
+  if(current==='recibos' && reciboSel){ reciboSel = null; renderRecibos(); return true; }
+  if(current==='clientes' && cliVista!=='inicio'){ cliVista = cliVista==='editar' ? 'lista' : 'inicio'; cliSel = null; cliBorrador = null; renderClientes(); return true; }
+  if(enVenta() && ventaVista==='cotizacion'){ ventaVista = 'ticket'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='programar'){ ventaVista = 'ticket'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='pedidoDet' && pedDesdeSel){ const o = pedDesdeSel; pedDesdeSel = null; if(current!==o.pantalla) go(o.pantalla); ventaVista = o.vista; renderVenta(); abrirSelectorCliente({...o.opts, q0:o.q}); return true; }
+  if(enVenta() && ventaVista==='pedidoDet'){ ventaVista = 'pedidos'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='relacion'){ ventaVista = relDesde; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='recibidos'){ ventaVista = 'inicioPre'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='pedidos'){ ventaVista = esPre() ? 'inicioPre' : 'grid'; renderVenta(); return true; }
+  if(enVenta() && esPre() && ventaVista==='grid'){ ventaVista = 'inicioPre'; renderVenta(); return true; }
+  if(enVenta() && esCot() && ventaVista==='grid'){ ventaVista = 'inicioCot'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='cotDet'){ ventaVista = 'cotHist'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='cotHist'){ ventaVista = 'inicioCot'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='guardar'){ ventaVista = ventaPrev==='ticket' ? 'ticket' : 'grid'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='abiertos'){ ventaVista = ventaPrev==='ticket' ? 'ticket' : 'grid'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='cobro'){ ventaVista = 'ticket'; renderVenta(); return true; }
+  if(enVenta() && ventaVista==='ticket'){ ventaVista = 'grid'; renderVenta(); return true; }
+  return false;
+}
 document.getElementById('menuBtn').onclick = ()=>{
-  if(current==='articulos' && artVista==='editar'){ artVista = 'lista'; artSel = null; artBorrador = null; if(volverACompras){ volverACompras = false; go('compras'); return; } renderArticulos(); return; }
-  if(current==='config' && cfgVista!=='inicio'){ cfgVista = (cfgVista==='impEdit' || cfgVista==='ticketDatos') ? 'impresoras' : 'inicio'; renderConfig(); return; }
-  if(current==='creditos' && credVista!=='inicio'){ atrasCreditos(); return; }
-  if(current==='inventario' && invVista!=='inicio'){ atrasInv(); return; }
-  if(current==='catalogo' && catVista!=='ver'){ catVista = 'ver'; renderCatalogo(); return; }
-  if(current==='turno' && turnoVista==='tesoreria'){ turnoVista = 'resumen'; go('turno'); return; }
-  if(current==='turno' && turnoVista==='histDet'){ turnoVista = 'historial'; go('turno'); return; }
-  if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return; }
-  if(current==='recibos' && reciboSel){ reciboSel = null; renderRecibos(); return; }
-  if(current==='clientes' && cliVista!=='inicio'){ cliVista = cliVista==='editar' ? 'lista' : 'inicio'; cliSel = null; cliBorrador = null; renderClientes(); return; }
-  if(enVenta() && ventaVista==='cotizacion'){ ventaVista = 'ticket'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='programar'){ ventaVista = 'ticket'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='pedidoDet' && pedDesdeSel){ const o = pedDesdeSel; pedDesdeSel = null; if(current!==o.pantalla) go(o.pantalla); ventaVista = o.vista; renderVenta(); abrirSelectorCliente({...o.opts, q0:o.q}); return; }
-  if(enVenta() && ventaVista==='pedidoDet'){ ventaVista = 'pedidos'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='relacion'){ ventaVista = relDesde; renderVenta(); return; }
-  if(enVenta() && ventaVista==='recibidos'){ ventaVista = 'inicioPre'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='pedidos'){ ventaVista = esPre() ? 'inicioPre' : 'grid'; renderVenta(); return; }
-  if(enVenta() && esPre() && ventaVista==='grid'){ ventaVista = 'inicioPre'; renderVenta(); return; }
-  if(enVenta() && esCot() && ventaVista==='grid'){ ventaVista = 'inicioCot'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='cotDet'){ ventaVista = 'cotHist'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='cotHist'){ ventaVista = 'inicioCot'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='guardar'){ ventaVista = ventaPrev==='ticket' ? 'ticket' : 'grid'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='abiertos'){ ventaVista = ventaPrev==='ticket' ? 'ticket' : 'grid'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='cobro'){ ventaVista = 'ticket'; renderVenta(); return; }
-  if(enVenta() && ventaVista==='ticket'){ ventaVista = 'grid'; renderVenta(); return; }
+  if(atrasApp()) return;
   drawer.classList.add('on'); scrim.classList.add('on');
 };
 scrim.onclick = closeDrawer;
+/* Botón Atrás del teléfono: cierra la ventana abierta, regresa un nivel o pregunta si quieres salir */
+(function atrasTelefono(){
+  try{ history.replaceState({mkBase:1}, ''); history.pushState({mk:1}, ''); }catch(_){ return; }
+  let saliendo = false;
+  window.addEventListener('popstate', ()=>{
+    if(saliendo) return;
+    try{ history.pushState({mk:1}, ''); }catch(_){}
+    const capa = [...document.querySelectorAll('.sheet-bg, .cat-modal, .popover')].pop();
+    if(capa){ const x = capa.querySelector('.cl-close, [data-a="no"], [data-a="x"]'); if(x) x.click(); if(capa.isConnected) capa.remove(); return; }
+    if(drawer.classList.contains('on')){ closeDrawer(); return; }
+    const app = document.getElementById('app');
+    if(app && !app.classList.contains('hidden')){
+      if(atrasApp()) return;
+      const inicio = turnoActual() ? 'venta' : 'turno';
+      if(current !== inicio && puede(inicio)){ go(inicio); return; }
+    }
+    confirmar({titulo:'Salir de la app', texto:'¿Quieres salir de Merkalimentos?', ok:'Salir', alAceptar:()=>{ saliendo = true; history.go(-2); setTimeout(()=>{ saliendo = false; }, 1500); }});
+  });
+})();
 function closeDrawer(){ drawer.classList.remove('on'); scrim.classList.remove('on'); }
 
 function toast(msg){
