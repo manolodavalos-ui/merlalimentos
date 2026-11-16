@@ -1991,7 +1991,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.49.3';
+const APP_VERSION = '0.49.4';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2888,6 +2888,7 @@ function bindAccionesTicket(){
     if(!ticket().lineas.length){ toast('El ticket está vacío'); return; }
     ventaPrev = ventaVista; ventaVista = 'guardar'; renderVenta();
   };
+  const ee = document.getElementById('btnEntregarEd'); if(ee) ee.onclick = entregarEditado;
   const ab = document.getElementById('btnAbiertos');
   if(ab) ab.onclick = ()=>{ ventaPrev = ventaVista; ventaVista = 'abiertos'; renderVenta(); };
   if(c) c.onclick = ()=> esPre() ? iniciarProgramar() : esCot() ? iniciarCotizacion() : iniciarCobro();
@@ -2899,6 +2900,7 @@ const ticketsGuardados = ()=> store.get(gKey(), []);
 const nombreGuardado = g => g.nombre || ('Ticket - ' + hora(g.guardado || g.creado || new Date().toISOString()));
 
 function botonIzq(){
+  if(esPre() && ticket().editPedido && ticket().lineas.length) return `<button id="btnEntregarEd">ENTREGAR Y COBRAR</button>`;
   if(ticket().lineas.length) return `<button id="btnGuardar">${esCot()?'GUARDAR COTIZACIÓN':'GUARDAR'}</button>`;
   const n = ticketsGuardados().length;
   return `<button id="btnAbiertos" class="btn-ab">${txtModo('TICKETS ABIERTOS','PEDIDOS ABIERTOS','COTIZACIONES GUARDADAS')}${n?`<span class="amt">${n}</span>`:''}</button>`;
@@ -4212,6 +4214,17 @@ function entregarPedidoProg(id){
     comentario:p.comentario || '', entregaPedido:p.id, entregaFolio:p.folio});
   go('venta'); ventaVista = 'ticket'; renderVenta(); iniciarCobro();
 }
+/* Editando una venta programada: guarda los cambios y pasa directo a cobrar y entregar, sin reprogramar */
+function entregarEditado(){
+  const t = ticket();
+  if(!t.lineas.length){ toast('La venta quedó sin productos: mejor cancélala'); return; }
+  if(!turnoActual()){ toast('Abre un turno para entregar y cobrar'); return; }
+  const tv = store.get('ticket', {lineas:[]});
+  if(tv.lineas.length && tv.entregaPedido !== t.editPedido){ toast('Tienes un ticket de venta en curso: cóbralo, guárdalo o vacíalo primero'); return; }
+  confirmar({titulo:`Entregar y cobrar #${esc(t.editFolio || '')}`, ok:'Entregar y cobrar',
+    texto:`Se guardan los cambios y pasas a cobrar <b>${fmt(totalTicket(t))}</b>. Al cobrar, la venta queda entregada, se descuenta del inventario y se imprime el ticket.`,
+    alAceptar:()=>{ const p = guardarEdicionPedido(); if(p){ toast(`Cambios guardados en #${p.folio}`); entregarPedidoProg(p.id); } }});
+}
 function cerrarEntregaPedido(t, recibo){
   const p = DB.pedidos.find(x=> x.id===t.entregaPedido); if(!p) return;
   moverDevoluciones(p.devoluciones, -1, '#' + p.folio + ' entregada');   /* la devolución ya entra con el recibo */
@@ -4224,7 +4237,8 @@ function guardarEdicionPedido(){
   if(!p){ toast('No se encontró la venta original'); return null; }
   const antes = {fecha:new Date().toISOString(), usuario:session.nombre, total:p.total, productos:cuentaTicket(p), fechaEntrega:p.fechaEntrega};
   moverDevoluciones(p.devoluciones, -1, '#' + p.folio + ' (edición)');
-  Object.assign(p, {fechaEntrega:document.getElementById('pFecha').value, horario:document.getElementById('pHorario').value, comentario:document.getElementById('pCom').value.trim(),
+  const fe = document.getElementById('pFecha'), ho = document.getElementById('pHorario'), co = document.getElementById('pCom');   /* fuera del formulario de Programar, se conservan los datos de la venta */
+  Object.assign(p, {fechaEntrega: fe ? fe.value : (t.fechaEntrega || p.fechaEntrega), horario: ho ? ho.value : (t.horario || p.horario), comentario: co ? co.value.trim() : (t.comentario ?? p.comentario ?? ''),
     cliente:t.cliente || p.cliente, lineas:congelarLineas(t.lineas), devoluciones:t.devoluciones||[], total:totalTicket(t), ticketNombre:t.nombre || p.ticketNombre || null,
     editado:{fecha:antes.fecha, usuario:session.nombre}, historial:[...(p.historial||[]), antes], sincronizado:false});
   DB.guardarPedido(p);
@@ -4480,7 +4494,7 @@ function actualizarVentaUI(){
   const t = ticket();
   const amt = document.getElementById('amtTop'); if(amt) amt.textContent = fmt(totalTicket(t));
   const izq = document.querySelector('.sale-bar .sale-actions > button:first-child');
-  if(izq && (t.lineas.length > 0) !== (izq.id === 'btnGuardar')){ izq.outerHTML = botonIzq(); bindAccionesTicket(); }
+  if(izq && (t.lineas.length > 0) !== (izq.id === 'btnGuardar' || izq.id === 'btnEntregarEd')){ izq.outerHTML = botonIzq(); bindAccionesTicket(); }
   const badge = document.getElementById('tBadge'); if(badge) badge.textContent = cuentaTicket(t);
   const porProd = {};
   t.lineas.forEach(l=>{ porProd[l.pid] = (porProd[l.pid]||0) + (l.porKilo ? 1 : l.cantidad); });
