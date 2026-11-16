@@ -1988,7 +1988,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.49.1';
+const APP_VERSION = '0.49.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3334,8 +3334,9 @@ function distanciaKm(a, b){
 const fmtDist = km => km < 1 ? `${Math.max(10, Math.round(km*1000/10)*10)} m` : `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 const tieneUbicacion = c => c.lat != null && c.lng != null && c.lat !== '' && !isNaN(c.lat);
 
-let pedDesdeSel = null, selDia = '';   /* venta programada abierta desde la etiqueta del selector de clientes: Atrás regresa al selector */
-function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
+let pedDesdeSel = null, selDia = '';   /* el selector abre siempre en Todos (más cercanos por GPS); el día solo para búsquedas específicas */   /* venta programada abierta desde la etiqueta del selector de clientes: Atrás regresa al selector */
+function abrirSelectorCliente({alElegir, alCancelar, q0 = '', dia0 = ''} = {}){
+  selDia = dia0;
   document.querySelector('.cl-sheet')?.remove();
   const bg = document.createElement('div');
   bg.className = 'sheet-bg cl-sheet';
@@ -3401,7 +3402,7 @@ function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
   };
   const bindRows = ()=>{ body.querySelectorAll('.cl-row').forEach(r=> r.onclick = e=>{
       const ch = e.target.closest('.cl-prog.on');
-      if(ch){ e.stopPropagation(); bg.remove(); pedDesdeSel = {pantalla: enVenta() ? current : 'preventa', vista: ventaVista, opts:{alElegir, alCancelar}, q}; pedidoSel = ch.dataset.ped; ventaVista = 'pedidoDet'; if(!enVenta()) go('preventa'); renderVenta(); return; }
+      if(ch){ e.stopPropagation(); bg.remove(); pedDesdeSel = {pantalla: enVenta() ? current : 'preventa', vista: ventaVista, opts:{alElegir, alCancelar}, q, dia:selDia}; pedidoSel = ch.dataset.ped; ventaVista = 'pedidoDet'; if(!enVenta()) go('preventa'); renderVenta(); return; }
       asignarCliente(clientes().find(c=>c.id===r.dataset.id)); cerrar(true);
     }); };
   const pintarForm = (nombreInicial='')=>{
@@ -8651,7 +8652,7 @@ function atrasApp(){
   if(current==='clientes' && cliVista!=='inicio'){ cliVista = cliVista==='editar' ? 'lista' : 'inicio'; cliSel = null; cliBorrador = null; renderClientes(); return true; }
   if(enVenta() && ventaVista==='cotizacion'){ ventaVista = 'ticket'; renderVenta(); return true; }
   if(enVenta() && ventaVista==='programar'){ ventaVista = 'ticket'; renderVenta(); return true; }
-  if(enVenta() && ventaVista==='pedidoDet' && pedDesdeSel){ const o = pedDesdeSel; pedDesdeSel = null; if(current!==o.pantalla) go(o.pantalla); ventaVista = o.vista; renderVenta(); abrirSelectorCliente({...o.opts, q0:o.q}); return true; }
+  if(enVenta() && ventaVista==='pedidoDet' && pedDesdeSel){ const o = pedDesdeSel; pedDesdeSel = null; if(current!==o.pantalla) go(o.pantalla); ventaVista = o.vista; renderVenta(); abrirSelectorCliente({...o.opts, dia0:o.dia, q0:o.q}); return true; }
   if(enVenta() && ventaVista==='pedidoDet'){ ventaVista = 'pedidos'; renderVenta(); return true; }
   if(enVenta() && ventaVista==='relacion'){ ventaVista = relDesde; renderVenta(); return true; }
   if(enVenta() && ventaVista==='recibidos'){ ventaVista = 'inicioPre'; renderVenta(); return true; }
