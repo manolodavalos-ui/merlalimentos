@@ -225,6 +225,9 @@ main.flush{padding:0}
 .pd-ent{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:var(--brand-soft);color:var(--brand);font-size:.9rem}
 .cli-vis{color:#6b5a00!important;background:#fff6dd!important}
 .vis-mot{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.vis-mot .dia{flex:none}
+.cl-prog.compro{background:#e3f5e8;color:#1a7f37;border:1px solid #9fd8ad;margin-left:4px}
+.cl-res{background:#f6f8f7;line-height:1.45}
+.cl-otros{padding:12px 16px 6px}
 .cl-prog.vis{background:#eef3ff;color:#3550a0;margin-left:4px}
 .vis-bar{position:relative;padding:8px 10px;margin:6px 0;border-radius:10px;background:var(--bg);overflow:hidden}.vis-bar span{position:relative;z-index:1;display:flex;justify-content:space-between;gap:10px;font-weight:600}.vis-bar small{color:var(--muted);font-weight:400}
 .vis-bar i{position:absolute;left:0;top:0;bottom:0;background:#cfe8da}.vis-bar i.neg{background:#f6d3cf}
@@ -1988,7 +1991,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.49.2';
+const APP_VERSION = '0.49.3';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3363,20 +3366,34 @@ function abrirSelectorCliente({alElegir, alCancelar, q0 = '', dia0 = ''} = {}){
   };
   const progDe = {}; DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega >= hoyClave()).sort((a,b)=> a.fechaEntrega.localeCompare(b.fechaEntrega))
     .forEach(p=>{ const k = p.cliente?.id; if(k) (progDe[k] = progDe[k] || []).push(p); });
-  const chipProg = c=>{ const ps = progDe[c.id], vh = visitaHoy(c.id), vis = vh ? ` <span class="cl-prog vis">Visitado hoy · ${esc(vh.motivo)}</span>` : '';
+  const hoyK = hoyClave(), compras = {};
+  DB.recibos.filter(r=> !r.cancelado && !r.reemplazadoPor && hoyClave(new Date(r.fecha))===hoyK).forEach(r=>{ const c = clientes().find(x=> esMismoCliente(r.cliente, x)); if(c) compras[c.id] = r2((compras[c.id]||0) + r.total); });
+  const chipProg = c=>{ const ps = progDe[c.id], vh = visitaHoy(c.id), comp = compras[c.id];
+    const vis = comp != null ? ` <span class="cl-prog compro">Visitado hoy · compró ${fmt(comp)}</span>` : vh ? ` <span class="cl-prog vis">Visitado hoy · ${esc(vh.motivo)}</span>` : '';
     if(!ps) return `<span class="cl-prog">Sin venta programada</span>${vis}`;
     const p = ps[0], cuando = p.fechaEntrega===hoyClave() ? 'hoy' : p.fechaEntrega===manana() ? 'mañana' : fechaCorta(p.fechaEntrega);
     return `<span class="cl-prog on" data-ped="${p.id}" role="button">Venta programada · ${cuando} · ${fmt(p.total)}${ps.length > 1 ? ` (+${ps.length-1})` : ''}</span>${vis}`; };
   const lista = ()=>{
     const qq = q.trim().toLowerCase();
     const pos = estadoPos==='ok' ? ultimaPos : null;
-    const ls = clientes().filter(c=> pasaDiaCli(c, selDia)).filter(c=> !qq || textoCliente(c).includes(qq))
+    const prep = arr => arr.filter(c=> !qq || textoCliente(c).includes(qq))
       .map(c=> ({c, d: pos && tieneUbicacion(c) ? distanciaKm(pos, {lat:Number(c.lat), lng:Number(c.lng)}) : null}))
       .sort((a,b)=> (a.d==null) - (b.d==null) || (a.d!=null ? a.d - b.d : 0) || (selDia && selDia!=='FS' ? (a.c.orden||9999) - (b.c.orden||9999) : 0) || a.c.nombre.localeCompare(b.c.nombre,'es'));
-    return ls.length ? ls.map(({c,d})=>`<button class="cl-row" data-id="${c.id}"><span class="cl-av">${esc(c.nombre.trim()[0]||'?').toUpperCase()}</span>
+    const delDia = clientes().filter(c=> pasaDiaCli(c, selDia)), ls = prep(delDia);
+    /* Con un día elegido: resumen de visitas y, al final, los clientes de otros días con venta programada para esa fecha */
+    let res = '', extra = [];
+    if(selDia && selDia!=='FS'){
+      const clave = hoyClave(fechaDeDia(selDia)), nom = (DIAS.find(x=> x[0]===selDia)||[])[1] || selDia;
+      const at = delDia.map(c=> atendidoEn(c, clave)), vis = at.filter(Boolean).length, comp = at.filter(a=> a && a.tipo==='Venta').length;
+      const conPed = new Set(DB.pedidos.filter(p=> (p.estado==='Programado' || p.estado==='Entregado') && p.fechaEntrega===clave).map(p=> p.cliente?.id).filter(Boolean));
+      extra = prep(clientes().filter(c=> !pasaDiaCli(c, selDia) && conPed.has(c.id)));
+      res = `<div class="cl-count cl-res"><b>${nom} ${fechaCorta(clave).replace(/^\S+\s/, '')}:</b> ${delDia.length} ${delDia.length===1?'cliente':'clientes'} · <span class="pos">${vis} ${vis===1?'visitado':'visitados'}</span>${comp ? ` (${comp} ${comp===1?'compró':'compraron'})` : ''} · <b>${delDia.length - vis} por visitar</b>${extra.length ? ` · +${extra.length} con pedido de otro día` : ''}</div>`;
+    }
+    const fila = ({c,d})=>`<button class="cl-row" data-id="${c.id}"><span class="cl-av">${esc(c.nombre.trim()[0]||'?').toUpperCase()}</span>
         <span class="cl-txt"><b>${esc(c.nombre)}${c.tienda?' · '+esc(c.tienda):''}</b><small>${esc([c.numero?'#'+c.numero:'', c.telefono, c.colonia||c.direccion].filter(Boolean).join(' · ') || 'Sin datos de contacto')}</small>${chipProg(c)}</span>
-        ${d!=null ? `<span class="cl-dist">${fmtDist(d)}</span>` : ''}</button>`).join('')
-      : `<div class="cl-empty">${clientes().length ? 'No hay clientes que coincidan.' : 'Aún no tienes clientes registrados.'}</div>`;
+        ${d!=null ? `<span class="cl-dist">${fmtDist(d)}</span>` : ''}</button>`;
+    return res + ((ls.length || extra.length) ? ls.map(fila).join('') + (extra.length ? `<div class="rc-day cl-otros">Otros clientes con venta programada para ese día (${extra.length})</div>` + extra.map(fila).join('') : '')
+      : `<div class="cl-empty">${clientes().length ? 'No hay clientes que coincidan.' : 'Aún no tienes clientes registrados.'}</div>`);
   };
   const pintarLista = ()=>{
     body.innerHTML = `<div class="rc-search cl-search">${svg('search')}<input id="clQ" placeholder="Buscar por nombre, tienda, número o teléfono" value="${esc(q)}" autocomplete="off"></div>
