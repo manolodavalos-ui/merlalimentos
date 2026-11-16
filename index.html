@@ -1988,7 +1988,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.49.0';
+const APP_VERSION = '0.49.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3369,9 +3369,9 @@ function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
   const lista = ()=>{
     const qq = q.trim().toLowerCase();
     const pos = estadoPos==='ok' ? ultimaPos : null;
-    const ls = clientes().filter(c=> !selDia || (selDia==='FS' ? c.canal==='FS' : (c.diasVisita||[]).includes(selDia))).filter(c=> !qq || textoCliente(c).includes(qq))
+    const ls = clientes().filter(c=> pasaDiaCli(c, selDia)).filter(c=> !qq || textoCliente(c).includes(qq))
       .map(c=> ({c, d: pos && tieneUbicacion(c) ? distanciaKm(pos, {lat:Number(c.lat), lng:Number(c.lng)}) : null}))
-      .sort((a,b)=> (a.d==null) - (b.d==null) || (a.d!=null ? a.d - b.d : 0) || a.c.nombre.localeCompare(b.c.nombre,'es'));
+      .sort((a,b)=> (a.d==null) - (b.d==null) || (a.d!=null ? a.d - b.d : 0) || (selDia && selDia!=='FS' ? (a.c.orden||9999) - (b.c.orden||9999) : 0) || a.c.nombre.localeCompare(b.c.nombre,'es'));
     return ls.length ? ls.map(({c,d})=>`<button class="cl-row" data-id="${c.id}"><span class="cl-av">${esc(c.nombre.trim()[0]||'?').toUpperCase()}</span>
         <span class="cl-txt"><b>${esc(c.nombre)}${c.tienda?' · '+esc(c.tienda):''}</b><small>${esc([c.numero?'#'+c.numero:'', c.telefono, c.colonia||c.direccion].filter(Boolean).join(' · ') || 'Sin datos de contacto')}</small>${chipProg(c)}</span>
         ${d!=null ? `<span class="cl-dist">${fmtDist(d)}</span>` : ''}</button>`).join('')
@@ -3380,13 +3380,12 @@ function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
   const pintarLista = ()=>{
     body.innerHTML = `<div class="rc-search cl-search">${svg('search')}<input id="clQ" placeholder="Buscar por nombre, tienda, número o teléfono" value="${esc(q)}" autocomplete="off"></div>
       <button class="cl-new" id="clNuevo">${svg('userAdd')}Nuevo cliente</button>
-      <div class="dias filtro ec-dias cl-dias" id="clDias">${[['','Todos'], ...DIAS, ['FS','FS']].map(([k,t])=>`<button class="dia${k===selDia?' on':''}${k==='FS'?' fs':''}" data-d="${k}">${t}${k && k===diaHoy()?' ·':''}</button>`).join('')}</div>
+      ${chipsDiasCli(selDia, 'clDias', 'ec-dias cl-dias')}
       <div class="cl-near" id="clNear" role="button" tabindex="0">${estadoCercania()}</div>
       <div class="cl-list" id="clList">${lista()}</div>`;
     const inp = body.querySelector('#clQ');
     inp.oninput = ()=>{ q = inp.value; body.querySelector('#clList').innerHTML = lista(); bindRows(); };
-    body.querySelectorAll('#clDias .dia').forEach(b=> b.onclick = ()=>{ selDia = b.dataset.d; body.querySelectorAll('#clDias .dia').forEach(x=> x.classList.toggle('on', x===b)); body.querySelector('#clList').innerHTML = lista(); bindRows(); });
-    setTimeout(()=>{ const on = body.querySelector('#clDias .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'}); }, 30);
+    bindChipsDiasCli(body, 'clDias', d=>{ selDia = d; body.querySelector('#clList').innerHTML = lista(); bindRows(); });
     body.querySelector('#clNuevo').onclick = ()=> pintarForm(q);
     body.querySelector('#clNear').onclick = ()=>{
       if(!clientes().some(tieneUbicacion) || estadoPos==='buscando') return;
@@ -3446,6 +3445,13 @@ function abrirSelectorCliente({alElegir, alCancelar, q0 = ''} = {}){
 
 /* ================= Clientes: crear y gestionar ================= */
 const DIAS = [['lun','Lun'],['mar','Mar'],['mie','Mié'],['jue','Jue'],['vie','Vie'],['sab','Sáb'],['dom','Dom']];
+/* Filtro estándar de clientes por día de visita: Todos, Lun…Dom y FS (foodservice). Se usa en todas las pantallas para elegir clientes */
+const pasaDiaCli = (c, d) => !d || (d==='FS' ? c.canal==='FS' : (c.diasVisita||[]).includes(d));
+const chipsDiasCli = (sel, id, cls='') => `<div class="dias filtro ${cls}" id="${id}">${[['','Todos'], ...DIAS, ['FS','FS']].map(([k,t])=>`<button class="dia${k===sel?' on':''}${k==='FS'?' fs':''}" data-d="${k}">${t}${k && k===diaHoy()?' ·':''}</button>`).join('')}</div>`;
+function bindChipsDiasCli(cont, id, alCambiar){
+  cont.querySelectorAll('#' + id + ' .dia').forEach(b=> b.onclick = ()=>{ cont.querySelectorAll('#' + id + ' .dia').forEach(x=> x.classList.toggle('on', x===b)); alCambiar(b.dataset.d); });
+  setTimeout(()=>{ const on = cont.querySelector('#' + id + ' .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'}); }, 30);
+}
 const DIA_LARGO = {lun:'Lunes',mar:'Martes',mie:'Miércoles',jue:'Jueves',vie:'Viernes',sab:'Sábado',dom:'Domingo'};
 const soloDigitos = v => String(v||'').replace(/\D/g,'');
 const textoCliente = c => [c.numero, c.nombre, c.tienda, c.telefono, c.direccion, c.colonia, c.ciudad, c.referencia].filter(Boolean).join(' ').toLowerCase();
@@ -3568,7 +3574,7 @@ function guardarClienteForm(){
 function filtrarClientes(){
   const q = cliQ.trim().toLowerCase(), qd = soloDigitos(q);
   return clientes().filter(c=>{
-    if(cliDia==='FS'){ if(c.canal!=='FS') return false; } else if(cliDia && !(c.diasVisita||[]).includes(cliDia)) return false;
+    if(!pasaDiaCli(c, cliDia)) return false;
     if(!q) return true;
     return textoCliente(c).includes(q) || (qd.length >= 3 && soloDigitos(c.telefono).includes(qd));
   }).sort((a,b)=> cliDia
@@ -3590,7 +3596,7 @@ function filasClientesHTML(){
 function viewClientesLista(){
   return `<div class="rc-wrap">
     <div class="rc-search cg-search">${svg('search')}<input id="cgQ" placeholder="Buscar nombre, tienda, número, teléfono o colonia" value="${esc(cliQ)}" autocomplete="off"></div>
-    <div class="dias filtro" id="cgDias"><button class="dia${!cliDia?' on':''}" data-d="">Todos</button>${DIAS.map(([k,t])=>`<button class="dia${cliDia===k?' on':''}" data-d="${k}">${t}</button>`).join('')}<button class="dia fs${cliDia==='FS'?' on':''}" data-d="FS">FS</button></div>
+    ${chipsDiasCli(cliDia, 'cgDias')}
     <div id="cgList">${filasClientesHTML()}</div>
   </div>`;
 }
@@ -6554,10 +6560,10 @@ async function publicarConAviso(despues){
 let ecDia = '';
 function elegirClienteSimple(cb){
   const bg = dialogo(`<h3>Enviar catálogo a…</h3>
-    <div class="dias filtro ec-dias" id="ecDias">${[['','Todos'], ...DIAS, ['FS','FS']].map(([k,t])=>`<button class="dia${k===ecDia?' on':''}${k==='FS'?' fs':''}" data-d="${k}">${t}${k && k===diaHoy()?' ·':''}</button>`).join('')}</div>
+    ${chipsDiasCli(ecDia, 'ecDias', 'ec-dias')}
     <input class="field" id="ecQ" placeholder="Buscar cliente" autocomplete="off"><div class="ea-list" id="ecL"></div>`);
   const pintar = ()=>{ const q = bg.querySelector('#ecQ').value;
-    const ls = clientes().filter(c=> !ecDia || (ecDia==='FS' ? c.canal==='FS' : (c.diasVisita||[]).includes(ecDia)))
+    const ls = clientes().filter(c=> pasaDiaCli(c, ecDia))
       .filter(c=> coincideBusqueda([c.nombre, c.tienda, c.numero, c.colonia].filter(Boolean).join(' '), q))
       .sort((a,b)=> ecDia && ecDia!=='FS' ? ((a.orden||999)-(b.orden||999)) || (a.tienda||a.nombre).localeCompare(b.tienda||b.nombre,'es') : (a.tienda||a.nombre).localeCompare(b.tienda||b.nombre,'es'));
     const conTel = ls.filter(c=> soloDigitos(c.telefono||'').length >= 10), pend = conTel.filter(c=> !enviadoHoy(c.id));
@@ -6566,9 +6572,8 @@ function elegirClienteSimple(cb){
       .map(c=>`<button class="ea-row" data-id="${c.id}"><b>${esc(c.tienda || c.nombre)}${enviadoHoy(c.id) ? ' <i class="tag-v">enviado ✓</i>' : ''}</b><small>${c.tienda?esc(c.nombre)+' · ':''}${c.telefono ? esc(c.telefono) : 'sin teléfono'}${Object.keys(c.preciosEspeciales||{}).length ? ' · precios especiales' : ''}</small></button>`).join('') || '<p class="note-sm">Sin resultados</p>');
     bg.querySelectorAll('.ea-row').forEach(r=> r.onclick = ()=>{ bg.remove(); cb(r.dataset.id); });
     const tt = bg.querySelector('#ecTodos'); if(tt) tt.onclick = ()=>{ const et = ecDia==='FS' ? 'Foodservice' : (DIAS.find(d=> d[0]===ecDia)||[])[1] || ecDia; bg.remove(); iniciarSerie(pend.map(c=> c.id), et); }; };
-  bg.querySelectorAll('#ecDias .dia').forEach(b=> b.onclick = ()=>{ ecDia = b.dataset.d; bg.querySelectorAll('#ecDias .dia').forEach(x=> x.classList.toggle('on', x===b)); pintar(); });
+  bindChipsDiasCli(bg, 'ecDias', d=>{ ecDia = d; pintar(); });
   bg.querySelector('#ecQ').oninput = pintar; pintar();
-  setTimeout(()=>{ const on = bg.querySelector('#ecDias .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'}); }, 30);
 }
 const msgCatalogo = (c, tok)=> `Hola ${c.nombre}, te comparto *Cliente consentido Merkalimentos*, nuestro catálogo${Object.keys(c.preciosEspeciales||{}).length ? ' con tus precios especiales' : ''}. Desde ahí puedes hacer tu pedido y lo puedes agregar a tu pantalla de inicio:\n${linkCatalogo(tok)}`;
 const catEnviados = ()=> store.get('catEnviados', {});
