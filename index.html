@@ -230,6 +230,10 @@ main.flush{padding:0}
 .inf-min .dias{padding:0 0 2px!important;border:0!important;margin:0!important}
 .inf-min-o{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.inf-min-o b{color:var(--ink,#1d2320)}
 .inf-min #infMinOtro{width:92px;flex:0 0 92px;margin:0;padding:6px 10px;min-height:0;height:36px}
+.pd-edit-g{margin:8px 0 4px}
+.pd-volver{display:block;width:100%;margin:8px 0 0;min-height:0;padding:10px 12px;font-size:.95rem}
+.pd-agregar{color:var(--brand)!important;border-color:var(--brand)!important;margin-bottom:10px}
+.pd-agregar svg{color:var(--brand)}
 .cl-res{background:#f6f8f7;line-height:1.45}
 .cl-otros{padding:12px 16px 6px}
 .cl-prog.vis{background:#eef3ff;color:#3550a0;margin-left:4px}
@@ -1995,7 +1999,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.50.2';
+const APP_VERSION = '0.50.3';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2716,6 +2720,10 @@ function agregarPeso(p, kg){
 
 /* ================= Venta ================= */
 let ventaVista = 'grid';
+document.addEventListener('click', e=>{
+  if(e.target.closest('#tkAgregarProd')){ ventaVista = 'grid'; renderVenta(); window.scrollTo(0,0); }
+  else if(e.target.closest('#gVolverEd')){ ventaVista = 'ticket'; renderVenta(); }
+});
 let filtro = {sec:'', q:'', buscando:false};
 const SLATS = 6;
 
@@ -2783,6 +2791,8 @@ function viewVenta(){
         <button id="btnCobrar">${txtModo('COBRAR','PROGRAMAR ENTREGA','COTIZAR')}<span class="amt" id="amtTop">${fmt(totalTicket(t))}</span></button>
       </div>
       ${barraCliente()}
+      ${t.editPedido || t.entregaPedido ? `<div class="pd-edit pd-edit-g">${t.editPedido ? 'Editando' : 'Entregando'} la venta <b>#${esc(t.editFolio || t.entregaFolio || '')}</b>: toca los productos para agregarlos.
+        <button class="btn pd-volver" id="gVolverEd">‹ Volver a la venta · ${cuentaTicket(t)} ${cuentaTicket(t)===1?'producto':'productos'} · <span id="amtVolver">${fmt(totalTicket(t))}</span></button></div>` : ''}
       <div class="filter">${filtroHTML}</div>
     </div>
     <div class="grid" id="grid">${gridHTML()}</div>`;
@@ -2806,6 +2816,7 @@ function viewTicket(){
     <div class="ticket-list">
       ${(t.lineas.length || (t.devoluciones||[]).length) ? filas + bloqueDevTicket(t) + ((t.devoluciones||[]).length ? `<div class="tsub"><span>Total de productos</span><span>${fmt(r2(totalTicket(t) + totalDev(t)))}</span></div><div class="tsub neg"><span>Devoluciones</span><span>−${fmt(totalDev(t))}</span></div>` : '') + `<div class="ttotal"><span>${totalTicket(t) < 0 ? 'A devolver' : (t.devoluciones||[]).length ? 'Total a pagar' : 'Total'}</span><span>${fmt(totalTicket(t))}</span></div>${ahorroTicket(t) > 0 ? `<div class="tahorro">${svg('articulos')}Ahorro por promociones: ${fmt(ahorroTicket(t))}</div>` : ''}`
                         : `<div class="ticket-empty">${txtModo('El ticket está vacío','El pedido está vacío','La cotización está vacía')}.<br>Toca un producto para agregarlo.</div>`}
+      ${t.editPedido || t.entregaPedido ? `<button class="dev-add pd-agregar" id="tkAgregarProd"><b style="font-size:1.25em;line-height:1">+</b> Agregar productos del catálogo</button>` : ''}
       ${botonDevolucion()}
     </div>
     <div class="ticket-foot"><div class="sale-actions">
@@ -4505,6 +4516,7 @@ function bindGrid(){
 function actualizarVentaUI(){
   const t = ticket();
   const amt = document.getElementById('amtTop'); if(amt) amt.textContent = fmt(totalTicket(t));
+  const gv = document.getElementById('gVolverEd'); if(gv){ const n = cuentaTicket(t); gv.innerHTML = `‹ Volver a la venta · ${n} ${n===1?'producto':'productos'} · <span id="amtVolver">${fmt(totalTicket(t))}</span>`; }
   const izq = document.querySelector('.sale-bar .sale-actions > button:first-child');
   if(izq && (t.lineas.length > 0) !== (izq.id === 'btnGuardar' || izq.id === 'btnEntregarEd')){ izq.outerHTML = botonIzq(); bindAccionesTicket(); }
   const badge = document.getElementById('tBadge'); if(badge) badge.textContent = cuentaTicket(t);
