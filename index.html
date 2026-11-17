@@ -1995,7 +1995,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.50.1';
+const APP_VERSION = '0.50.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -7869,6 +7869,27 @@ function infResumen(comp){
     <div class="card cajon inf-card"><h3>Ventas ${nombreModo}</h3>${leyenda(comp)}${barras('tiempo', sA.labels, sA.val, sB ? sB.val : null, {cada:sA.cada, tips:tipsT})}</div>
     <div class="card cajon inf-card"><h3>Por día de la semana</h3><p class="sub" style="margin:0 0 6px">Total vendido cada día de visita en el periodo</p>${leyenda(comp)}${barras('semana', DIAS_CORTOS, semA, rB ? semB : null)}</div>
     <div class="card cajon inf-card"><h3>Forma de pago</h3>${['Efectivo','Tarjeta','Crédito'].map(m=>`<div class="cj-row"><span>${m}</span><b>${fmt(A.met[m]||0)} ${B ? delta(A.met[m]||0, B.met[m]||0) : ''}</b></div>`).join('')}</div>
+    ${cardCobranza(comp)}
+  </div>`;
+}
+/* Cobranza del periodo: lo vendido a crédito contra lo recuperado con abonos (los abonos no son ventas) */
+function cobranzaRango(d1, d2){
+  const enR = f => { const k = hoyClave(new Date(f)); return k >= d1 && k <= d2; };
+  const cred = DB.recibos.filter(r=> r.metodo==='Crédito' && esRaiz(r) && !r.cancelado && enR(r.fecha));
+  const abs = DB.abonos.filter(a=> a.tipo==='abono' && !a.cancelado && enR(a.fecha));
+  const met = {}; abs.forEach(a=> met[a.metodo||'Efectivo'] = r2((met[a.metodo||'Efectivo']||0) + a.monto));
+  return {nuevos: sumar(cred, r=> r.total), anticipos: sumar(cred, r=> r.credito?.anticipo||0), nCred: cred.length, abonos: sumar(abs, a=> a.monto), nAb: abs.length, met};
+}
+function cardCobranza(comp){
+  const A = cobranzaRango(infDesde, infHasta), B = comp ? cobranzaRango(comp[0], comp[1]) : null;
+  if(!A.nCred && !A.nAb && !(B && (B.nCred || B.nAb))) return '';
+  const fiado = r2(A.nuevos - A.anticipos), neto = r2(A.abonos - fiado), porCobrar = sumar(cartera(), x=> x.saldo);
+  return `<div class="card cajon inf-card"><h3>Cobranza del periodo</h3>
+    <div class="cj-row"><span>Ventas a crédito<small class="ir-s">${A.nCred} ${A.nCred===1?'ticket':'tickets'}${A.anticipos ? ` · anticipos ${fmt(A.anticipos)}` : ''}</small></span><b>${fmt(A.nuevos)} ${B ? delta(A.nuevos, B.nuevos) : ''}</b></div>
+    <div class="cj-row"><span>Abonos recibidos<small class="ir-s">${A.nAb} ${A.nAb===1?'abono':'abonos'}${Object.keys(A.met).length ? ' · ' + Object.entries(A.met).map(([m,v])=> `${m.toLowerCase()} ${fmt(v)}`).join(' · ') : ''}</small></span><b>${fmt(A.abonos)} ${B ? delta(A.abonos, B.abonos) : ''}</b></div>
+    <div class="cj-row"><span>${neto >= 0 ? 'Se recuperó más de lo que se fió' : 'Se fió más de lo que se recuperó'}<small class="ir-s">abonos − (crédito − anticipos)</small></span><b class="${neto >= 0 ? 'pos' : 'neg'}">${neto >= 0 ? '+' : '−'}${fmt(Math.abs(neto))}</b></div>
+    <div class="cj-teo"><span>Total por cobrar hoy</span><b>${fmt(porCobrar)}</b></div>
+    <p class="note-sm" style="text-align:left;margin:6px 0 0">Los abonos no se suman a las ventas: la venta ya se contó el día que se hizo. El detalle está en Créditos → Reportes de cobranza.</p>
   </div>`;
 }
 function infProductos(comp){
