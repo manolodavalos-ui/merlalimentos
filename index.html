@@ -2014,7 +2014,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.52.1';
+const APP_VERSION = '0.52.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2702,12 +2702,16 @@ function faltaPromo(l){
 /* Congela precio de lista, promoción y costo al registrar una venta o pedido */
 const congelarLineas = lineas => lineas.map(l=>{
   const a = artPorId(l.pid);
-  return {...l, promoRegla: reglaDe(l), costo: a && a.costo != null ? a.costo : null};
+  return {...l, promoRegla: reglaDe(l), costo: a && a.costo != null ? a.costo : null, ...(l.especial ? {precioLista: l.precioLista ?? a?.precio ?? null} : {})};
 });
 const totalTicket = t => r2(t.lineas.reduce((s,l)=> s + importeLinea(l), 0) - totalDev(t));
 const ahorroTicket = t => r2(t.lineas.reduce((s,l)=> s + ahorroLinea(l), 0));
 /* Ahorro por promociones de lo que quedó en el recibo (considera descuentos por pedido incompleto) */
 const ahorroRecibo = r => r2((r.lineas||[]).reduce((s,l)=> s + r2((l.precio||0)*l.cantidad) - importeCon(l, l.cantidad), 0));
+/* Ahorro por precio especial del cliente: (precio de lista − precio especial) × cantidad */
+const precioListaDe = l => l.precioLista ?? artPorId(l.pid)?.precio;
+const ahorroEspLinea = l => { if(!l.especial) return 0; const p = precioListaDe(l); return p != null && p > (l.precio||0) ? r2((p - (l.precio||0)) * l.cantidad) : 0; };
+const ahorroEspecial = x => r2((x.lineas||[]).reduce((s,l)=> s + ahorroEspLinea(l), 0));
 function deudaCliente(id){
   const pend = DB.recibos.filter(r=> r.metodo==='Crédito' && !r.cancelado && !r.reemplazadoPor && (r.saldo||0) > 0.004 && r.cliente && r.cliente.id===id)
     .sort((a,b)=> (a.credito?.fechaPago||a.fecha).localeCompare(b.credito?.fechaPago||b.fecha));
@@ -2721,7 +2725,7 @@ function agregarPieza(p){
   const t = ticket();
   const l = t.lineas.find(x=> x.pid===p.id && !x.porKilo);
   if(l) l.cantidad += 1;
-  else { const e = precioEspecial(t.cliente, p.id); t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio: e ?? p.precio, porKilo:false, cantidad:1, ...(e ? {especial:true, promoRegla:null} : {})}); }
+  else { const e = precioEspecial(t.cliente, p.id); t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio: e ?? p.precio, ...(e ? {precioLista:p.precio} : {}), porKilo:false, cantidad:1, ...(e ? {especial:true, promoRegla:null} : {})}); }
   guardarTicket(t); actualizarVentaUI(p.id);
 }
 function agregarPeso(p, kg){
@@ -2729,7 +2733,7 @@ function agregarPeso(p, kg){
   const e = precioEspecial(t.cliente, p.id);
   const previa = !e && promoActiva(p) && t.lineas.find(x=> x.pid===p.id && x.porKilo && !x.especial);
   if(previa) previa.cantidad = r3(previa.cantidad + kg);   /* con promoción por volumen se suman los kilos en una sola línea */
-  else t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio: e ?? p.precio, porKilo:true, cantidad:kg, ...(e ? {especial:true} : {})});
+  else t.lineas.push({lid:'L'+Date.now()+Math.random().toString(36).slice(2,6), pid:p.id, nombre:nombreTicket(p), precio: e ?? p.precio, ...(e ? {precioLista:p.precio} : {}), porKilo:true, cantidad:kg, ...(e ? {especial:true} : {})});
   guardarTicket(t); actualizarVentaUI(p.id);
 }
 
@@ -2831,7 +2835,7 @@ function viewTicket(){
     ${t.nombre ? `<div class="tk-name">${svg('recibos')}<div><b>${esc(t.nombre)}</b>${t.comentario?`<small>${esc(t.comentario)}</small>`:''}</div></div>` : ''}
     <div class="tk-cli">${barraCliente()}</div>
     <div class="ticket-list">
-      ${(t.lineas.length || (t.devoluciones||[]).length) ? filas + bloqueDevTicket(t) + ((t.devoluciones||[]).length ? `<div class="tsub"><span>Total de productos</span><span>${fmt(r2(totalTicket(t) + totalDev(t)))}</span></div><div class="tsub neg"><span>Devoluciones</span><span>−${fmt(totalDev(t))}</span></div>` : '') + `<div class="ttotal"><span>${totalTicket(t) < 0 ? 'A devolver' : (t.devoluciones||[]).length ? 'Total a pagar' : 'Total'}</span><span>${fmt(totalTicket(t))}</span></div>${ahorroTicket(t) > 0 ? `<div class="tahorro">${svg('articulos')}Ahorro por promociones: ${fmt(ahorroTicket(t))}</div>` : ''}`
+      ${(t.lineas.length || (t.devoluciones||[]).length) ? filas + bloqueDevTicket(t) + ((t.devoluciones||[]).length ? `<div class="tsub"><span>Total de productos</span><span>${fmt(r2(totalTicket(t) + totalDev(t)))}</span></div><div class="tsub neg"><span>Devoluciones</span><span>−${fmt(totalDev(t))}</span></div>` : '') + `<div class="ttotal"><span>${totalTicket(t) < 0 ? 'A devolver' : (t.devoluciones||[]).length ? 'Total a pagar' : 'Total'}</span><span>${fmt(totalTicket(t))}</span></div>${ahorroTicket(t) > 0 ? `<div class="tahorro">${svg('articulos')}Ahorro por promociones: ${fmt(ahorroTicket(t))}</div>` : ''}${ahorroEspecial(t) > 0 ? `<div class="tahorro">${svg('star')}Ahorro por precio especial: ${fmt(ahorroEspecial(t))}</div>` : ''}`
                         : `<div class="ticket-empty">${txtModo('El ticket está vacío','El pedido está vacío','La cotización está vacía')}.<br>Toca un producto para agregarlo.</div>`}
       ${t.editPedido || t.entregaPedido ? `<button class="dev-add pd-agregar" id="tkAgregarProd"><b style="font-size:1.25em;line-height:1">+</b> Agregar productos del catálogo</button>` : ''}
       ${botonDevolucion()}
@@ -3215,6 +3219,7 @@ function viewHecho(){
       ${r.metodo==='Crédito' ? `<dt>Saldo a crédito</dt><dd>${fmt(r.saldo)}</dd>` : ''}
       ${r.metodo==='Crédito' && r.credito?.fechaPago ? `<dt>Fecha de pago</dt><dd>${fechaCorta(r.credito.fechaPago)}</dd>` : ''}
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
+      ${ahorroEspecial(r) > 0 ? `<dt>Ahorro por precio especial</dt><dd class="pos">${fmt(ahorroEspecial(r))}</dd>` : ''}
     </dl>
     ${r.metodo==='Crédito' && r.cliente?.id ? bloqueDeuda(r) : ''}
     <div class="tk-acts"><button class="btn ghost" id="hechoPrint">${svg('recibos')}Imprimir</button><button class="btn ghost" id="hechoShare">${svg('share')}Compartir</button></div>
@@ -5031,6 +5036,7 @@ function htmlTicket(r){
     ${r.metodo==='Efectivo' && d.length && !anulado(r) ? fila('A devolver', fmt(d[0].monto)) : ''}
     ${r.cancelado && r.metodo==='Efectivo' ? fila('A devolver', fmt(r.total)) : ''}
     ${ahorroRecibo(r) > 0 ? `<div class="s"></div><div class="c">Ahorro por promociones: ${fmt(ahorroRecibo(r))}</div>` : ''}
+    ${ahorroEspecial(r) > 0 ? `<div class="c">Ahorro por precio especial: ${fmt(ahorroEspecial(r))}</div>` : ''}
     <div class="s"></div><div class="c">${esc(impCfg().pie)}</div>
   </body></html>`;
 }
@@ -5120,7 +5126,11 @@ function lineasTicket(r){
   }
   else L.push({t:dos(r.metodo, fmt(neto))});
   L.push({t:sep});
-  if(ahorroRecibo(r) > 0){ L.push({t:centro('Ahorro por promociones: ' + fmt(ahorroRecibo(r)))}); L.push({t:sep}); }
+  { const ap = ahorroRecibo(r), ae = ahorroEspecial(r);
+    if(ap > 0) L.push({t:dos('Ahorro por promociones', fmt(ap))});
+    if(ae > 0) L.push({t:dos('Ahorro precio especial', fmt(ae))});
+    if(ap > 0 && ae > 0) L.push({t:dos('AHORRO TOTAL', fmt(r2(ap + ae))), b:true});
+    if(ap > 0 || ae > 0) L.push({t:sep}); }
   if(c.pie) envolver(c.pie).forEach(x=> L.push({t:centro(x)}));
   return L;
 }
@@ -5512,6 +5522,7 @@ function viewReciboDetalle(r){
       ${r.credito?.nota ? `<dt>Nota</dt><dd>${esc(r.credito.nota)}</dd>` : ''}
       ${(r.cambiosPago||[]).map(c=> `<dt>Cambio de pago</dt><dd>${esc(c.de)} → ${esc(c.a)}<small style="display:block;color:var(--muted)">${fecha(c.fecha)} · ${esc(c.vendedor||c.usuario)}</small></dd>`).join('')}
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
+      ${ahorroEspecial(r) > 0 ? `<dt>Ahorro por precio especial</dt><dd class="pos">${fmt(ahorroEspecial(r))}</dd>` : ''}
     </dl>
     <div class="tk-acts"><button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir${r.version>1 ? ' v'+r.version : ''}</button><button class="btn ghost" id="rdShare">${svg('share')}Compartir</button></div>
   </div>`;
@@ -6703,8 +6714,8 @@ function repreciarTicket(t){
   (t.lineas||[]).forEach(l=>{
     const a = artPorId(l.pid); if(!a) return;
     const e = precioEspecial(t.cliente, l.pid);
-    if(e){ l.precio = e; l.especial = true; l.promoRegla = null; }
-    else if(l.especial){ l.precio = a.precio; delete l.especial; delete l.promoRegla; }
+    if(e){ l.precio = e; l.especial = true; l.precioLista = a.precio; l.promoRegla = null; }
+    else if(l.especial){ l.precio = a.precio; delete l.especial; delete l.precioLista; delete l.promoRegla; }
   });
 }
 function bloquePreciosEsp(c){
