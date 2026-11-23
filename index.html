@@ -141,7 +141,12 @@ main.flush{padding:0}
 .ticket-list{padding:6px 16px 0;flex:1}
 .tline{display:flex;justify-content:space-between;gap:12px;padding:15px 2px;border-bottom:1px solid var(--line);font-size:1.02rem;cursor:pointer}
 .tline:active{background:#f0f3f2}
-.tline .q{color:var(--muted);margin-left:4px}
+.tline .q{color:var(--muted);margin-left:4px;font-size:.85em}
+.tl-r{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:0 0 auto;text-align:right}
+.tq{display:inline-flex;align-items:center;border:1.5px solid var(--brand);border-radius:999px;overflow:hidden;background:#fff}
+.tq button{width:38px;height:34px;border:0;background:none;color:var(--brand);font-size:1.35rem;font-weight:700;line-height:1;padding:0;cursor:pointer}
+.tq button:active{background:#e5f2eb}.tq b{min-width:30px;text-align:center;font-size:1rem}
+.tq-kg{border:1.5px solid var(--brand);border-radius:999px;background:#fff;color:var(--brand);font:inherit;font-weight:600;font-size:.95rem;padding:6px 12px;cursor:pointer}
 .tline .np{color:var(--warn);font-size:.8rem;display:block;margin-top:3px}
 .tsub{display:flex;justify-content:space-between;padding:10px 2px 0;font-size:.98rem;color:var(--muted)}
 .tsub.neg{color:var(--danger)}
@@ -2009,7 +2014,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.52.0';
+const APP_VERSION = '0.52.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2812,11 +2817,13 @@ function viewTicket(){
   const t = ticket();
   const filas = t.lineas.map(l=>`
     <div class="tline" data-lid="${l.lid}">
-      <div>${esc(nombreTk(l))}<span class="q">${l.porKilo ? fmtKg(l.cantidad)+' kg' : 'x '+l.cantidad}</span>
+      <div>${esc(nombreTk(l))}<span class="q">· ${fmt(l.precio||0)}${l.porKilo ? '/kg' : ' c/u'}</span>
         ${l.precio==null?'<span class="np">Sin precio capturado</span>':''}
         ${ahorroLinea(l) > 0 ? `<span class="promo-l">${svg('articulos')}Promo ${textoPromo(reglaDe(l))} · ahorras ${fmt(ahorroLinea(l))}</span>` : (reglaDe(l) && faltaPromo(l) ? `<span class="promo-h">Lleva ${l.porKilo ? fmtKg(faltaPromo(l)) + ' kg' : faltaPromo(l)} más para la promo ${textoPromo(reglaDe(l))}</span>` : '')}
         ${existencia(l.pid) <= 0 ? `<span class="nostock">${svg('alert')}No disponible en inventario</span>` : ''}</div>
-      <div>${fmt(importeLinea(l))}</div>
+      <div class="tl-r"><span>${fmt(importeLinea(l))}</span>
+        ${l.porKilo ? `<button class="tq-kg" data-kg="${l.lid}">${fmtKg(l.cantidad)} kg ✎</button>`
+          : `<span class="tq"><button data-menos="${l.lid}" aria-label="Quitar uno">−</button><b>${l.cantidad}</b><button data-mas="${l.lid}" aria-label="Agregar uno">+</button></span>`}</div>
     </div>`).join('');
   return `<div class="ticket-wrap">
     ${t.entregaPedido ? `<div class="pd-edit">Entregando la venta programada <b>#${esc(t.entregaFolio || '')}</b>: puedes ajustar cantidades antes de cobrar. <button class="lnk" id="tkDescartarEnt">Dejarla pendiente</button></div>` : ''}
@@ -2887,7 +2894,12 @@ function renderVenta(){
   if(ventaVista==='ticket'){
     const dEd = document.getElementById('tkDescartarEd'); if(dEd) dEd.onclick = cancelarEdicionPedido;
     const dEn = document.getElementById('tkDescartarEnt'); if(dEn) dEn.onclick = ()=> confirmar({titulo:'Dejar pendiente', ok:'Dejar pendiente', texto:'Se vacía este ticket y la venta programada sigue sin entregar.', alAceptar:()=>{ guardarTicket({lineas:[]}); renderVenta(); }});
-    view.querySelectorAll('.tline:not(.dev)').forEach(el=> el.onclick = ()=> editarLinea(el.dataset.lid));
+    view.querySelectorAll('.tline:not(.dev)').forEach(el=> el.onclick = e=>{
+      const mas = e.target.closest('[data-mas]'), menos = e.target.closest('[data-menos]'), kg = e.target.closest('[data-kg]');
+      if(mas || menos){ e.stopPropagation(); cambiarPiezas(el.dataset.lid, mas ? 1 : -1); return; }
+      if(kg){ e.stopPropagation(); editarLinea(el.dataset.lid); return; }
+      editarLinea(el.dataset.lid);
+    });
     view.querySelectorAll('.tline.dev').forEach(el=> el.onclick = ()=> quitarDevolucion(el.dataset.did));
     const da = document.getElementById('devAdd'); if(da) da.onclick = abrirDevolucion;
     window.scrollTo(0,0);
@@ -4656,6 +4668,16 @@ function abrirTeclado({producto, linea}){
     const t = ticket(); t.lineas = t.lineas.filter(x=>x.lid!==linea.lid); guardarTicket(t);
     cerrar(); renderVenta(); toast('Producto quitado');
   };
+}
+/* Botones − / + del ticket: cambia piezas sin abrir el teclado; en 0 pregunta si se quita */
+function cambiarPiezas(lid, d){
+  const t = ticket(), l = t.lineas.find(x=> x.lid===lid); if(!l || l.porKilo) return;
+  const y = window.scrollY, pintar = ()=>{ renderVenta(); window.scrollTo(0, y); };
+  if(l.cantidad + d <= 0){
+    return confirmar({titulo:'Quitar producto', texto:`¿Quitar <b>${esc(nombreTk(l))}</b> del ${txtModo('ticket','pedido','presupuesto')}?`, ok:'Quitar',
+      alAceptar:()=>{ const t2 = ticket(); t2.lineas = t2.lineas.filter(x=> x.lid!==lid); guardarTicket(t2); pintar(); toast('Producto quitado'); }});
+  }
+  l.cantidad += d; guardarTicket(t); pintar();
 }
 function editarLinea(lid){
   const l = ticket().lineas.find(x=>x.lid===lid);
