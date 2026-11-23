@@ -196,7 +196,7 @@ main.flush{padding:0}
 .rp-av{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line,#eee)}
 .rp-av span{display:flex;flex-direction:column;min-width:0}
 .rp-av .btn{width:auto;flex:0 0 auto;margin:0;padding:8px 12px;min-height:0}
-.rp-av .btn svg{width:18px!important;height:18px!important;flex:0 0 18px}
+.rp-av .btn{display:inline-flex;align-items:center;gap:6px}.rp-av .btn svg{width:18px!important;height:18px!important;flex:0 0 18px;stroke:currentColor}
 .rp-fin{grid-template-columns:1fr!important}.rp-fin .btn{flex:1 1 100%;grid-column:1/-1}
 .rp-av .btn.hecho{color:var(--ok,#1a7f37);border-color:currentColor}.nb-sw span{display:flex;flex-direction:column}.nb-sw small{color:var(--muted)}
 .nb-reglas{margin-top:16px}.nb-reglas summary{font-weight:700;cursor:pointer;padding:6px 0}.nb-reglas pre{font-size:.68rem;background:#f4f6f5;border-radius:10px;padding:10px;overflow-x:auto;white-space:pre;margin:8px 0}
@@ -244,6 +244,27 @@ main.flush{padding:0}
 .cf .cg-acts{background:none;padding:0}
 .cf-ped{width:100%;background:none;border:0;border-bottom:1px solid var(--line,#eee);font:inherit;text-align:left;cursor:pointer;color:inherit}
 .cf .cg-tk{margin:10px 0 0;width:100%}.cf #cfEditar{width:100%;margin:6px 0 20px}
+.pd-wrap{padding-bottom:24px}
+.pd-dias{position:sticky;top:0;z-index:3;background:var(--bg,#f3f5f4);padding:10px 16px!important;margin:0!important;border-bottom:1px solid var(--line,#e3e7e5)!important;overflow-x:auto}
+.pd-dias .dia{flex:0 0 auto}.pd-dias .dia b{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:999px;background:rgba(31,111,74,.12);font-size:.8em}
+.pd-dias .dia.on b{background:rgba(255,255,255,.25)}.pd-dias .dia.vacio{opacity:.55}.pd-dias .dia.atr{color:#c0392b;border-color:#e8b4ad}.pd-dias .dia.atr.on{background:#c0392b;color:#fff}
+.pd-head{padding-top:10px!important}
+.seg{display:flex;border:1.5px solid var(--brand);border-radius:12px;overflow:hidden}.seg button{flex:1;border:0;background:#fff;color:var(--brand);font:inherit;font-weight:600;padding:9px 4px;cursor:pointer}.seg button.on{background:var(--brand);color:#fff}
+.pd-res{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 4px}.pd-res div{display:flex;flex-direction:column}.pd-res span{color:var(--muted);font-size:.9rem}
+.pd-res .btn{white-space:nowrap;width:auto;margin:0;padding:8px 12px;min-height:0;flex:0 0 auto}.pd-res .btn{display:flex;align-items:center;gap:6px}.pd-res .btn svg{width:18px;height:18px;stroke:currentColor;flex:none}
+.pd-card{background:#fff;margin:10px 16px;border-radius:14px;border:1px solid var(--line,#e3e7e5);border-left:6px solid #e6b800;box-shadow:0 1px 2px rgba(0,0,0,.04);overflow:hidden}
+.pd-card.ent{border-left-color:#1e8e3e}.pd-card.canc{border-left-color:#c0392b;opacity:.75}.pd-card.atr{border-left-color:#c0392b}.pd-card.rep{border-left-color:#e8710a}
+.pd-main{padding:12px 14px 10px;cursor:pointer}.pd-main:active{background:#f6f8f7}
+.pd-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pd-cli{display:flex;flex-direction:column;min-width:0}.pd-cli b{font-size:1.05rem}.pd-cli small{color:var(--muted)}
+.pd-tot{font-size:1.15rem;white-space:nowrap}.pd-meta{color:var(--muted);font-size:.88rem;margin-top:4px}.pd-meta i{margin-left:4px}
+.pd-com{font-style:italic;color:#5b6461;font-size:.88rem;margin-top:4px}
+.pd-acts{display:flex;gap:8px;padding:0 14px 12px}.pd-acts .btn{margin:0;min-height:0;padding:9px 12px}.pd-ent-b{flex:1}.pd-wa{width:auto;flex:0 0 auto}.pd-wa{display:flex;align-items:center;justify-content:center;padding:9px 14px!important}.pd-wa svg{width:22px;height:22px;stroke:currentColor;flex:none}
+.pd-vacio{padding-top:30px}.pd-vacio .btn{margin:8px auto 0;display:block}
+.pd-cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.pd-cal-h b{text-transform:capitalize}
+.pd-cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}.pd-cal-g small{color:var(--muted);font-weight:600;padding:4px 0}
+.pd-cal-g button{position:relative;aspect-ratio:1;border:1px solid transparent;border-radius:10px;background:none;font:inherit;cursor:pointer;padding:0}
+.pd-cal-g button.con{background:#e5f2eb;color:var(--brand);font-weight:700}.pd-cal-g button.hoy{border-color:var(--brand)}.pd-cal-g button.on{background:var(--brand);color:#fff}
+.pd-cal-g button i{position:absolute;right:2px;top:1px;font-style:normal;font-size:.62rem;background:#e6b800;color:#222;border-radius:999px;padding:0 4px;line-height:1.4}
 #cpMet .dia:disabled{opacity:.4;text-decoration:line-through}
 .pd-edit-g{margin:8px 0 4px}
 .pd-volver{display:block;width:100%;margin:8px 0 0;min-height:0;padding:10px 12px;font-size:.95rem}
@@ -2014,7 +2035,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.52.2';
+const APP_VERSION = '0.53.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2872,8 +2893,13 @@ function renderVenta(){
     else if(ventaVista==='pedidos'){
       document.querySelectorAll('[data-ped]').forEach(el=> el.onclick = ()=>{ pedDesdeSel = null; pedidoSel = el.dataset.ped; ventaVista = 'pedidoDet'; renderVenta(); });
       const vp = document.getElementById('vacioProg'); if(vp) vp.onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
-      const rl = document.getElementById('pdRel'); if(rl) rl.onclick = ()=>{ relDesde = 'pedidos'; ventaVista = 'relacion'; renderVenta(); };
-      const vc = document.getElementById('pdVerCanc'); if(vc) vc.onclick = ()=>{ pedVerCanc = !pedVerCanc; renderVenta(); };
+      const rl = document.getElementById('pdRel'); if(rl) rl.onclick = ()=>{ relDesde = 'pedidos'; if(/^\d{4}-/.test(pedDia)) relDia = pedDia; ventaVista = 'relacion'; renderVenta(); };
+      document.querySelectorAll('[data-pd]').forEach(b=> b.onclick = ()=>{ pedDia = b.dataset.pd; renderVenta(); });
+      document.querySelectorAll('[data-pe]').forEach(b=> b.onclick = ()=>{ pedEstado = b.dataset.pe; renderVenta(); });
+      const cal = document.getElementById('pdCal'); if(cal) cal.onclick = calendarioPedidos;
+      document.querySelectorAll('[data-entregar]').forEach(b=> b.onclick = e=>{ e.stopPropagation(); entregarPedidoProg(b.dataset.entregar); });
+      document.querySelectorAll('[data-wa]').forEach(b=> b.onclick = e=>{ e.stopPropagation(); const p = DB.pedidos.find(x=> x.id===b.dataset.wa); if(p) abrirWa(urlWa(telPedidoProg(p), `Hola ${p.cliente?.nombre || ''}, `)); });
+      const on = document.querySelector('#pdDias .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'});
     }
     window.scrollTo(0,0);
     return;
@@ -4265,7 +4291,7 @@ function bindProgramado(){
   const av = document.getElementById('avisarCli'); if(av) av.onclick = ()=>{ const p = ultimoPedido; abrirWa(urlWa(av.dataset.tel, msgAviso(p) + detalleTextoWa(p.lineas, p.total, p.folio))); marcarAvisado(p); };
   const ai = document.getElementById('avisarImg'); if(ai) ai.onclick = ()=>{ const p = ultimoPedido; compartirRecibo({...p, esPedido:true}, msgAviso(p)); marcarAvisado(p); };
   document.getElementById('nuevoPedido').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
-  document.getElementById('verProgramadas').onclick = ()=>{ ventaVista = 'pedidos'; renderVenta(); };
+  document.getElementById('verProgramadas').onclick = ()=>{ pedDia = null; pedEstado = 'pend'; ventaVista = 'pedidos'; renderVenta(); };
 }
 function viewInicioPre(){
   const t = ticket(), n = cuentaTicket(t);
@@ -4285,7 +4311,7 @@ function viewInicioPre(){
 function bindInicioPre(){
   document.getElementById('optRelacion').onclick = ()=>{ relDesde = 'inicioPre'; relDia = null; ventaVista = 'relacion'; renderVenta(); };
   document.getElementById('optProgramar').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
-  document.getElementById('optProgramadas').onclick = ()=>{ ventaVista = 'pedidos'; renderVenta(); };
+  document.getElementById('optProgramadas').onclick = ()=>{ pedDia = null; pedEstado = 'pend'; ventaVista = 'pedidos'; renderVenta(); };
   document.getElementById('optRecibidos').onclick = ()=>{ ventaVista = 'recibidos'; renderVenta(); };
 }
 /* ----- Editar y cancelar ventas programadas ----- */
@@ -4552,21 +4578,80 @@ function viewPedidoDet(){
   </div>`;
 }
 let pedVerCanc = false;
+let pedDia = null, pedEstado = 'pend', pedCalMes = null;   /* pedDia: 'AAAA-MM-DD' | 'atrasadas' | 'todas' */
+const ESTADO_PED = {pend:'Programado', ent:'Entregado', canc:'Cancelado'};
+function pedidosFiltrados(dia = pedDia){
+  const hoy = hoyClave(), est = ESTADO_PED[pedEstado];
+  return DB.pedidos.filter(p=> p.estado===est && (dia==='todas' || (dia==='atrasadas' ? (p.estado==='Programado' && (p.fechaEntrega||'') < hoy) : p.fechaEntrega===dia)));
+}
 function viewPedidos(){
-  const nCanc = DB.pedidos.filter(p=> p.estado==='Cancelado').length;
-  const ls = DB.pedidos.filter(p=> pedVerCanc || p.estado!=='Cancelado').sort((a,b)=> (a.fechaEntrega+a.fecha).localeCompare(b.fechaEntrega+b.fecha));
-  const top = `<div class="cr-pad" style="padding-top:12px"><div class="tk-acts" style="margin:0"><button class="btn ghost" id="pdRel">${svg('inventario')}Productos a entregar</button>${nCanc ? `<button class="btn ghost" id="pdVerCanc">${pedVerCanc ? 'Ocultar canceladas' : `Ver canceladas (${nCanc})`}</button>` : ''}</div></div>`;
-  if(!ls.length) return `<div class="rc-wrap"><div class="rc-empty">${svg('preventa')}<p>No hay ventas programadas.</p><button class="btn" id="vacioProg" style="max-width:240px">Programar venta</button></div></div>`;
-  let html = '', dia = '';
-  ls.forEach(p=>{
-    if(p.fechaEntrega!==dia){ dia = p.fechaEntrega; html += `<div class="rc-day">Entrega: ${fechaCorta(dia)}</div>`; }
-    html += `<div class="ab-row${p.estado==='Cancelado' ? ' pd-canc' : ''}"><div class="ab-main" role="button" data-ped="${p.id}">
-      <span class="ab-t"><b>${esc(p.cliente.nombre)}${p.cliente.tienda?` <i class="muted">· ${esc(p.cliente.tienda)}</i>`:''}${p.estado==='Cancelado' ? ' <i class="tag-c">Cancelada</i>' : p.estado==='Entregado' ? ' <i class="tag-v">Entregada ✓</i>' : p.reprogramado ? ' <i class="tag-c">Reprogramada</i>' : p.editado ? ' <i class="tag-v">Modificada</i>' : ''}</b><span>${fmt(p.total)}</span></span>
-      <span class="ab-m">#${esc(p.folio)} · ${esc(p.horario)} · ${cuentaTicket(p)} ${cuentaTicket(p)===1?'producto':'productos'}</span>
-      ${p.comentario?`<span class="ab-c">${esc(p.comentario)}</span>`:''}
-    </div></div>`;
-  });
-  return `<div class="rc-wrap">${top}${html}</div>`;
+  const hoy = hoyClave();
+  if(!pedDia) pedDia = hoy;
+  const nAtr = DB.pedidos.filter(p=> p.estado==='Programado' && (p.fechaEntrega||'') < hoy).length;
+  if(pedDia==='atrasadas' && (!nAtr || pedEstado!=='pend')) pedDia = hoy;
+  const dias = Array.from({length:7}, (_,i)=> sumaDias(hoy, i));
+  const cuenta = d => pedidosFiltrados(d).length;
+  const etq = (d,i) => i===0 ? 'Hoy' : i===1 ? 'Mañana' : (()=>{ const x = kDate(d); return DIAS_CORTOS[(x.getDay()+6)%7] + ' ' + x.getDate(); })();
+  const fuera = /^\d{4}-/.test(pedDia) && !dias.includes(pedDia);
+  const chips = `<div class="dias filtro pd-dias" id="pdDias">
+    ${nAtr && pedEstado==='pend' ? `<button class="dia atr${pedDia==='atrasadas'?' on':''}" data-pd="atrasadas">Atrasadas (${nAtr})</button>` : ''}
+    ${dias.map((d,i)=>{ const n = cuenta(d); return `<button class="dia${pedDia===d?' on':''}${n?'':' vacio'}" data-pd="${d}">${etq(d,i)}${n ? ` <b>${n}</b>` : ''}</button>`; }).join('')}
+    ${fuera ? `<button class="dia on" data-pd="${pedDia}">${fechaCorta(pedDia)} <b>${cuenta(pedDia)}</b></button>` : ''}
+    <button class="dia${pedDia==='todas'?' on':''}" data-pd="todas">Todas</button>
+    <button class="dia" id="pdCal" aria-label="Calendario">📅</button></div>`;
+  const estados = `<div class="seg pd-est">${[['pend','Pendientes'],['ent','Entregadas'],['canc','Canceladas']].map(([k,t])=>`<button class="${pedEstado===k?'on':''}" data-pe="${k}">${t}</button>`).join('')}</div>`;
+  const ls = pedidosFiltrados().sort((a,b)=> (a.fechaEntrega||'').localeCompare(b.fechaEntrega||'') || ordenHorario(a.horario) - ordenHorario(b.horario) || (a.fecha||'').localeCompare(b.fecha||''));
+  const total = sumar(ls, p=> p.total);
+  const nomDia = pedDia==='todas' ? 'Todas las fechas' : pedDia==='atrasadas' ? 'Atrasadas' : pedDia===hoy ? 'Hoy' : pedDia===manana() ? 'Mañana' : fechaCorta(pedDia);
+  const otrosEst = /^\d{4}-/.test(pedDia) ? DB.pedidos.filter(p=> p.fechaEntrega===pedDia && p.estado!=='Cancelado') : [];
+  const nPend = otrosEst.filter(p=> p.estado==='Programado').length, nEnt = otrosEst.filter(p=> p.estado==='Entregado').length;
+  const resumen = `<div class="pd-res"><div><b>${nomDia}</b><span>${ls.length} ${ls.length===1?'venta':'ventas'} · ${fmt(total)}${/^\d{4}-/.test(pedDia) && (nPend || nEnt) ? ` · ${nPend} por entregar · ${nEnt} ${nEnt===1?'entregada':'entregadas'}` : ''}</span></div>
+    <button class="btn ghost" id="pdRel">${svg('inventario')}Productos</button></div>`;
+  let lista = '';
+  if(!ls.length){
+    const sig = pedEstado==='pend' && pedDia===hoy ? DB.pedidos.filter(p=> p.estado==='Programado' && p.fechaEntrega > hoy).map(p=> p.fechaEntrega).sort()[0] : null;
+    lista = `<div class="rc-empty pd-vacio">${svg('preventa')}<p>No hay ventas ${pedEstado==='pend' ? 'pendientes' : pedEstado==='ent' ? 'entregadas' : 'canceladas'} ${pedDia==='todas' ? '' : pedDia===hoy ? 'para hoy' : 'en esta fecha'}.</p>
+      ${sig ? `<button class="btn" data-pd="${sig}" style="max-width:280px">Siguiente entrega: ${sig===manana() ? 'mañana' : fechaCorta(sig)} (${cuenta(sig)})</button>` : ''}
+      <button class="btn ghost" id="vacioProg" style="max-width:240px">Programar venta</button></div>`;
+  } else {
+    const turno = !!turnoActual(); let dia = '';
+    ls.forEach(p=>{
+      if((pedDia==='todas' || pedDia==='atrasadas') && p.fechaEntrega!==dia){ dia = p.fechaEntrega; lista += `<div class="rc-day">Entrega: ${fechaCorta(dia)}</div>`; }
+      const atr = p.estado==='Programado' && (p.fechaEntrega||'') < hoy;
+      const cls = p.estado==='Cancelado' ? 'canc' : p.estado==='Entregado' ? 'ent' : atr ? 'atr' : p.reprogramado ? 'rep' : 'pend';
+      const tel = telPedidoProg(p), n = cuentaTicket(p);
+      const tag = p.estado==='Cancelado' ? '<i class="tag-c">Cancelada</i>' : p.estado==='Entregado' ? '<i class="tag-v">Entregada ✓</i>' : atr ? '<i class="tag-c">Atrasada</i>' : p.reprogramado ? '<i class="tag-c">Reprogramada</i>' : p.editado ? '<i class="tag-v">Modificada</i>' : '';
+      lista += `<div class="pd-card ${cls}">
+        <div class="pd-main" role="button" data-ped="${p.id}">
+          <div class="pd-top"><span class="pd-cli"><b>${esc(p.cliente?.tienda || p.cliente?.nombre || '')}</b>${p.cliente?.tienda ? `<small>${esc(p.cliente.nombre)}</small>` : ''}</span><b class="pd-tot">${fmt(p.total)}</b></div>
+          <div class="pd-meta">${esc(p.horario || 'Cualquier hora')} · ${n} ${n===1?'producto':'productos'} · #${esc(p.folio)} ${tag}</div>
+          ${p.comentario ? `<div class="pd-com">${esc(p.comentario)}</div>` : ''}
+        </div>
+        ${p.estado==='Programado' ? `<div class="pd-acts">${(p.fechaEntrega||'') <= hoy && turno ? `<button class="btn pd-ent-b" data-entregar="${p.id}">Entregar y cobrar</button>` : ''}${tel ? `<button class="btn ghost pd-wa" data-wa="${p.id}" aria-label="WhatsApp">${svg('whatsapp')}</button>` : ''}</div>` : ''}
+      </div>`;
+    });
+  }
+  return `<div class="rc-wrap pd-wrap">${chips}<div class="cr-pad pd-head">${estados}${resumen}</div>${lista}</div>`;
+}
+const ordenHorario = h => /mañana/i.test(h||'') ? 1 : /tarde/i.test(h||'') ? 2 : /noche/i.test(h||'') ? 3 : 4;
+function calendarioPedidos(){
+  const hoy = hoyClave(); if(!pedCalMes) pedCalMes = (/^\d{4}-/.test(pedDia) ? pedDia : hoy).slice(0,7);
+  const bg = dialogo('<div class="pd-cal"></div>'), box = bg.querySelector('.pd-cal');
+  const pintar = ()=>{
+    const [y, m] = pedCalMes.split('-').map(Number), primero = new Date(y, m-1, 1), dIni = (primero.getDay()+6)%7, nDias = new Date(y, m, 0).getDate();
+    const cnt = {}; DB.pedidos.filter(p=> p.estado===ESTADO_PED[pedEstado]).forEach(p=>{ if((p.fechaEntrega||'').startsWith(pedCalMes)) cnt[p.fechaEntrega] = (cnt[p.fechaEntrega]||0) + 1; });
+    const celdas = Array(dIni).fill('<span></span>').concat(Array.from({length:nDias}, (_,i)=>{ const k = `${pedCalMes}-${String(i+1).padStart(2,'0')}`, n = cnt[k];
+      return `<button class="${k===hoy?'hoy ':''}${k===pedDia?'on ':''}${n?'con':''}" data-k="${k}">${i+1}${n ? `<i>${n}</i>` : ''}</button>`; }));
+    box.innerHTML = `<div class="pd-cal-h"><button class="icon-btn" data-m="-1">‹</button><b>${primero.toLocaleDateString('es-MX',{month:'long', year:'numeric'})}</b><button class="icon-btn" data-m="1">›</button></div>
+      <div class="pd-cal-g">${['L','M','M','J','V','S','D'].map(x=>`<small>${x}</small>`).join('')}${celdas.join('')}</div>
+      <p class="note-sm">El número indica las ventas ${pedEstado==='pend'?'pendientes':pedEstado==='ent'?'entregadas':'canceladas'} de cada día.</p>
+      <div class="sheet-actions"><button class="btn ghost" data-a="hoy">Hoy</button><button class="btn ghost" data-a="no">Cerrar</button></div>`;
+    box.querySelectorAll('[data-m]').forEach(b=> b.onclick = ()=>{ const d = new Date(y, m-1 + Number(b.dataset.m), 1); pedCalMes = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; pintar(); });
+    box.querySelectorAll('[data-k]').forEach(b=> b.onclick = ()=>{ pedDia = b.dataset.k; bg.remove(); renderVenta(); });
+    box.querySelector('[data-a="hoy"]').onclick = ()=>{ pedDia = hoy; pedCalMes = null; bg.remove(); renderVenta(); };
+    box.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  };
+  pintar();
 }
 
 /* Toque corto = agregar · mantener presionado = ver precio (persiana) */
@@ -4779,7 +4864,7 @@ function abrirMas(){
     guardarTicket({lineas:[]}); cerrar(); renderVenta(); toast('Ticket limpio');
   };
   pop.querySelector('#pGuardados').onclick = ()=>{ cerrar(); ventaPrev = ventaVista; ventaVista = 'abiertos'; renderVenta(); };
-  const pp = pop.querySelector('#pPedidos'); if(pp) pp.onclick = ()=>{ cerrar(); ventaVista = 'pedidos'; renderVenta(); };
+  const pp = pop.querySelector('#pPedidos'); if(pp) pp.onclick = ()=>{ cerrar(); pedDia = null; pedEstado = 'pend'; ventaVista = 'pedidos'; renderVenta(); };
 }
 
 /* ================= Recibos ================= */
