@@ -230,6 +230,8 @@ main.flush{padding:0}
 .inf-min .dias{padding:0 0 2px!important;border:0!important;margin:0!important}
 .inf-min-o{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.inf-min-o b{color:var(--ink,#1d2320)}
 .inf-min #infMinOtro{width:92px;flex:0 0 92px;margin:0;padding:6px 10px;min-height:0;height:36px}
+.ec-pre{background:#fff;border:1px solid var(--line,#e3e7e5);border-radius:10px;padding:10px;font:12px/1.35 "DejaVu Sans Mono","Roboto Mono",monospace;max-height:42vh;overflow:auto;white-space:pre;margin:8px 0}
+.ec-ops{display:flex;flex-direction:column;gap:8px}.ec-ops .btn{width:100%;margin:0}.ec-ops .lnk{align-self:center;padding:4px}
 #cpMet .dia:disabled{opacity:.4;text-decoration:line-through}
 .pd-edit-g{margin:8px 0 4px}
 .pd-volver{display:block;width:100%;margin:8px 0 0;min-height:0;padding:10px 12px;font-size:.95rem}
@@ -2000,7 +2002,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.51.0';
+const APP_VERSION = '0.51.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4983,6 +4985,7 @@ const resumenImp = i => `${i.ancho} mm · ${i.modo==='grafico' ? 'Gráfico' : 'T
 /* Ticket en texto de ancho fijo (32 columnas en 58 mm, 48 en 80 mm) */
 function lineasTicket(r){
   if(r.tipo==='abono' || r.tipo==='ajuste') return lineasAbono(r);
+  if(r.tipo==='estado') return lineasEstadoCuenta(r.cid);
   const c = impCfg(), W = c.ancho >= 80 ? 48 : 32;
   const centro = t => { t = String(t).slice(0, W); const e = Math.floor((W - t.length)/2); return ' '.repeat(Math.max(0,e)) + t; };
   const dos = (a, b) => { a = String(a); b = String(b); const esp = W - a.length - b.length; return esp >= 1 ? a + ' '.repeat(esp) + b : a.slice(0, W - b.length - 1) + ' ' + b; };
@@ -8481,7 +8484,28 @@ function pdfEstadoCuenta(cid){
   doc.text(`${impCfg().encabezado} · ${impCfg().sub}${impCfg().tel ? ' · WhatsApp: '+impCfg().tel : ''}`, M, H-14);
   return {doc, nombre: limpiarNombreArchivo('Estado de cuenta ' + (c.tienda || c.nombre)) + '.pdf'};
 }
-async function compartirEstadoCuenta(cid){
+function opcionesEstadoCuenta(cid){
+  const cl = cliDe(cid), doc = {tipo:'estado', cid, folio:'EC-' + hoyClave(), fecha:new Date().toISOString(), cliente:cl, total:deudaCliente(cid).total};
+  const bg = dialogo(`<h3>Estado de cuenta</h3><p class="sub">${esc(cl.tienda || cl.nombre)}</p>
+    <pre class="ec-pre">${esc(lineasEstadoCuenta(cid).map(l=> l.t).join('\n'))}</pre>
+    <div class="ec-ops"><button class="btn" data-a="img">${svg('share')}Compartir como imagen</button>
+    ${impSel() ? `<button class="btn ghost" data-a="imp">${svg('recibos')}Imprimir ticket</button>` : ''}
+    <button class="lnk" data-a="pdf">Descargar PDF tamaño carta</button>
+    <button class="btn ghost" data-a="no">Cerrar</button></div>`);
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  bg.querySelector('[data-a="pdf"]').onclick = ()=>{ bg.remove(); compartirEstadoCuentaPdf(cid); };
+  const ip = bg.querySelector('[data-a="imp"]'); if(ip) ip.onclick = ()=>{ const imp = impSel(); if(imp && (imp.conexion==='bt' || imp.conexion==='rawbt')) imprimirRecibo(doc); else { toast('Tu impresora no admite este formato: compártelo como imagen'); } };
+  bg.querySelector('[data-a="img"]').onclick = async ()=>{
+    const nombre = limpiarNombreArchivo('Estado de cuenta ' + (cl.tienda || cl.nombre)) + '.png';
+    let blob = null; try{ blob = await imagenTicket(doc); }catch(_){}
+    if(!blob){ toast('No se pudo generar la imagen'); return; }
+    const file = new File([blob], nombre, {type:'image/png'});
+    try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:nombre, text:`Estado de cuenta · saldo ${fmt(doc.total)}`}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
+    descargarBlob(blob, nombre); toast('Se descargó la imagen');
+  };
+}
+async function compartirEstadoCuenta(cid){ opcionesEstadoCuenta(cid); }
+async function compartirEstadoCuentaPdf(cid){
   let r; try{ r = pdfEstadoCuenta(cid); }catch(e){ toast('No se pudo generar el PDF'); return; }
   const blob = r.doc.output('blob'), file = new File([blob], r.nombre, {type:'application/pdf'});
   try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:r.nombre}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
@@ -8700,6 +8724,42 @@ function atrasCreditos(){
 }
 
 /* Comprobante de abono para impresora */
+/* Estado de cuenta en formato de ticket: se comparte como imagen o se imprime en la impresora de tickets */
+function lineasEstadoCuenta(cid){
+  const c = impCfg(), W = c.ancho >= 80 ? 48 : 32, cl = cliDe(cid), d = deudaCliente(cid);
+  const centro = t => { t = String(t).slice(0, W); const e = Math.floor((W - t.length)/2); return ' '.repeat(Math.max(0,e)) + t; };
+  const dos = (x, y) => { x = String(x); y = String(y); const esp = W - x.length - y.length; return esp >= 1 ? x + ' '.repeat(esp) + y : x.slice(0, W - y.length - 1) + ' ' + y; };
+  const fC = x => new Date(x).toLocaleDateString('es-MX', {day:'2-digit', month:'2-digit', year:'2-digit'});
+  const fK = k => k.split('-').reverse().map((p,i)=> i===2 ? p.slice(2) : p).join('/');
+  const sep = '-'.repeat(W), L = [];
+  L.push({t:centro(c.encabezado), b:true, g:true}); if(c.sub) L.push({t:centro(c.sub)}); if(c.tel) L.push({t:centro('WhatsApp ' + c.tel)});
+  L.push({t:sep}); L.push({t:centro('ESTADO DE CUENTA'), b:true});
+  L.push({t:dos('Fecha', new Date().toLocaleString('es-MX', {dateStyle:'short', timeStyle:'short'}))});
+  L.push({t:dos('Cliente', (cl.nombre||'').slice(0, W-9))}); if(cl.tienda) L.push({t:dos('Tienda', cl.tienda.slice(0, W-8))});
+  if(cl.numero) L.push({t:dos('No. cliente', String(cl.numero))});
+  L.push({t:sep});
+  if(!d.recibos.length) L.push({t:centro('Sin saldos pendientes')});
+  d.recibos.forEach((r, i)=>{
+    if(i) L.push({t:''});
+    const v = diasVencido(r);
+    L.push({t:dos('Ticket #' + r.folio + (r.version>1 ? ' v'+r.version : ''), fC(r.fecha)), b:true});
+    L.push({t:dos('  Total', fmt(r.total))});
+    const ab = r2(r.total - r.saldo); if(ab > 0) L.push({t:dos('  Abonado', '-' + fmt(ab))});
+    L.push({t:dos('  Saldo', fmt(r.saldo)), b:true});
+    if(r.credito?.fechaPago) L.push({t:dos('  Vence', fK(r.credito.fechaPago))});
+    if(v > 0) L.push({t:dos('  VENCIDO', `${v} ${v===1?'dia':'dias'}`), b:true});
+  });
+  L.push({t:sep});
+  L.push({t:dos('SALDO TOTAL', fmt(d.total)), b:true, g:true});
+  const venc = sumar(d.recibos.filter(r=> diasVencido(r) > 0), r=> r.saldo); if(venc > 0) L.push({t:dos('Vencido', fmt(venc)), b:true});
+  const abs = DB.abonos.filter(a=> a.cliente?.id===cid && !a.cancelado).sort((a,b)=> b.fecha.localeCompare(a.fecha)).slice(0, 5);
+  if(abs.length){
+    L.push({t:sep}); L.push({t:'ULTIMOS ABONOS', b:true});
+    abs.forEach(a=> L.push({t:dos(`${fC(a.fecha)} ${a.tipo==='ajuste' ? 'Ajuste' : a.metodo}`, fmt(a.monto))}));
+  }
+  L.push({t:sep}); if(c.pie) L.push({t:centro(c.pie)});
+  return L;
+}
 function lineasAbono(a){
   const c = impCfg(), W = c.ancho >= 80 ? 48 : 32;
   const centro = t => { t = String(t).slice(0, W); const e = Math.floor((W - t.length)/2); return ' '.repeat(Math.max(0,e)) + t; };
