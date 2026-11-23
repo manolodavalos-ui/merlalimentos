@@ -232,6 +232,13 @@ main.flush{padding:0}
 .inf-min #infMinOtro{width:92px;flex:0 0 92px;margin:0;padding:6px 10px;min-height:0;height:36px}
 .ec-pre{background:#fff;border:1px solid var(--line,#e3e7e5);border-radius:10px;padding:10px;font:12px/1.35 "DejaVu Sans Mono","Roboto Mono",monospace;max-height:42vh;overflow:auto;white-space:pre;margin:8px 0}
 .ec-ops{display:flex;flex-direction:column;gap:8px}.ec-ops .btn{width:100%;margin:0}.ec-ops .lnk{align-self:center;padding:4px}
+.cli-ficha{cursor:pointer}.cli-ficha b{text-decoration:underline;text-decoration-color:rgba(31,111,74,.35);text-underline-offset:3px}
+.cf-head{display:flex;align-items:center;gap:12px;margin:4px 0 12px}.cf-head h2{margin:0;font-size:1.25rem}.cf-head p{margin:2px 0 0;color:var(--muted)}
+.cf-head .cl-av{flex:0 0 auto;min-width:56px;height:56px;padding:0 8px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:#e5f2eb;color:var(--brand);font-weight:700}
+.cf .card{margin:12px 0}.cf .cg-acts{margin:0 0 4px}.cf .cj-row{gap:12px}.cf .cj-row b{min-width:0}.cf-dir b{text-align:right;font-weight:500;max-width:68%;white-space:normal!important;overflow-wrap:anywhere}
+.cf .cg-acts{background:none;padding:0}
+.cf-ped{width:100%;background:none;border:0;border-bottom:1px solid var(--line,#eee);font:inherit;text-align:left;cursor:pointer;color:inherit}
+.cf .cg-tk{margin:10px 0 0;width:100%}.cf #cfEditar{width:100%;margin:6px 0 20px}
 #cpMet .dia:disabled{opacity:.4;text-decoration:line-through}
 .pd-edit-g{margin:8px 0 4px}
 .pd-volver{display:block;width:100%;margin:8px 0 0;min-height:0;padding:10px 12px;font-size:.95rem}
@@ -2002,7 +2009,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.51.1';
+const APP_VERSION = '0.52.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3238,7 +3245,10 @@ let seccionPrevia = 'turno';
 function barraCliente(){
   const c = ticket().cliente;
   if(!c) return esPre() ? '' : '';
-  return `<div class="cli-bar">${svg('clientes')}<span><b>${esc(c.nombre)}${c.tienda?' · '+esc(c.tienda):''}</b>${c.telefono||c.numero?`<small>${esc([c.numero?'#'+c.numero:'', c.telefono].filter(Boolean).join(' · '))}</small>`:''}</span>
+  const full = c.id ? clientes().find(x=> x.id===c.id) : null;
+  const dias = full ? [...(full.diasVisita||[]).map(d=> (DIAS.find(x=> x[0]===d)||[])[1]).filter(Boolean), full.canal==='FS' ? 'FS' : ''].filter(Boolean).join(', ') : '';
+  const sub = [c.numero ? '#' + c.numero : '', c.telefono, dias].filter(Boolean).join(' · ');
+  return `<div class="cli-bar">${svg('clientes')}<span${full ? ' id="cliFicha" role="button" class="cli-ficha"' : ''}><b>${esc(c.nombre)}${c.tienda?' · '+esc(c.tienda):''}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>
     ${!esCot() && !ticket().lineas.length && !ticket().editPedido && !ticket().entregaPedido ? `<button class="cli-x cli-vis" id="cliVisitado">Visitado</button>` : ''}
     <button class="cli-x" id="cliCambiar">Cambiar</button></div>`;
 }
@@ -3499,7 +3509,11 @@ function siguienteNumeroCliente(){
 }
 const linkMapa = (lat,lng) => `https://maps.google.com/?q=${lat},${lng}`;
 const fmtCoord = n => Number(n).toFixed(6);
-let cliVista = 'inicio', cliSel = null, cliQ = '', cliDia = '', cliBorrador = null;
+let cliVista = 'inicio', cliSel = null, cliQ = '', cliDia = '', cliBorrador = null, cliDesde = null;   /* cliDesde: pantalla desde la que se abrió la ficha (para regresar con Atrás) */
+function abrirFichaCliente(id){
+  const desde = {pantalla: current, vista: ventaVista};
+  go('clientes'); cliDesde = desde; cliSel = id; cliVista = 'ficha'; cliBorrador = null; renderClientes();
+}
 
 function viewClientesInicio(){
   const n = clientes().length;
@@ -3606,6 +3620,7 @@ function guardarClienteForm(){
     lista.push({id:'C'+Date.now(), ...d, catalogo:nuevoToken(), creado:ahora, creadoPor:session.usuario});
     store.set('clientes', lista); toast('Cliente guardado');
   }
+  if(cliSel){ cliVista = 'ficha'; cliBorrador = null; renderClientes(); return; }
   cliVista = 'lista'; cliSel = null; cliBorrador = null; renderClientes();
 }
 
@@ -3638,6 +3653,43 @@ function viewClientesLista(){
     <div id="cgList">${filasClientesHTML()}</div>
   </div>`;
 }
+function viewClienteFicha(c){
+  const dias = [...(c.diasVisita||[]).map(d=> (DIAS.find(x=> x[0]===d)||[])[1]).filter(Boolean), c.canal==='FS' ? 'FS (foodservice)' : ''].filter(Boolean).join(', ') || 'Sin días asignados';
+  const tk = recibosDeCliente(c.id).filter(r=> !anulado(r) && r.total > 0).sort((a,b)=> fechaRec(b).localeCompare(fechaRec(a)));
+  const tot = r2(tk.reduce((s,r)=> s + (Number(r.total)||0), 0)), ult = tk[0];
+  const deuda = deudaCliente(c.id), cc = condCredito(c);
+  const peds = DB.pedidos.filter(p=> p.estado==='Programado' && p.cliente?.id===c.id).sort((a,b)=> (a.fechaEntrega||'').localeCompare(b.fechaEntrega||''));
+  const vis = DB.visitas.filter(v=> v.cliente?.id===c.id).sort((a,b)=> b.fecha.localeCompare(a.fecha))[0];
+  const dir = [c.direccion, c.colonia, c.ciudad, c.cp ? 'CP ' + c.cp : ''].filter(Boolean).join(', ');
+  const fila = (k, v) => v ? `<div class="cj-row"><span>${k}</span><b>${v}</b></div>` : '';
+  return `<div class="cr-pad cf">
+    <div class="cf-head"><span class="cl-av">${esc(c.numero || (c.nombre||'?')[0])}</span><div><h2>${esc(c.tienda || c.nombre)}</h2><p>${esc(c.tienda ? c.nombre : '')}</p></div></div>
+    <div class="cg-acts">
+      ${c.telefono?`<a class="ub-b" href="${urlWa(c.telefono, '')}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a><a class="ub-b" href="tel:${c.telefono}">${svg('tel')}Llamar</a>`:''}
+      ${c.lat!=null?`<a class="ub-b" href="${linkMapa(c.lat,c.lng)}" target="_blank" rel="noopener">${svg('mapa')}Cómo llegar</a>`:''}
+    </div>
+    <div class="card cajon"><h3>Datos</h3>
+      ${fila('No. cliente', c.numero ? '#' + esc(c.numero) : '')}${fila('Teléfono', esc(c.telefono||''))}
+      ${fila('Días de visita', esc(dias))}${c.ventaRuta ? fila('Venta en ruta', 'Sí') : ''}
+      ${dir ? `<div class="cj-row cf-dir"><span>Dirección</span><b>${esc(dir)}</b></div>` : ''}${c.referencia ? `<div class="cj-row cf-dir"><span>Referencia</span><b>${esc(c.referencia)}</b></div>` : ''}
+      ${(c.preciosEspeciales||[]).length ? fila('Precios especiales', (c.preciosEspeciales||[]).length + ' productos') : ''}
+    </div>
+    <div class="card cajon"><h3>Compras</h3>
+      ${fila('Tickets', tk.length ? `${tk.length} · ${fmt(tot)}` : 'Sin compras')}
+      ${tk.length ? fila('Promedio por compra', fmt(r2(tot / tk.length))) : ''}
+      ${ult ? fila('Última compra', `${fechaCorta(hoyClave(new Date(fechaRec(ult))))} · ${fmt(ult.total)}`) : ''}
+      ${vis ? fila('Última visita sin compra', `${fechaCorta(hoyClave(new Date(vis.fecha)))} · ${esc(vis.motivo)}`) : ''}
+      <button class="cg-tk" id="cliTickets"${tk.length?'':' disabled'}>${svg('recibos')}<span><b>Ver tickets del cliente</b></span></button>
+    </div>
+    ${peds.length ? `<div class="card cajon"><h3>Ventas programadas</h3>${peds.map(p=> `<button class="cj-row cf-ped" data-cfped="${p.id}"><span>#${esc(p.folio)}<small class="ir-s">Entrega ${fechaCorta(p.fechaEntrega)}</small></span><b>${fmt(p.total)} ›</b></button>`).join('')}</div>` : ''}
+    <div class="card cajon"><h3>Crédito</h3>
+      ${fila('Saldo pendiente', `<span class="${deuda.total>0?'neg':''}">${fmt(deuda.total)}</span>${deuda.recibos.length ? ` <small>(${deuda.recibos.length} ${deuda.recibos.length===1?'ticket':'tickets'})</small>` : ''}`)}
+      ${fila('Condiciones', `${cc.limite ? 'Límite ' + fmt(cc.limite) + ' · ' : ''}${cc.dias} días${cc.bloqueado ? ' · <span class="neg">bloqueado</span>' : ''}`)}
+      ${deuda.total > 0 ? `<button class="cg-tk" id="cfEdo">${svg('creditos')}<span><b>Estado de cuenta</b></span></button>` : ''}
+    </div>
+    <button class="btn" id="cfEditar">Editar cliente</button>
+  </div>`;
+}
 function viewClienteEditar(c){
   const acciones = `<div class="cg-acts">
     ${c.telefono?`<a class="ub-b" href="${urlWa(c.telefono, '')}" target="_blank" rel="noopener">${svg('whatsapp')}WhatsApp</a>`:''}
@@ -3665,10 +3717,21 @@ function renderClientes(conservar){
     if(!c){ cliVista='lista'; return renderClientes(); }
     view.innerHTML = viewClienteEditar(c);
   }
+  else if(cliVista==='ficha'){
+    const c = clientes().find(x=>x.id===cliSel);
+    if(!c){ cliVista='lista'; return renderClientes(); }
+    view.innerHTML = viewClienteFicha(c);
+  }
   else if(cliVista==='lista') view.innerHTML = viewClientesLista();
   else view.innerHTML = viewClientesInicio();
   renderHeader();
   const ctk = document.getElementById('cliTickets'); if(ctk) ctk.onclick = ()=>{ const id = cliSel; reciboQ = ''; go('recibos'); reciboCli = id; renderRecibos(); };
+  if(cliVista==='ficha'){
+    const ed = document.getElementById('cfEditar'); if(ed) ed.onclick = ()=>{ cliVista = 'editar'; cliBorrador = null; renderClientes(); };
+    const ec = document.getElementById('cfEdo'); if(ec) ec.onclick = ()=> opcionesEstadoCuenta(cliSel);
+    document.querySelectorAll('[data-cfped]').forEach(b=> b.onclick = ()=>{ go('preventa'); pedidoSel = b.dataset.cfped; ventaVista = 'pedidoDet'; renderVenta(); });
+    window.scrollTo(0,0); return;
+  }
   if(cliVista==='crear' || cliVista==='editar'){ bindFormCliente(); if(conservar) window.scrollTo(0,y); else window.scrollTo(0,0); return; }
   if(cliVista==='lista'){
     const q = document.getElementById('cgQ');
@@ -3681,7 +3744,7 @@ function renderClientes(conservar){
   document.getElementById('optLista').onclick = ()=>{ cliVista='lista'; renderClientes(); };
 }
 function bindFilasClientes(){
-  document.querySelectorAll('.cl-row.cg').forEach(b=> b.onclick = ()=>{ cliSel = b.dataset.id; cliVista = 'editar'; renderClientes(); });
+  document.querySelectorAll('.cl-row.cg').forEach(b=> b.onclick = ()=>{ cliSel = b.dataset.id; cliDesde = null; cliVista = 'ficha'; renderClientes(); });
   const vc = document.getElementById('vacioCrear'); if(vc) vc.onclick = ()=>{ cliVista='crear'; cliSel=null; renderClientes(); };
 }
 
@@ -4644,6 +4707,7 @@ function renderHeader(){
     const hc = document.getElementById('hCliente'); if(hc) hc.onclick = ()=> abrirSelectorCliente({alElegir:()=> renderVenta()});
     const cc = document.getElementById('cliCambiar'); if(cc) cc.onclick = ()=> abrirSelectorCliente({alElegir:()=> renderVenta()});
     const cv = document.getElementById('cliVisitado'); if(cv) cv.onclick = registrarVisita;
+    const cf = document.getElementById('cliFicha'); if(cf) cf.onclick = ()=> abrirFichaCliente(ticket().cliente.id);
     document.getElementById('hMas').onclick = abrirMas;
   } else {
     const m = MENU.find(x=>x.id===current);
@@ -4658,7 +4722,7 @@ function renderHeader(){
     const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt || enCred || enInv || enCat || enHist;
     title.textContent = enHist ? 'Turno ' + turnoHistSel : enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea (GitHub)', nube:'Nube', datos:'Datos y respaldo', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
-      : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente'})[cliVista]
+      : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente', ficha:'Cliente'})[cliVista]
       : (m ? m.label : '');
     pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(current));
     acts.innerHTML = current==='clientes' && (cliVista==='crear'||cliVista==='editar') ? '<button class="head-txt" id="hCliGuardar">GUARDAR</button>'
@@ -8813,7 +8877,7 @@ function go(id){
   view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
   if(id==='turno'){ if(!turnoActual() && turnoVista==='tesoreria') turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; reciboCli = null; renderRecibos(); }
-  else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; renderClientes(); }
+  else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; cliDesde = null; renderClientes(); }
   else if(id==='config'){ cfgVista = 'inicio'; renderConfig(); }
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
   else if(id==='catalogo'){ catVista = 'ver'; renderCatalogo(); }
@@ -8892,7 +8956,9 @@ function atrasApp(){
   if(current==='turno' && turnoVista==='histDet'){ turnoVista = 'historial'; go('turno'); return true; }
   if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return true; }
   if(current==='recibos' && reciboSel){ reciboSel = null; renderRecibos(); return true; }
-  if(current==='clientes' && cliVista!=='inicio'){ cliVista = cliVista==='editar' ? 'lista' : 'inicio'; cliSel = null; cliBorrador = null; renderClientes(); return true; }
+  if(current==='clientes' && cliVista==='ficha' && cliDesde){ const o = cliDesde; cliDesde = null; cliVista = 'inicio'; cliSel = null; go(o.pantalla); if(['venta','preventa','cotizar'].includes(o.pantalla)){ ventaVista = o.vista; renderVenta(); } return true; }
+  if(current==='clientes' && cliVista==='editar' && cliSel){ cliVista = 'ficha'; cliBorrador = null; renderClientes(); return true; }
+  if(current==='clientes' && cliVista!=='inicio'){ cliVista = cliVista==='ficha' ? 'lista' : 'inicio'; cliSel = null; cliBorrador = null; renderClientes(); return true; }
   if(enVenta() && ventaVista==='cotizacion'){ ventaVista = 'ticket'; renderVenta(); return true; }
   if(enVenta() && ventaVista==='programar'){ ventaVista = 'ticket'; renderVenta(); return true; }
   if(enVenta() && ventaVista==='pedidoDet' && pedDesdeSel){ const o = pedDesdeSel; pedDesdeSel = null; if(current!==o.pantalla) go(o.pantalla); ventaVista = o.vista; renderVenta(); abrirSelectorCliente({...o.opts, dia0:o.dia, q0:o.q}); return true; }
