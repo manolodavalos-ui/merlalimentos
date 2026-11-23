@@ -230,6 +230,7 @@ main.flush{padding:0}
 .inf-min .dias{padding:0 0 2px!important;border:0!important;margin:0!important}
 .inf-min-o{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.inf-min-o b{color:var(--ink,#1d2320)}
 .inf-min #infMinOtro{width:92px;flex:0 0 92px;margin:0;padding:6px 10px;min-height:0;height:36px}
+#cpMet .dia:disabled{opacity:.4;text-decoration:line-through}
 .pd-edit-g{margin:8px 0 4px}
 .pd-volver{display:block;width:100%;margin:8px 0 0;min-height:0;padding:10px 12px;font-size:.95rem}
 .pd-agregar{color:var(--brand)!important;border-color:var(--brand)!important;margin-bottom:10px}
@@ -1999,7 +2000,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.50.3';
+const APP_VERSION = '0.51.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4766,13 +4767,82 @@ function iniciarDescuento(){
 function menuRecibo(r){
   if(document.querySelector('.popover')) return;
   const pop = document.createElement('div'); pop.className = 'popover';
-  pop.innerHTML = `<button id="rmDesc">${svg('articulos')}Realizar descuento</button><button id="rmCanc" class="neg">${svg('close')}Cancelar ticket completo</button>`;
+  pop.innerHTML = `<button id="rmDesc">${svg('articulos')}Realizar descuento</button><button id="rmPago">${svg('creditos')}Cambiar forma de pago</button><button id="rmCanc" class="neg">${svg('close')}Cancelar ticket completo</button>`;
   document.body.appendChild(pop);
   const cerrar = ()=>{ pop.remove(); document.removeEventListener('pointerdown', fuera, true); };
   const fuera = e=>{ if(!pop.contains(e.target)) cerrar(); };
   setTimeout(()=> document.addEventListener('pointerdown', fuera, true), 0);
   pop.querySelector('#rmDesc').onclick = ()=>{ cerrar(); iniciarDescuento(); };
   pop.querySelector('#rmCanc').onclick = ()=>{ cerrar(); pedirCancelacion(r); };
+  pop.querySelector('#rmPago').onclick = ()=>{ cerrar(); cambiarFormaPago(r); };
+}
+/* Cambiar la forma de pago de un recibo (Efectivo, Tarjeta o Crédito), ajustando el saldo del cliente */
+function cambiarFormaPago(r, cliElegido){
+  if(anulado(r)){ toast('El ticket está cancelado'); return; }
+  if((r.version||1) > 1 || r.reemplazadoPor || descuentosDe(r).length){ toast('Este ticket tiene descuentos (versiones): no se puede cambiar la forma de pago'); return; }
+  if(!(r.total > 0)){ toast('Solo aplica a tickets con importe a pagar'); return; }
+  if(r.devAbonada){ toast('Este ticket abonó una devolución al crédito: no se puede cambiar'); return; }
+  if(r.metodo==='Crédito' && (r.pagos||[]).length){ toast(`El crédito ya tiene ${r.pagos.length===1?'un abono':r.pagos.length+' abonos'}: cancélalos primero en Créditos`); return; }
+  const ta = turnoActual(), turnoCerrado = !ta || ta.folio !== r.turno;
+  if(turnoCerrado && session.rol!=='admin'){ toast('El ticket es de un turno ya cerrado: solo el administrador puede cambiarlo'); return; }
+  const cli = cliElegido || (r.cliente?.id ? r.cliente : null);
+  const plazo = condCredito(cli && clientes().find(x=> x.id===cli.id)).dias;
+  let nuevo = r.metodo==='Crédito' ? 'Efectivo' : r.metodo==='Efectivo' ? 'Tarjeta' : 'Efectivo';
+  const bg = dialogo(`<h3>Cambiar forma de pago</h3>
+    <p class="sub">Ticket #${esc(r.folio)} · <b>${fmt(r.total)}</b> · ahora: <b>${esc(r.metodo)}</b>${r.metodo==='Crédito' ? ` (saldo ${fmt(r.saldo||0)})` : ''}</p>
+    <div class="dias" id="cpMet">${['Efectivo','Tarjeta','Crédito'].map(m=>`<button class="dia${m===nuevo?' on':''}" data-m="${m}" ${m===r.metodo?'disabled':''}>${m}</button>`).join('')}</div>
+    <div id="cpCred" class="hidden">
+      <div class="cli-bar static" style="margin:10px 0">${svg('clientes')}<span><b id="cpCli">${cli ? esc(cli.nombre + (cli.tienda ? ' · ' + cli.tienda : '')) : 'Sin cliente'}</b><small>${cli ? (()=>{ const d = deudaCliente(cli.id); return d.recibos.length ? `Ya debe ${fmt(d.total)}` : 'Sin deuda pendiente'; })() : 'El crédito necesita un cliente'}</small></span><button class="lnk" id="cpCambiarCli">${cli ? 'Cambiar' : 'Elegir'}</button></div>
+      <label for="cpFecha">Fecha de pago</label>
+      <input class="field" id="cpFecha" type="date" min="${hoyClave()}" value="${masDias(plazo)}">
+      <label for="cpAnt">Ya pagó (anticipo en efectivo)</label>
+      <div class="money"><span>$</span><input class="field" id="cpAnt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+      <label for="cpNota">Nota (opcional)</label>
+      <input class="field" id="cpNota" maxlength="120" autocomplete="off" placeholder="Ej. Pagará al recibir su siguiente pedido">
+    </div>
+    <p class="sub" id="cpEfecto" style="margin-top:10px"></p>
+    ${turnoCerrado ? `<p class="note-sm" style="text-align:left">Este ticket es del turno ${esc(r.turno||'')}, ya cerrado: su corte se recalcula y puede mostrar diferencia contra el efectivo contado.</p>` : ''}
+    <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">Cambiar</button></div>`);
+  const cred = bg.querySelector('#cpCred'), ant = bg.querySelector('#cpAnt'), efecto = bg.querySelector('#cpEfecto');
+  const pintar = ()=>{
+    cred.classList.toggle('hidden', nuevo!=='Crédito');
+    const a = r2(parseFloat(ant.value)||0);
+    const cajonAntes = r.metodo==='Efectivo' ? r.total : r.metodo==='Crédito' ? (r.credito?.anticipo||0) : 0;
+    const cajonDesp = nuevo==='Efectivo' ? r.total : nuevo==='Crédito' ? a : 0, dif = r2(cajonDesp - cajonAntes);
+    efecto.innerHTML = (nuevo==='Crédito' ? `Saldo a crédito del cliente: <b>${fmt(r2(Math.max(0, r.total - a)))}</b>. ` : r.metodo==='Crédito' ? `Se elimina el saldo de <b>${fmt(r.saldo||0)}</b> del cliente. ` : '') +
+      (dif ? `Efectivo en caja: <b class="${dif>0?'pos':'neg'}">${dif>0?'+':'−'}${fmt(Math.abs(dif))}</b>${dif>0 ? ' (recíbelo del cliente)' : ' (no entró a caja)'}.` : 'El efectivo en caja no cambia.');
+  };
+  bg.querySelectorAll('#cpMet .dia').forEach(b=> b.onclick = ()=>{ if(b.disabled) return; nuevo = b.dataset.m; bg.querySelectorAll('#cpMet .dia').forEach(x=> x.classList.toggle('on', x===b)); pintar(); });
+  ant.oninput = pintar;
+  bg.querySelector('#cpCambiarCli').onclick = ()=>{ bg.remove(); elegirClienteSimple(id=>{ const c = clientes().find(x=> x.id===id); if(c) cambiarFormaPago(r, clienteRef(c)); else cambiarFormaPago(r); }, 'Cliente del crédito'); };
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  bg.querySelector('[data-a="si"]').onclick = ()=>{
+    const a = r2(parseFloat(ant.value)||0), fechaP = bg.querySelector('#cpFecha').value;
+    if(nuevo==='Crédito'){
+      if(!cli){ toast('Elige al cliente del crédito'); return; }
+      if(!fechaP || fechaP < hoyClave()){ toast('Elige una fecha de pago válida'); return; }
+      if(a < 0 || a >= r.total){ toast(a >= r.total ? 'Lo pagado cubre todo: déjalo en efectivo' : 'Anticipo no válido'); return; }
+    }
+    const aplicar = ()=>{
+      bg.remove();
+      const de = r.metodo;
+      r.cambiosPago = [...(r.cambiosPago||[]), {fecha:new Date().toISOString(), usuario:session.usuario, vendedor:session.nombre, de, a:nuevo, saldoAnterior:r.saldo||0, turno:ta?.folio || null}];
+      if(nuevo==='Crédito'){ r.cliente = cli; r.credito = {fechaPago:fechaP, nota:bg.querySelector('#cpNota').value.trim(), anticipo:a}; r.recibido = a; r.saldo = r2(r.total - a); }
+      else { r.credito = null; r.saldo = 0; r.recibido = r.total; }
+      r.cambio = 0; r.metodo = nuevo; r.sincronizado = false;
+      DB.guardarRecibo(r);
+      toast(`Forma de pago cambiada: ${de} → ${nuevo}`); renderRecibos();
+    };
+    if(nuevo==='Crédito'){
+      const mot = revisarCredito(cli.id, r2(r.total - a));
+      if(mot.length){
+        if(session.rol!=='admin'){ toast('Crédito no autorizado: ' + mot[0]); return; }
+        return confirmar({titulo:'Crédito con observaciones', texto: mot.join('<br>') + '<br><br>¿Autorizas el crédito?', ok:'Autorizar', alAceptar: aplicar});
+      }
+    }
+    aplicar();
+  };
+  pintar();
 }
 function viewDescuento(r){
   const us = unidadesDescontables(r);
@@ -5351,6 +5421,7 @@ function viewReciboDetalle(r){
       ${r.metodo==='Crédito' ? `<dt>Saldo pendiente</dt><dd>${fmt(r.saldo)}</dd>` : ''}
       ${r.metodo==='Crédito' && r.credito?.fechaPago ? `<dt>Fecha de pago</dt><dd>${fechaCorta(r.credito.fechaPago)}</dd>` : ''}
       ${r.credito?.nota ? `<dt>Nota</dt><dd>${esc(r.credito.nota)}</dd>` : ''}
+      ${(r.cambiosPago||[]).map(c=> `<dt>Cambio de pago</dt><dd>${esc(c.de)} → ${esc(c.a)}<small style="display:block;color:var(--muted)">${fecha(c.fecha)} · ${esc(c.vendedor||c.usuario)}</small></dd>`).join('')}
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
     </dl>
     <div class="tk-acts"><button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir${r.version>1 ? ' v'+r.version : ''}</button><button class="btn ghost" id="rdShare">${svg('share')}Compartir</button></div>
@@ -6614,8 +6685,8 @@ async function publicarConAviso(despues){
 
 /* ----- Enviar catálogo ----- */
 let ecDia = '';
-function elegirClienteSimple(cb){
-  const bg = dialogo(`<h3>Enviar catálogo a…</h3>
+function elegirClienteSimple(cb, titulo = 'Enviar catálogo a…'){
+  const bg = dialogo(`<h3>${titulo}</h3>
     ${chipsDiasCli(ecDia, 'ecDias', 'ec-dias')}
     <input class="field" id="ecQ" placeholder="Buscar cliente" autocomplete="off"><div class="ea-list" id="ecL"></div>`);
   const pintar = ()=>{ const q = bg.querySelector('#ecQ').value;
