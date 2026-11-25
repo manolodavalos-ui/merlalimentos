@@ -244,6 +244,12 @@ main.flush{padding:0}
 .cf .cg-acts{background:none;padding:0}
 .cf-ped{width:100%;background:none;border:0;border-bottom:1px solid var(--line,#eee);font:inherit;text-align:left;cursor:pointer;color:inherit}
 .cf .cg-tk{margin:10px 0 0;width:100%}.cf #cfEditar{width:100%;margin:6px 0 20px}
+.rc-row.sel{background:#e3f2ea}.rc-row.sel .rc-ic{background:var(--brand);color:#fff;border-radius:12px}.rc-ok{display:grid;place-items:center;width:100%;height:100%;font-size:1.2rem}
+.rc-row{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.rc-selbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--line);box-shadow:0 -4px 12px rgba(0,0,0,.08);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.rc-sel-t{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.rc-sel-a{display:grid;grid-template-columns:3fr 2fr;gap:8px}.rc-sel-a .btn{margin:0;display:flex;align-items:center;justify-content:center;gap:6px}
+.rc-sel-a svg{width:18px;height:18px;stroke:currentColor;flex:none}.rc-selbar small{display:block;color:var(--muted);margin-top:6px;text-align:center}
+body.rc-con-sel #rcList{padding-bottom:130px}
 .pd-wrap{padding-bottom:24px}.pd-wrap.con-acc{padding-bottom:110px}
 .pd-card.selmode{display:grid;grid-template-columns:auto 1fr}.pd-card.selmode .pd-chk{margin:14px 0 0 12px}.pd-card.selmode .pd-acts{grid-column:1/-1}.pd-card.sel{background:#f1f8f4;border-color:var(--brand)}
 .pd-selbar{display:flex;justify-content:space-between;align-items:center;margin:10px 0 0;font-size:.88rem;color:var(--muted)}
@@ -2055,7 +2061,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.54.1';
+const APP_VERSION = '0.55.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -5048,8 +5054,8 @@ function listaRecibosHTML(){
   lista.forEach(r=>{
     const d = new Date(fechaRec(r)), clave = hoyClave(d);
     if(clave !== dia){ dia = clave; html += `<div class="rc-day">${fechaLarga(d)}</div>`; }
-    html += `<button class="rc-row" data-id="${r.id}">
-      <span class="rc-ic${r.metodo==='Crédito'?' cred':''}">${svg(ICON_PAGO[r.metodo]||'cash')}</span>
+    html += `<button class="rc-row${recSel.has(r.id) ? ' sel' : ''}${recSel.size ? ' selmode' : ''}" data-id="${r.id}">
+      <span class="rc-ic${r.metodo==='Crédito'?' cred':''}">${recSel.has(r.id) ? '<b class="rc-ok">✓</b>' : svg(ICON_PAGO[r.metodo]||'cash')}</span>
       <span class="rc-main"><b class="${anulado(r)?'tachado':''}">${fmt(r.total)}${r.version>1?` <i class="tag-v">v${r.version}</i>`:''}${anulado(r)?' <i class="tag-c">Cancelado</i>':''}</b><small>${hora(fechaRec(r))}${r.metodo!=='Efectivo'?' · '+esc(r.metodo):''}${r.cliente?' · '+esc(r.cliente.nombre||''):''}</small></span>
       <span class="rc-folio">#${esc(r.folio)}</span>
     </button>`;
@@ -5063,6 +5069,7 @@ function viewRecibos(){
     ${reciboCli ? (()=>{ const c = clientes().find(x=> x.id===reciboCli), ls = recibosDeCliente(reciboCli).filter(r=> !anulado(r));
       return `<div class="rc-cli"><span>Tickets de <b>${esc(c ? (c.tienda || c.nombre) : 'cliente')}</b><small>${ls.length} ventas · ${fmt(r2(ls.reduce((s,r)=> s + (Number(r.total)||0), 0)))}</small></span><button class="ub-b" id="rcCliX">${svg('close')}Quitar</button></div>`; })() : ''}
     <div id="rcList">${listaRecibosHTML()}</div>
+    <div id="rcSelBar"></div>
   </div>`;
 }
 
@@ -5318,6 +5325,7 @@ function lineasTicket(r){
   if(r.tipo==='abono' || r.tipo==='ajuste') return lineasAbono(r);
   if(r.tipo==='estado') return lineasEstadoCuenta(r.cid);
   if(r.tipo==='relacion') return lineasRelacion();
+  if(r.tipo==='suma') return lineasSuma(r);
   const c = impCfg(), W = c.ancho >= 80 ? 48 : 32;
   const centro = t => { t = String(t).slice(0, W); const e = Math.floor((W - t.length)/2); return ' '.repeat(Math.max(0,e)) + t; };
   const dos = (a, b) => { a = String(a); b = String(b); const esp = W - a.length - b.length; return esp >= 1 ? a + ' '.repeat(esp) + b : a.slice(0, W - b.length - 1) + ' ' + b; };
@@ -5789,8 +5797,58 @@ function renderRecibos(){
   const cx = document.getElementById('rcCliX'); if(cx) cx.onclick = ()=>{ reciboCli = null; renderRecibos(); };
   bindFilas();
 }
+/* Selección de varios tickets (mantener presionado) para imprimir juntos con su suma; no modifica ningún ticket */
+let recSel = new Set();
 function bindFilas(){
-  document.querySelectorAll('.rc-row').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.id; reciboVista = 'detalle'; renderRecibos(); });
+  const repintar = ()=>{ const l = document.getElementById('rcList'); if(!l) return; const y = window.scrollY; l.innerHTML = listaRecibosHTML(); bindFilas(); window.scrollTo(0, y); pintarSelBar(); };
+  const alternar = id =>{ const r = recPorId(id); if(!r) return; if(anulado(r)){ toast('Ese ticket está cancelado'); return; } recSel.has(id) ? recSel.delete(id) : recSel.add(id); try{ navigator.vibrate && navigator.vibrate(12); }catch(_){} repintar(); };
+  document.querySelectorAll('#rcList .rc-row').forEach(b=>{
+    let t = null, largo = false, x0 = 0, y0 = 0;
+    b.addEventListener('pointerdown', e=>{ largo = false; x0 = e.clientX; y0 = e.clientY; clearTimeout(t); t = setTimeout(()=>{ largo = true; alternar(b.dataset.id); }, 450); });
+    b.addEventListener('pointermove', e=>{ if(Math.abs(e.clientX-x0) > 10 || Math.abs(e.clientY-y0) > 10) clearTimeout(t); });
+    ['pointerup','pointercancel','pointerleave'].forEach(ev=> b.addEventListener(ev, ()=> clearTimeout(t)));
+    b.addEventListener('contextmenu', e=> e.preventDefault());
+    b.onclick = ()=>{ if(largo){ largo = false; return; } if(recSel.size){ alternar(b.dataset.id); return; } reciboSel = b.dataset.id; reciboVista = 'detalle'; renderRecibos(); };
+  });
+  pintarSelBar();
+}
+function pintarSelBar(){
+  const bar = document.getElementById('rcSelBar'); if(!bar) return;
+  const ls = [...recSel].map(recPorId).filter(Boolean);
+  if(!ls.length){ bar.innerHTML = ''; document.body.classList.remove('rc-con-sel'); return; }
+  document.body.classList.add('rc-con-sel');
+  bar.innerHTML = `<div class="rc-selbar"><div class="rc-sel-t"><b>${ls.length} ${ls.length===1?'ticket':'tickets'} · ${fmt(r2(sumar(ls, r=> r.total)))}</b><button class="lnk" id="rsCancel">Cancelar</button></div>
+    <div class="rc-sel-a"><button class="btn" id="rsSumar"${ls.length < 2 ? ' disabled' : ''}>${svg('recibos')}Sumar e imprimir</button><button class="btn ghost" id="rsShare"${ls.length < 2 ? ' disabled' : ''}>${svg('share')}Compartir</button></div>
+    ${ls.length < 2 ? '<small>Toca otro ticket para agregarlo a la suma</small>' : ''}</div>`;
+  bar.querySelector('#rsCancel').onclick = ()=>{ recSel.clear(); const l = document.getElementById('rcList'); l.innerHTML = listaRecibosHTML(); bindFilas(); };
+  const doc = ()=> ({tipo:'suma', ids:[...recSel], folio:'SUMA', fecha:new Date().toISOString(), total:r2(sumar(ls, r=> r.total))});
+  bar.querySelector('#rsSumar').onclick = ()=>{ const imp = impSel(); if(imp && (imp.conexion==='bt' || imp.conexion==='rawbt')) imprimirRecibo(doc()); else compartirSuma(doc()); };
+  bar.querySelector('#rsShare').onclick = ()=> compartirSuma(doc());
+}
+async function compartirSuma(d){
+  const nombre = `Suma de ${d.ids.length} tickets.png`;
+  let blob = null; try{ blob = await imagenTicket(d); }catch(_){}
+  if(!blob){ toast('No se pudo generar la imagen'); return; }
+  const file = new File([blob], nombre, {type:'image/png'});
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:nombre, text:`${d.ids.length} tickets · total ${fmt(d.total)}`}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
+  descargarBlob(blob, nombre); toast('Se descargó la imagen');
+}
+function lineasSuma(d){
+  const c = impCfg(), W = c.ancho >= 80 ? 48 : 32, ls = d.ids.map(recPorId).filter(Boolean).sort((a,b)=> fechaRec(a).localeCompare(fechaRec(b)));
+  const centro = t => { t = String(t).slice(0, W); return ' '.repeat(Math.max(0, Math.floor((W - t.length)/2))) + t; };
+  const dos = (x, y) => { x = String(x); y = String(y); const e = W - x.length - y.length; return e >= 1 ? x + ' '.repeat(e) + y : x.slice(0, W - y.length - 1) + ' ' + y; };
+  const L = [];
+  ls.forEach((r, i)=>{ if(i){ L.push({t:''}); L.push({t:centro('- - - - - - - - - - - -')}); L.push({t:''}); } L.push(...lineasTicket(r)); });
+  L.push({t:''}); L.push({t:'='.repeat(W)}); L.push({t:centro(`SUMA DE ${ls.length} TICKETS`), b:true});
+  L.push({t:'='.repeat(W)});
+  ls.forEach(r=> L.push({t:dos(`#${r.folio} ${new Date(fechaRec(r)).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'})}`, fmt(r.total))}));
+  L.push({t:'-'.repeat(W)});
+  L.push({t:dos('TOTAL', fmt(r2(sumar(ls, r=> r.total)))), b:true, g:true});
+  const met = {}; ls.forEach(r=> met[r.metodo] = r2((met[r.metodo]||0) + r.total));
+  if(Object.keys(met).length > 1) Object.entries(met).forEach(([m, v])=> L.push({t:dos('  ' + m, fmt(v))}));
+  const sal = r2(sumar(ls.filter(r=> r.metodo==='Crédito' && !r.reemplazadoPor), r=> r.saldo||0)); if(sal > 0) L.push({t:dos('  Saldo pendiente', fmt(sal)), b:true});
+  L.push({t:'='.repeat(W)}); L.push({t:centro('Solo informativo')}); L.push({t:centro('No modifica los tickets')});
+  return L;
 }
 
 /* ================= Artículos ================= */
@@ -9133,7 +9191,7 @@ function viewPendiente(id){
 
 function go(id){
   if(!puede(id)){ toast('No tienes permiso para esta sección'); return; }
-  if(current !== id){ seccionPrevia = current; pedDesdeSel = null; }
+  if(current !== id){ seccionPrevia = current; pedDesdeSel = null; recSel.clear(); document.body.classList.remove('rc-con-sel'); }
   current = id;
   if(id!=='mapa') cerrarMapa();
   document.querySelector('.cl-sheet')?.remove();
@@ -9227,6 +9285,7 @@ function atrasApp(){
   if(current==='catalogo' && catVista!=='ver'){ catVista = 'ver'; renderCatalogo(); return true; }
   if(current==='turno' && turnoVista==='tesoreria'){ turnoVista = 'resumen'; go('turno'); return true; }
   if(current==='turno' && turnoVista==='histDet'){ turnoVista = 'historial'; go('turno'); return true; }
+  if(current==='recibos' && !reciboSel && recSel.size){ recSel.clear(); renderRecibos(); return true; }
   if(current==='recibos' && reciboSel && reciboVista==='descuento'){ reciboVista = 'detalle'; renderRecibos(); return true; }
   if(current==='recibos' && reciboSel){ reciboSel = null; renderRecibos(); return true; }
   if(current==='clientes' && cliVista==='ficha' && cliDesde){ const o = cliDesde; cliDesde = null; cliVista = 'inicio'; cliSel = null; go(o.pantalla); if(['venta','preventa','cotizar'].includes(o.pantalla)){ ventaVista = o.vista; renderVenta(); } return true; }
