@@ -265,6 +265,22 @@ main.flush{padding:0}
 .pd-cal-g button{position:relative;aspect-ratio:1;border:1px solid transparent;border-radius:10px;background:none;font:inherit;cursor:pointer;padding:0}
 .pd-cal-g button.con{background:#e5f2eb;color:var(--brand);font-weight:700}.pd-cal-g button.hoy{border-color:var(--brand)}.pd-cal-g button.on{background:var(--brand);color:#fff}
 .pd-cal-g button i{position:absolute;right:2px;top:1px;font-style:normal;font-size:.62rem;background:#e6b800;color:#222;border-radius:999px;padding:0 4px;line-height:1.4}
+.rl-wrap{padding-bottom:24px}.pd-dias .dia.sem{border-color:var(--brand);color:var(--brand);font-weight:700}.pd-dias .dia.sem.on{color:#fff}
+.rl-h{display:flex;flex-direction:column;margin-bottom:8px}.rl-h b{font-size:1.1rem}.rl-h small{color:var(--muted)}
+.rl-ks{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px}.rl-k{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;display:flex;flex-direction:column;min-width:0}
+.rl-k b{font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-k span{font-size:.7rem;color:var(--muted)}.rl-k.neg{background:#fff4f2;border-color:#f3c4bd}.rl-k.neg b{color:var(--danger)}.rl-k.pos b{color:var(--brand)}
+.rl-modo{margin:0 0 8px}.rl-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.85rem}.rl-tools .lnk{display:inline-flex;align-items:center;gap:4px;padding:4px 0}.rl-tools svg{width:16px;height:16px;stroke:currentColor}
+.rl2{grid-template-columns:auto 1fr auto!important;align-items:start;background:#fff}.rl2 .rl-bar,.rl2 .rl-inline,.rl2 .rl-det{grid-column:2/-1}
+.rl-chk{width:28px;height:28px;border-radius:8px;border:2px solid #b9c4bf;background:#fff;color:#fff;font-weight:800;font-size:.95rem;padding:0;margin-top:2px;cursor:pointer}.rl-chk.on{background:var(--brand);border-color:var(--brand)}
+.rl-row.marcado{opacity:.55}.rl-row.marcado .rl-t b{text-decoration:line-through}
+.rl-bar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:#eef1ef;margin-top:4px}.rl-bar i{display:block;height:100%}.rl-bar .e{background:#1e8e3e}.rl-bar .p{background:#e6b800}.rl-bar .f{background:#d93025}
+.rl-inline{font-size:.8rem;color:var(--brand);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rl-inline b{font-size:.75rem}
+.rl-dias{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.rl-dias i{font-style:normal;font-size:.72rem;background:#f0f3f1;border-radius:6px;padding:1px 6px;color:#3c4744}
+.rl-cli{cursor:pointer}.rl-cli:active{background:#e5f2eb}
+.rl-dfalta{display:flex;justify-content:space-between;align-items:center;color:var(--danger)!important;background:#fff4f2}.rl-dfalta .lnk{font-size:.82rem}
+.rl-cc{background:#fff;margin:10px 16px;border:1px solid var(--line);border-left:6px solid #e6b800;border-radius:14px;overflow:hidden}.rl-cc.ent{border-left-color:#1e8e3e;opacity:.7}.rl-cc.marcado{border-left-color:var(--brand);opacity:.6}
+.rl-cch{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:12px 14px 8px}.rl-cch .rl-t{cursor:pointer}.rl-cc.marcado .rl-cch b{text-decoration:line-through}
+.rl-ccl{padding:0 14px 12px 52px;font-size:.9rem}.rl-ccl div{display:flex;gap:8px;padding:3px 0;border-top:1px dashed #edf0ee}.rl-ccl b{min-width:54px;color:var(--brand)}
 #cpMet .dia:disabled{opacity:.4;text-decoration:line-through}
 .pd-edit-g{margin:8px 0 4px}
 .pd-volver{display:block;width:100%;margin:8px 0 0;min-height:0;padding:10px 12px;font-size:.95rem}
@@ -2035,7 +2051,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.53.0';
+const APP_VERSION = '0.54.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4466,81 +4482,190 @@ function crearOCFaltantes(prov){
   ls.forEach(x=> compBorr[x.pid] = {cant: esKg(x.pid) ? Math.ceil(x.falta*10)/10 : Math.ceil(x.falta)});
   go('compras'); toast(`${ls.length} faltantes de ${prov} listos: revisa y toca Orden de compra`);
 }
-function relacionDia(dia){
-  /* Todos los pedidos del día (pendientes y ya entregados): el total no se achica al entregar. Lo que falta se compara solo contra lo pendiente. */
-  const peds = DB.pedidos.filter(p=> (p.estado==='Programado' || p.estado==='Entregado') && p.fechaEntrega===dia), m = {};
+/* Rango de la relación: un día ('AAAA-MM-DD'), 'semana' (pendientes lun–dom de esta semana, incluye atrasadas) o 'atrasadas' */
+const semanaFin = ()=> sumaDias(lunesDe(hoyClave()), 6);
+function pedidosRel(sel){
+  const hoy = hoyClave();
+  if(sel==='semana') return DB.pedidos.filter(p=> p.estado==='Programado' && (p.fechaEntrega||'') <= semanaFin());
+  if(sel==='atrasadas') return DB.pedidos.filter(p=> p.estado==='Programado' && (p.fechaEntrega||'') < hoy);
+  return DB.pedidos.filter(p=> (p.estado==='Programado' || p.estado==='Entregado') && p.fechaEntrega===sel);
+}
+const relNombre = sel => { const f = k => { const t = fechaCorta(k); return t.charAt(0).toUpperCase() + t.slice(1); };
+  return sel==='semana' ? `Semana pendiente (al ${diaCorto(semanaFin()).toLowerCase()})` : sel==='atrasadas' ? 'Atrasadas' : sel===hoyClave() ? 'Hoy · ' + f(sel) : sel===manana() ? 'Mañana · ' + f(sel) : f(sel); };
+const diaCorto = k => { const x = kDate(k); return DIAS_CORTOS[(x.getDay()+6)%7] + ' ' + x.getDate(); };
+function relacionDia(sel){
+  /* Todos los pedidos del rango (pendientes y ya entregados): el total no se achica al entregar. Lo que falta se compara solo contra lo pendiente. */
+  const peds = pedidosRel(sel), m = {};
   peds.forEach(p=> (p.lineas||[]).forEach(l=>{
-    const x = m[l.pid] = m[l.pid] || {pid:l.pid, nombre:nombreTk(l), cant:0, ent:0, pedidos:[]}, q = Number(l.cantidad||0), ok = p.estado==='Entregado';
-    x.cant = r3(x.cant + q); if(ok) x.ent = r3(x.ent + q);
-    x.pedidos.push({cli:p.cliente?.tienda || p.cliente?.nombre || '', folio:p.folio, cant:q, ent:ok});
+    const x = m[l.pid] = m[l.pid] || {pid:l.pid, nombre:nombreTk(l), cant:0, ent:0, pedidos:[], porDia:{}}, q = Number(l.cantidad||0), ok = p.estado==='Entregado';
+    x.cant = r3(x.cant + q); if(ok) x.ent = r3(x.ent + q); else x.porDia[p.fechaEntrega] = r3((x.porDia[p.fechaEntrega]||0) + q);
+    x.pedidos.push({id:p.id, cid:p.cliente?.id, cli:p.cliente?.tienda || p.cliente?.nombre || '', folio:p.folio, cant:q, ent:ok, horario:p.horario, fecha:p.fechaEntrega});
   }));
   const ls = Object.values(m).map(x=>{ const a = artPorId(x.pid), alm = stockEn('almacen', x.pid), cam = stockEn('camioneta', x.pid), hay = r3(alm + cam), pend = r3(x.cant - x.ent);
     return {...x, pend, a, alm, cam, hay, falta: r3(Math.max(0, pend - Math.max(0, hay))), sec: a?.seccion || 'Otros', nombre: a ? nombreTicket(a) : x.nombre}; });
   const orden = categorias();
   ls.sort((a,b)=> (orden.indexOf(a.sec) - orden.indexOf(b.sec)) || a.nombre.localeCompare(b.nombre,'es'));
-  const nEnt = peds.filter(p=> p.estado==='Entregado').length;
-  return {peds, ls, nEnt, total: sumar(peds, p=> p.total)};
+  const nEnt = peds.filter(p=> p.estado==='Entregado').length, nCli = new Set(peds.map(p=> p.cliente?.id || p.cliente?.nombre)).size;
+  return {peds, ls, nEnt, nCli, total: sumar(peds, p=> p.total)};
 }
 const relEstado = x => x.ent >= x.cant - 0.0005 ? `<small class="pos">entregado ✓</small>` : x.ent > 0 ? `<small>entregado ${fmtCant(x.pid, x.ent)} · pendiente ${fmtCant(x.pid, x.pend)}</small>` : '';
+/* Lista para cargar/armar: marcas por rango, guardadas en el teléfono */
+const relClave = ()=> relDia==='semana' ? 'sem-' + lunesDe(hoyClave()) : relDia;
+const relMarcas = ()=> (store.get('relCargado', {})[relClave()] || {});
+function relMarcar(k){ const all = store.get('relCargado', {}), c = relClave(), m = all[c] || (all[c] = {}); if(m[k]) delete m[k]; else m[k] = 1;
+  Object.keys(all).forEach(x=>{ if(/^\d{4}-/.test(x) && x < sumaDias(hoyClave(), -14)) delete all[x]; }); store.set('relCargado', all); }
+function barraRel(x){
+  const t = x.cant || 1, e = x.ent / t * 100, f = x.falta / t * 100, p = Math.max(0, 100 - e - f);
+  return `<div class="rl-bar">${e ? `<i class="e" style="width:${e}%"></i>` : ''}${p ? `<i class="p" style="width:${p}%"></i>` : ''}${f ? `<i class="f" style="width:${f}%"></i>` : ''}</div>`;
+}
+function filaProducto(x, M){
+  const marc = !!M['p:'+x.pid], abierto = relAbierto===x.pid || (esKg(x.pid) && relAbierto!=='-'+x.pid);
+  const pend = x.pedidos.filter(d=> !d.ent), vista = (pend.length ? pend : x.pedidos);
+  const inline = vista.slice(0,3).map(d=> `${esc(d.cli.split(' ').slice(0,2).join(' '))} ${fmtCant(x.pid, d.cant)}`).join(' · ') + (vista.length > 3 ? ` · +${vista.length-3}` : '');
+  const dias = relDia==='semana' || relDia==='atrasadas' ? Object.keys(x.porDia).sort().map(k=> `<i>${k < hoyClave() ? '⚠ ' : ''}${diaCorto(k)}: ${fmtCant(x.pid, x.porDia[k])}</i>`).join('') : '';
+  return `<div class="rl-row rl2${x.falta > 0 ? ' falta' : ''}${marc ? ' marcado' : ''}" data-pid="${x.pid}">
+    <button class="rl-chk${marc?' on':''}" data-mk="p:${x.pid}" aria-label="Cargado">${marc ? '✓' : ''}</button>
+    <span class="rl-t"><b>${esc(x.nombre)}</b>
+      <small>${x.ent > 0 ? `<span class="pos">entregado ${fmtCant(x.pid, x.ent)}</span> · ` : ''}${x.pend > 0 ? `pendiente ${fmtCant(x.pid, x.pend)} · ` : ''}hay ${fmtCant(x.pid, x.hay)}${x.cam ? ` <span class="muted">(cam. ${fmtCant(x.pid, x.cam)})</span>` : ''}</small>
+      ${dias ? `<span class="rl-dias">${dias}</span>` : ''}</span>
+    <span class="rl-q"><b>${fmtCant(x.pid, x.cant)}</b>${x.pend <= 0.0005 ? `<i class="tag-v">entregado ✓</i>` : x.falta > 0 ? `<i class="tag-c">faltan ${fmtCant(x.pid, x.falta)}</i>` : `<i class="tag-v">alcanza</i>`}</span>
+    ${barraRel(x)}
+    ${abierto ? `<div class="rl-det">${esKg(x.pid) ? '<p class="rl-sep">Separar por entrega:</p>' : ''}${x.pedidos.map((d,i)=>`<div class="rl-cli" data-ped="${d.id}"><span>${esKg(x.pid) ? `<i class="rl-n">${i+1}</i>` : ''}${esc(d.cli)} <small>#${esc(d.folio)}${relDia==='semana'||relDia==='atrasadas' ? ' · ' + diaCorto(d.fecha) : ''}${d.horario && !/cualquier/i.test(d.horario) ? ' · ' + esc(d.horario) : ''}${d.ent ? ' · entregado ✓' : ''}</small></span><b>${fmtCant(x.pid, d.cant)} ›</b></div>`).join('')}</div>`
+      : `<span class="rl-inline">${inline} <b>▾</b></span>`}
+  </div>`;
+}
+function vistaPorCliente(R, M){
+  const g = {};
+  R.peds.forEach(p=>{ const k = p.cliente?.id || p.cliente?.nombre || p.id, x = g[k] || (g[k] = {k, cli:p.cliente||{}, peds:[], lineas:{}, total:0, ent:0});
+    x.peds.push(p); x.total = r2(x.total + p.total); if(p.estado==='Entregado') x.ent++;
+    (p.lineas||[]).forEach(l=>{ const y = x.lineas[l.pid] || (x.lineas[l.pid] = {pid:l.pid, nombre:nombreTk(l), cant:0}); y.cant = r3(y.cant + Number(l.cantidad||0)); }); });
+  const ordenCli = k => { const c = clientes().find(z=> z.id===k); return c?.orden || 9999; };
+  const ls = Object.values(g).sort((a,b)=> (!!M['c:'+a.k]) - (!!M['c:'+b.k]) || (a.ent===a.peds.length) - (b.ent===b.peds.length) || ordenHorario(a.peds[0].horario) - ordenHorario(b.peds[0].horario) || ordenCli(a.k) - ordenCli(b.k) || (a.cli.tienda||a.cli.nombre||'').localeCompare(b.cli.tienda||b.cli.nombre||'','es'));
+  return ls.map(x=>{ const marc = !!M['c:'+x.k], todo = x.ent===x.peds.length;
+    return `<div class="rl-cc${marc?' marcado':''}${todo?' ent':''}">
+      <div class="rl-cch"><button class="rl-chk${marc?' on':''}" data-mk="c:${x.k}" aria-label="Armado">${marc ? '✓' : ''}</button>
+        <span class="rl-t" data-ped="${x.peds[0].id}" role="button"><b>${esc(x.cli.tienda || x.cli.nombre || '')}</b><small>${x.cli.tienda ? esc(x.cli.nombre)+' · ' : ''}${x.peds.map(p=> '#'+esc(p.folio) + (relDia==='semana'||relDia==='atrasadas' ? ' ' + diaCorto(p.fechaEntrega) : '')).join(', ')} · ${esc(x.peds[0].horario||'')}</small></span>
+        <span class="rl-q"><b>${fmt(x.total)}</b>${todo ? '<i class="tag-v">entregado ✓</i>' : marc ? '<i class="tag-v">armado</i>' : ''}</span></div>
+      <div class="rl-ccl">${Object.values(x.lineas).map(l=> `<div><b>${fmtCant(l.pid, l.cant)}</b><span>${esc(l.nombre)}</span></div>`).join('')}</div>
+    </div>`; }).join('');
+}
 function viewRelacion(){
-  if(!relDia) relDia = DB.pedidos.some(p=> p.estado==='Programado' && p.fechaEntrega===manana()) ? manana() : hoyClave();
-  const R = relacionDia(relDia), faltan = R.ls.filter(x=> x.falta > 0), ver = relSoloFalta ? faltan : R.ls;
-  const chip = (k, t)=> `<button class="dia${relDia===k?' on':''}" data-rd="${k}">${t}</button>`;
-  const pasado = (()=>{ const d = new Date(); d.setDate(d.getDate()+2); return hoyClave(d); })();
-  let sec = '', filas = '';
+  const hoy = hoyClave();
+  if(!relDia) relDia = DB.pedidos.some(p=> p.estado==='Programado' && p.fechaEntrega===manana()) && !DB.pedidos.some(p=> p.estado==='Programado' && p.fechaEntrega===hoy) ? manana() : hoy;
+  const nAtr = pedidosRel('atrasadas').length; if(relDia==='atrasadas' && !nAtr) relDia = hoy;
+  const R = relacionDia(relDia), faltan = R.ls.filter(x=> x.falta > 0), M = relMarcas();
+  const dias7 = Array.from({length:7}, (_,i)=> sumaDias(hoy, i)), cnt = k => pedidosRel(k).length;
+  const fuera = /^\d{4}-/.test(relDia) && !dias7.includes(relDia);
+  const chips = `<div class="dias filtro pd-dias" id="rlDias">
+    ${nAtr ? `<button class="dia atr${relDia==='atrasadas'?' on':''}" data-rd="atrasadas">Atrasadas (${nAtr})</button>` : ''}
+    ${dias7.map((d,i)=>{ const n = cnt(d); return `<button class="dia${relDia===d?' on':''}${n?'':' vacio'}" data-rd="${d}">${i===0?'Hoy':i===1?'Mañana':diaCorto(d)}${n ? ` <b>${n}</b>` : ''}</button>`; }).join('')}
+    <button class="dia sem${relDia==='semana'?' on':''}" data-rd="semana">Semana pendiente <b>${cnt('semana')}</b></button>
+    ${fuera ? `<button class="dia on" data-rd="${relDia}">${diaCorto(relDia)} <b>${cnt(relDia)}</b></button>` : ''}
+    <button class="dia" id="rlCal" aria-label="Calendario">📅</button></div>`;
+  const kpi = (n, t, cls='') => `<div class="rl-k ${cls}"><b>${n}</b><span>${t}</span></div>`;
+  const resumen = `<div class="rl-h"><b>${relNombre(relDia)}</b>${R.nEnt ? `<small>${R.nEnt} ${R.nEnt===1?'entregada':'entregadas'} · ${R.peds.length - R.nEnt} por entregar</small>` : ''}</div>
+    <div class="rl-ks">${kpi(R.peds.length, R.peds.length===1?'venta':'ventas')}${kpi(R.nCli, R.nCli===1?'cliente':'clientes')}${kpi(fmt(R.total).replace('.00',''), 'total')}${kpi(R.ls.length, 'productos')}${kpi(faltan.length, faltan.length===1?'faltante':'faltantes', faltan.length ? 'neg' : 'pos')}</div>`;
+  let filas = '';
   if(relModo==='proveedor'){
-    const grupos = {}; ver.forEach(x=>{ const pv = x.a?.proveedor || 'Sin proveedor'; (grupos[pv] = grupos[pv] || []).push(x); });
+    const ver = relSoloFalta ? faltan : R.ls, grupos = {}; ver.forEach(x=>{ const pv = x.a?.proveedor || 'Sin proveedor'; (grupos[pv] = grupos[pv] || []).push(x); });
     Object.entries(grupos).sort((a,b)=> b[1].filter(x=> x.falta>0).length - a[1].filter(x=> x.falta>0).length || a[0].localeCompare(b[0],'es')).forEach(([pv, xs])=>{
       const fl = xs.filter(x=> x.falta > 0), costo = sumar(fl, x=> x.falta * (Number(x.a?.costo)||0));
       filas += `<div class="rl-prov"><div class="rl-ph"><span><b>${esc(pv)}</b><small>${fl.length ? `${fl.length} ${fl.length===1?'faltante':'faltantes'}${costo ? ' · aprox. ' + fmt(costo) : ''}` : 'Todo alcanza ✓'}</small></span>
         ${fl.length && pv!=='Sin proveedor' && session.rol==='admin' ? `<button class="btn ghost rl-oc" data-prov="${esc(pv)}">Crear orden de compra</button>` : ''}</div>`;
-      xs.forEach(x=>{ filas += `<div class="rl-row${x.falta > 0 ? ' falta' : ''}" data-pid="${x.pid}">
+      xs.forEach(x=>{ filas += `<div class="rl-row${x.falta > 0 ? ' falta' : ''}" data-pid="${x.pid}" data-nox="1">
         <span class="rl-t"><b>${esc(x.nombre)}</b><small>pedidos ${fmtCant(x.pid, x.cant)}${x.ent > 0 ? ` · pendiente ${fmtCant(x.pid, x.pend)}` : ''} · hay ${fmtCant(x.pid, x.hay)}</small></span>
         <span class="rl-q">${x.falta > 0 ? `<b class="neg">${fmtCant(x.pid, x.falta)}</b><i class="tag-c">comprar</i>` : `<i class="tag-v">alcanza</i>`}</span></div>`; });
       filas += `</div>`;
     });
+  } else if(relModo==='cliente'){
+    filas = vistaPorCliente(R, M);
+  } else {
+    const ver = relSoloFalta ? faltan : R.ls;
+    const fl = ver.filter(x=> x.falta > 0), resto = ver.filter(x=> !(x.falta > 0));
+    if(fl.length) filas += `<div class="rc-day rl-dfalta"><span>⚠ Faltantes (${fl.length})</span>${session.rol==='admin' ? `<button class="lnk" id="rlIrOC">Orden de compra ›</button>` : ''}</div>` + fl.map(x=> filaProducto(x, M)).join('');
+    const orden = [...resto.filter(x=> !M['p:'+x.pid]), ...resto.filter(x=> M['p:'+x.pid])];
+    let sec = '', yaMarc = false;
+    orden.forEach(x=>{
+      if(M['p:'+x.pid]){ if(!yaMarc){ yaMarc = true; filas += `<div class="rc-day">✓ Cargados</div>`; } }
+      else if(x.sec !== sec){ sec = x.sec; filas += `<div class="rc-day">${esc(sec)}</div>`; }
+      filas += filaProducto(x, M);
+    });
   }
-  else ver.forEach(x=>{
-    if(x.sec !== sec){ sec = x.sec; filas += `<div class="rc-day">${esc(sec)}</div>`; }
-    filas += `<div class="rl-row${x.falta > 0 ? ' falta' : ''}" data-pid="${x.pid}">
-      <span class="rl-t"><b>${esc(x.nombre)}</b><small>${x.pedidos.length} ${x.pedidos.length===1?'pedido':'pedidos'} · hay ${fmtCant(x.pid, x.hay)}${x.cam ? ` (almacén ${fmtCant(x.pid, x.alm)}, camioneta ${fmtCant(x.pid, x.cam)})` : ''}</small>${relEstado(x)}</span>
-      <span class="rl-q"><b>${fmtCant(x.pid, x.cant)}</b>${x.pend <= 0.0005 ? `<i class="tag-v">entregado</i>` : x.falta > 0 ? `<i class="tag-c">faltan ${fmtCant(x.pid, x.falta)}</i>` : `<i class="tag-v">alcanza</i>`}</span>
-      ${relAbierto===x.pid || (esKg(x.pid) && relAbierto!=='-'+x.pid) ? `<div class="rl-det">${esKg(x.pid) ? '<p class="rl-sep">Separar por entrega:</p>' : ''}${x.pedidos.map((d,i)=>`<div><span>${esKg(x.pid) ? `<i class="rl-n">${i+1}</i>` : ''}${esc(d.cli)} <small>#${esc(d.folio)}${d.ent ? ' · entregado ✓' : ''}</small></span><b>${fmtCant(x.pid, d.cant)}</b></div>`).join('')}</div>` : `<span class="rl-mas">▾ ver a qué clientes va</span>`}
-    </div>`;
-  });
-  return `<div class="rc-wrap">
+  const nMarc = relModo==='cliente' ? Object.keys(M).filter(k=> k.startsWith('c:')).length : Object.keys(M).filter(k=> k.startsWith('p:')).length;
+  const tot = relModo==='cliente' ? R.nCli : R.ls.length;
+  return `<div class="rc-wrap rl-wrap">${chips}
     <div class="cr-pad" style="padding-top:12px">
-      <div class="dias filtro" style="padding:0;border:0">${chip(hoyClave(),'Hoy')}${chip(manana(),'Mañana')}${chip(pasado,'Pasado mañana')}
-        <label class="dia rl-fecha">Otro día <input type="date" id="rlFecha" value="${relDia}"></label></div>
-      <div class="rl-res"><b>${fechaCorta(relDia)}</b><span>${R.peds.length} ${R.peds.length===1?'venta programada':'ventas programadas'}${R.nEnt ? ` (${R.nEnt} ${R.nEnt===1?'entregada':'entregadas'}, ${R.peds.length - R.nEnt} por entregar)` : ''} · ${fmt(R.total)} · ${R.ls.length} productos</span>
-        ${R.ls.length ? (faltan.length ? `<span class="neg"><b>Faltan ${faltan.length} ${faltan.length===1?'producto':'productos'}</b> para cubrir el día</span>` : (R.nEnt === R.peds.length ? `<span class="pos"><b>Todo el día ya se entregó ✓</b></span>` : `<span class="pos"><b>El inventario alcanza para lo pendiente ✓</b></span>`)) : ''}</div>
-      ${R.ls.length && !relEnInv() ? `<button class="btn" id="rlCargar" style="margin:12px 0 0">${svg('inventario')}Cargar a la camioneta</button>` : ''}
-      ${R.ls.length ? `<div class="dias filtro" style="padding:12px 0 0;border:0">${[['producto','Por producto'],['proveedor','Por proveedor (compras)']].map(([k,t])=>`<button class="dia${relModo===k?' on':''}" data-rm="${k}">${t}</button>`).join('')}</div>` : ''}
-      ${R.ls.length ? `<div class="tk-acts" style="margin:10px 0 4px"><button class="btn ghost" id="rlFalta">${relSoloFalta ? 'Ver todos' : 'Solo faltantes'}</button><button class="btn ghost" id="rlShare">${svg('share')}Compartir</button></div>` : ''}
+      ${resumen}
+      ${R.ls.length ? `<div class="seg rl-modo">${[['producto','Por producto'],['cliente','Por cliente'],['proveedor','Por proveedor']].map(([k,t])=>`<button class="${relModo===k?'on':''}" data-rm="${k}">${t}</button>`).join('')}</div>
+        <div class="rl-tools">${relModo!=='cliente' ? `<button class="lnk" id="rlFalta">${relSoloFalta ? 'Ver todos' : 'Solo faltantes'}</button>` : '<span></span>'}
+          ${relModo!=='proveedor' && tot ? `<span class="muted">${relModo==='cliente' ? 'Armados' : 'Cargados'} ${nMarc}/${tot}${nMarc ? ` · <button class="lnk" id="rlLimpiar">desmarcar</button>` : ''}</span>` : ''}
+          <button class="lnk" id="rlShare">${svg('share')}Compartir</button></div>
+        ${!relEnInv() && relDia!=='semana' && relDia!=='atrasadas' ? `<button class="btn" id="rlCargar" style="margin:10px 0 0">${svg('inventario')}Cargar a la camioneta</button>` : ''}` : ''}
     </div>
-    ${R.ls.length ? (filas || '<div class="rc-empty"><p>Todo alcanza ✓</p></div>') + `<p class="note-sm" style="padding:0 16px">"Hay" es el inventario actual de almacén más camioneta; los faltantes se calculan solo sobre lo pendiente de entregar. Toca un producto para ver a qué clientes va.</p>`
-      : `<div class="rc-empty">${svg('preventa')}<p>No hay ventas programadas para este día.</p></div>`}
+    ${R.ls.length ? (filas || '<div class="rc-empty"><p>Todo alcanza ✓</p></div>') + `<p class="note-sm" style="padding:0 16px">Barra: <b class="pos">verde</b> entregado · <b style="color:#b38b00">amarillo</b> pendiente con inventario · <b class="neg">rojo</b> faltante. "Hay" = almacén + camioneta. Marca la casilla cuando lo cargues o armes.</p>`
+      : `<div class="rc-empty">${svg('preventa')}<p>No hay ventas programadas ${relDia==='semana' ? 'pendientes esta semana' : 'para este día'}.</p></div>`}
   </div>`;
 }
 function textoRelacion(){
   const R = relacionDia(relDia), ls = relSoloFalta ? R.ls.filter(x=> x.falta > 0) : R.ls;
-  return `*Productos a entregar · ${fechaCorta(relDia)}*\n${R.peds.length} ventas programadas · ${fmt(R.total)}\n\n` +
-    ls.map(x=> `• ${x.nombre}: ${fmtCant(x.pid, x.cant)}${x.ent > 0 ? ` (entregado ${fmtCant(x.pid, x.ent)})` : ''}${x.falta > 0 ? ` (faltan ${fmtCant(x.pid, x.falta)})` : ''}` + (esKg(x.pid) && x.pedidos.length > 1 ? '\n' + x.pedidos.map((d,i)=> `    ${i+1}) ${d.cli}: ${fmtCant(x.pid, d.cant)}`).join('\n') : '')).join('\n');
+  return `*Productos a entregar · ${relNombre(relDia)}*\n${R.peds.length} ventas · ${R.nCli} clientes · ${fmt(R.total)}\n\n` +
+    ls.map(x=> `• ${x.nombre}: ${fmtCant(x.pid, x.cant)}${x.ent > 0 ? ` (entregado ${fmtCant(x.pid, x.ent)})` : ''}${x.falta > 0 ? ` (faltan ${fmtCant(x.pid, x.falta)})` : ''}` + (x.pedidos.length > 1 || esKg(x.pid) ? '\n' + x.pedidos.map((d,i)=> `    ${i+1}) ${d.cli}: ${fmtCant(x.pid, d.cant)}`).join('\n') : '')).join('\n');
+}
+/* Lista en formato de ticket (imagen o impresora) */
+function lineasRelacion(){
+  const c = impCfg(), W = c.ancho >= 80 ? 48 : 32, R = relacionDia(relDia), ls = relSoloFalta ? R.ls.filter(x=> x.falta > 0) : R.ls;
+  const centro = t => { t = String(t).slice(0, W); return ' '.repeat(Math.max(0, Math.floor((W - t.length)/2))) + t; };
+  const dos = (x, y) => { x = String(x); y = String(y); const e = W - x.length - y.length; return e >= 1 ? x + ' '.repeat(e) + y : x.slice(0, W - y.length - 1) + ' ' + y; };
+  const sep = '-'.repeat(W), L = [{t:centro(c.encabezado), b:true}, {t:centro('PRODUCTOS A ENTREGAR'), b:true}, {t:centro(relNombre(relDia).slice(0, W))},
+    {t:centro(`${R.peds.length} ventas · ${R.nCli} clientes · ${fmt(R.total)}`)}, {t:sep}];
+  if(relModo==='cliente'){
+    const g = {}; R.peds.filter(p=> p.estado!=='Entregado').forEach(p=>{ const k = p.cliente?.id || p.id; (g[k] = g[k] || {cli:p.cliente||{}, ls:{}});
+      (p.lineas||[]).forEach(l=>{ const y = g[k].ls[l.pid] || (g[k].ls[l.pid] = {pid:l.pid, n:nombreTk(l), q:0}); y.q = r3(y.q + Number(l.cantidad||0)); }); });
+    Object.values(g).forEach((x,i)=>{ if(i) L.push({t:''}); L.push({t:(x.cli.tienda || x.cli.nombre || '').slice(0, W), b:true}); Object.values(x.ls).forEach(y=> L.push({t:dos(' ' + y.n.slice(0, W-12), fmtCant(y.pid, y.q))})); });
+  } else ls.forEach(x=>{
+    L.push({t:dos(x.nombre.slice(0, W-12), fmtCant(x.pid, x.pend > 0 ? x.pend : x.cant)), b:true});
+    if(x.falta > 0) L.push({t:dos('  FALTAN', fmtCant(x.pid, x.falta))});
+    if(x.pedidos.length > 1 || esKg(x.pid)) x.pedidos.filter(d=> !d.ent).forEach((d,i)=> L.push({t:dos(`  ${i+1}) ${d.cli}`.slice(0, W-10), fmtCant(x.pid, d.cant))}));
+  });
+  L.push({t:sep}); L.push({t:centro(new Date().toLocaleString('es-MX', {dateStyle:'short', timeStyle:'short'}))});
+  return L;
+}
+function compartirRelacion(){
+  const bg = dialogo(`<h3>Compartir lista</h3><p class="sub">${esc(relNombre(relDia))} · ${relModo==='cliente' ? 'por cliente' : 'por producto'}</p>
+    <div class="ec-ops"><button class="btn" data-a="img">${svg('share')}Imagen tipo ticket</button>${impSel() ? `<button class="btn ghost" data-a="imp">${svg('recibos')}Imprimir ticket</button>` : ''}<button class="btn ghost" data-a="txt">Texto (WhatsApp)</button><button class="btn ghost" data-a="no">Cerrar</button></div>`);
+  const doc = {tipo:'relacion', folio:'REL', fecha:new Date().toISOString(), total:0};
+  bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+  bg.querySelector('[data-a="txt"]').onclick = async ()=>{ bg.remove(); const t = textoRelacion();
+    try{ if(navigator.share){ await navigator.share({title:'Productos a entregar', text:t}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
+    copiarTexto(t, 'Lista copiada'); };
+  const ip = bg.querySelector('[data-a="imp"]'); if(ip) ip.onclick = ()=>{ const imp = impSel(); if(imp && (imp.conexion==='bt' || imp.conexion==='rawbt')) imprimirRecibo(doc); else toast('Tu impresora no admite este formato: compártelo como imagen'); };
+  bg.querySelector('[data-a="img"]').onclick = async ()=>{
+    const nombre = limpiarNombreArchivo('Productos a entregar ' + relNombre(relDia)) + '.png';
+    let blob = null; try{ blob = await imagenTicket(doc); }catch(_){}
+    if(!blob){ toast('No se pudo generar la imagen'); return; }
+    const file = new File([blob], nombre, {type:'image/png'});
+    try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:nombre}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
+    descargarBlob(blob, nombre); toast('Se descargó la imagen');
+  };
 }
 function bindRelacion(){
   document.querySelectorAll('[data-rm]').forEach(b=> b.onclick = ()=>{ relModo = b.dataset.rm; relRender(); });
   document.querySelectorAll('.rl-oc').forEach(b=> b.onclick = e=>{ e.stopPropagation(); crearOCFaltantes(b.dataset.prov); });
   document.querySelectorAll('[data-rd]').forEach(b=> b.onclick = ()=>{ relDia = b.dataset.rd; relAbierto = null; relRender(); });
-  const f = document.getElementById('rlFecha'); if(f) f.onchange = ()=>{ if(f.value){ relDia = f.value; relAbierto = null; relRender(); } };
+  const on = document.querySelector('#rlDias .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'});
+  const cal = document.getElementById('rlCal'); if(cal) cal.onclick = ()=> calendarioDias({sel:relDia, contar:k=> pedidosRel(k).filter(p=> p.estado==='Programado').length, nota:'El número indica las ventas pendientes de cada día.', alElegir:k=>{ relDia = k; relAbierto = null; relRender(); }});
+  const oc = document.getElementById('rlIrOC'); if(oc) oc.onclick = ()=>{ relModo = 'proveedor'; relSoloFalta = true; relRender(); };
   const rc = document.getElementById('rlCargar'); if(rc) rc.onclick = ()=>{
     if(!turnoActual()){ toast('Abre un turno para registrar la carga'); return; }
     const dia = relDia; go('inventario'); invVista = 'carga'; cargaDia = dia; invBorr = {}; alternarFuente('ped'); renderInventario(); window.scrollTo(0,0); };
   const sf = document.getElementById('rlFalta'); if(sf) sf.onclick = ()=>{ relSoloFalta = !relSoloFalta; relRender(); };
-  const sh = document.getElementById('rlShare'); if(sh) sh.onclick = async ()=>{ const t = textoRelacion();
-    try{ if(navigator.share){ await navigator.share({title:'Productos a entregar', text:t}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
-    copiarTexto(t, 'Lista copiada'); };
-  document.querySelectorAll('.rl-row').forEach(r=> r.onclick = ()=>{ const id = r.dataset.pid, abierto = r.querySelector('.rl-det');
-    relAbierto = abierto ? (esKg(id) ? '-' + id : null) : id; const y = window.scrollY; relRender(); window.scrollTo(0, y); });
+  const sh = document.getElementById('rlShare'); if(sh) sh.onclick = compartirRelacion;
+  const lm = document.getElementById('rlLimpiar'); if(lm) lm.onclick = ()=>{ const all = store.get('relCargado', {}); delete all[relClave()]; store.set('relCargado', all); relRender(); };
+  const y0 = ()=> window.scrollY;
+  document.querySelectorAll('[data-mk]').forEach(b=> b.onclick = e=>{ e.stopPropagation(); const y = y0(); relMarcar(b.dataset.mk); relRender(); window.scrollTo(0, y); });
+  document.querySelectorAll('.rl-cli[data-ped], .rl-cch [data-ped]').forEach(b=> b.onclick = e=>{ e.stopPropagation(); const id = b.dataset.ped; if(relEnInv()) go('preventa'); pedidoSel = id; ventaVista = 'pedidoDet'; renderVenta(); });
+  document.querySelectorAll('.rl-row:not([data-nox])').forEach(r=> r.onclick = ()=>{ const id = r.dataset.pid, abierto = r.querySelector('.rl-det');
+    relAbierto = abierto ? (esKg(id) ? '-' + id : null) : id; const y = y0(); relRender(); window.scrollTo(0, y); });
 }
 
 let pedidoSel = null;
@@ -4634,24 +4759,28 @@ function viewPedidos(){
   return `<div class="rc-wrap pd-wrap">${chips}<div class="cr-pad pd-head">${estados}${resumen}</div>${lista}</div>`;
 }
 const ordenHorario = h => /mañana/i.test(h||'') ? 1 : /tarde/i.test(h||'') ? 2 : /noche/i.test(h||'') ? 3 : 4;
-function calendarioPedidos(){
-  const hoy = hoyClave(); if(!pedCalMes) pedCalMes = (/^\d{4}-/.test(pedDia) ? pedDia : hoy).slice(0,7);
+function calendarioDias({sel, contar, nota, alElegir}){
+  const hoy = hoyClave(); let mes = (/^\d{4}-/.test(sel||'') ? sel : hoy).slice(0,7);
   const bg = dialogo('<div class="pd-cal"></div>'), box = bg.querySelector('.pd-cal');
   const pintar = ()=>{
-    const [y, m] = pedCalMes.split('-').map(Number), primero = new Date(y, m-1, 1), dIni = (primero.getDay()+6)%7, nDias = new Date(y, m, 0).getDate();
-    const cnt = {}; DB.pedidos.filter(p=> p.estado===ESTADO_PED[pedEstado]).forEach(p=>{ if((p.fechaEntrega||'').startsWith(pedCalMes)) cnt[p.fechaEntrega] = (cnt[p.fechaEntrega]||0) + 1; });
-    const celdas = Array(dIni).fill('<span></span>').concat(Array.from({length:nDias}, (_,i)=>{ const k = `${pedCalMes}-${String(i+1).padStart(2,'0')}`, n = cnt[k];
-      return `<button class="${k===hoy?'hoy ':''}${k===pedDia?'on ':''}${n?'con':''}" data-k="${k}">${i+1}${n ? `<i>${n}</i>` : ''}</button>`; }));
+    const [y, m] = mes.split('-').map(Number), primero = new Date(y, m-1, 1), dIni = (primero.getDay()+6)%7, nDias = new Date(y, m, 0).getDate();
+    const celdas = Array(dIni).fill('<span></span>').concat(Array.from({length:nDias}, (_,i)=>{ const k = `${mes}-${String(i+1).padStart(2,'0')}`, n = contar(k);
+      return `<button class="${k===hoy?'hoy ':''}${k===sel?'on ':''}${n?'con':''}" data-k="${k}">${i+1}${n ? `<i>${n}</i>` : ''}</button>`; }));
     box.innerHTML = `<div class="pd-cal-h"><button class="icon-btn" data-m="-1">‹</button><b>${primero.toLocaleDateString('es-MX',{month:'long', year:'numeric'})}</b><button class="icon-btn" data-m="1">›</button></div>
       <div class="pd-cal-g">${['L','M','M','J','V','S','D'].map(x=>`<small>${x}</small>`).join('')}${celdas.join('')}</div>
-      <p class="note-sm">El número indica las ventas ${pedEstado==='pend'?'pendientes':pedEstado==='ent'?'entregadas':'canceladas'} de cada día.</p>
+      <p class="note-sm">${nota}</p>
       <div class="sheet-actions"><button class="btn ghost" data-a="hoy">Hoy</button><button class="btn ghost" data-a="no">Cerrar</button></div>`;
-    box.querySelectorAll('[data-m]').forEach(b=> b.onclick = ()=>{ const d = new Date(y, m-1 + Number(b.dataset.m), 1); pedCalMes = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; pintar(); });
-    box.querySelectorAll('[data-k]').forEach(b=> b.onclick = ()=>{ pedDia = b.dataset.k; bg.remove(); renderVenta(); });
-    box.querySelector('[data-a="hoy"]').onclick = ()=>{ pedDia = hoy; pedCalMes = null; bg.remove(); renderVenta(); };
+    box.querySelectorAll('[data-m]').forEach(b=> b.onclick = ()=>{ const d = new Date(y, m-1 + Number(b.dataset.m), 1); mes = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; pintar(); });
+    box.querySelectorAll('[data-k]').forEach(b=> b.onclick = ()=>{ bg.remove(); alElegir(b.dataset.k); });
+    box.querySelector('[data-a="hoy"]').onclick = ()=>{ bg.remove(); alElegir(hoy); };
     box.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
   };
   pintar();
+}
+function calendarioPedidos(){
+  const est = ESTADO_PED[pedEstado];
+  calendarioDias({sel:pedDia, contar:k=> DB.pedidos.filter(p=> p.estado===est && p.fechaEntrega===k).length,
+    nota:`El número indica las ventas ${pedEstado==='pend'?'pendientes':pedEstado==='ent'?'entregadas':'canceladas'} de cada día.`, alElegir:k=>{ pedDia = k; renderVenta(); }});
 }
 
 /* Toque corto = agregar · mantener presionado = ver precio (persiana) */
@@ -5163,6 +5292,7 @@ const resumenImp = i => `${i.ancho} mm · ${i.modo==='grafico' ? 'Gráfico' : 'T
 function lineasTicket(r){
   if(r.tipo==='abono' || r.tipo==='ajuste') return lineasAbono(r);
   if(r.tipo==='estado') return lineasEstadoCuenta(r.cid);
+  if(r.tipo==='relacion') return lineasRelacion();
   const c = impCfg(), W = c.ancho >= 80 ? 48 : 32;
   const centro = t => { t = String(t).slice(0, W); const e = Math.floor((W - t.length)/2); return ' '.repeat(Math.max(0,e)) + t; };
   const dos = (a, b) => { a = String(a); b = String(b); const esp = W - a.length - b.length; return esp >= 1 ? a + ' '.repeat(esp) + b : a.slice(0, W - b.length - 1) + ' ' + b; };
