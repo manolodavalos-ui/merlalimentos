@@ -108,6 +108,8 @@ main.flush{padding:0}
 .sale-actions button:active{background:var(--brand-2)}
 .sale-actions button+button{border-left:1px solid rgba(255,255,255,.28)}
 .sale-actions .amt{display:block;font-size:1.05rem;margin-top:2px}
+/* Editando una venta programada: Programar entrega a la izquierda, Entregar y cobrar a la derecha */
+.sale-actions #btnEntregarEd{order:2;border-left:1px solid rgba(255,255,255,.28)}.sale-actions:has(#btnEntregarEd) > button:not(#btnEntregarEd){order:1;border-left:0}
 .filter{display:flex;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;margin-top:10px;overflow:hidden}
 .filter select,.filter input{flex:1;min-width:0;border:0;background:transparent;padding:12px;font:inherit;font-size:1rem;outline:none;color:var(--text)}
 .filter .icon-btn{border-left:1px solid var(--line);border-radius:0;width:48px;height:46px}
@@ -2071,7 +2073,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.55.2';
+const APP_VERSION = '0.55.3';
 
 /* ================= Íconos ================= */
 const I = {
