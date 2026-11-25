@@ -2073,7 +2073,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.55.3';
+const APP_VERSION = '0.55.4';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4530,7 +4530,7 @@ function pedidosRel(sel){
 const relNombre = sel => { const f = k => { const t = fechaCorta(k); return t.charAt(0).toUpperCase() + t.slice(1); };
   return sel==='semana' ? `Semana pendiente (al ${diaCorto(semanaFin()).toLowerCase()})` : sel==='atrasadas' ? 'Atrasadas' : sel===hoyClave() ? 'Hoy · ' + f(sel) : sel===manana() ? 'Mañana · ' + f(sel) : f(sel); };
 /* Días de visita del cliente en corto: "L, J" (FS si es foodservice) */
-const diasVisitaTxt = c => c ? [...(c.diasVisita||[]).map(d=> ({lun:'L',mar:'M',mie:'Mi',jue:'J',vie:'V',sab:'S',dom:'D'})[d]).filter(Boolean), c.canal==='FS' ? 'FS' : ''].filter(Boolean).join(', ') : '';
+const diasVisitaTxt = c => c ? [...(c.diasVisita||[]).map(d=> (DIAS.find(x=> x[0]===d)||[])[1]).filter(Boolean), c.canal==='FS' ? 'FS' : ''].filter(Boolean).join(', ') : '';   /* mismo formato que Clientes: "Lun, Jue" */
 const diaCorto = k => { const x = kDate(k); return DIAS_CORTOS[(x.getDay()+6)%7] + ' ' + x.getDate(); };
 function relacionDia(sel){
   /* Todos los pedidos del rango (pendientes y ya entregados): el total no se achica al entregar. Lo que falta se compara solo contra lo pendiente. */
