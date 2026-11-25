@@ -316,6 +316,9 @@ body.rc-con-sel #rcList{padding-bottom:130px}
 .cb-mod{display:block;margin-top:6px;padding:6px 10px;border-radius:10px;background:#fff8e6;color:#7a5200!important;font-size:.85rem}
 .rd-wa{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:16px 0 0;background:#1fa855}.rd-wa svg{width:20px;height:20px;stroke:currentColor}
 .tk-acts{align-items:stretch}.tk-acts .btn{margin:0!important;min-height:52px}
+.cj-tp{margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#fff8e6;color:#7a5200;font-size:.88rem}
+.tag-w{font-style:normal;font-size:.7rem;font-weight:700;padding:2px 6px;border-radius:999px;background:#fff1cc;color:#7a5200;vertical-align:2px}
+.rd-tr{margin-top:16px}.rd-tr .btn{display:flex;align-items:center;justify-content:center;gap:6px}.rd-tr svg{width:18px;height:18px;stroke:currentColor}
 #cpMet .dia:disabled{opacity:.4;text-decoration:line-through}
 .pd-edit-g{margin:8px 0 4px}
 .pd-volver{display:block;width:100%;margin:8px 0 0;min-height:0;padding:10px 12px;font-size:.95rem}
@@ -512,7 +515,7 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .cj-teo b{font-size:1.25rem;color:var(--text)}
 .cj-teo.cj-ven{margin-top:8px;background:#eef4fb;color:#1a5fb4;align-items:center}
 .cj-teo.cj-ven small{display:block;font-weight:500;font-size:.74rem;color:var(--muted);margin-top:2px}
-.cj-met{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.cj-met{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}
 .cj-met span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:10px;background:var(--bg);font-size:.78rem;color:var(--muted)}
 .cj-met svg{width:18px;height:18px;stroke:var(--brand)}
 .cj-met b{color:var(--text);font-size:.92rem}
@@ -2086,7 +2089,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.58.0';
+const APP_VERSION = '0.59.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2109,6 +2112,7 @@ const I = {
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
   alert:'<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+  bank:'<path d="M3 10h18M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18M12 3l9 5H3z"/>',
   card:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h2M11 15h3"/>',
   check:'<path d="M20 6L9 17l-5-5"/>',
   chev:'<path d="M9 18l6-6-6-6"/>',
@@ -2274,7 +2278,7 @@ function viewHistTurnoDet(){
       ${c.devol ? fila('Devoluciones de clientes', c.devol, '-', 'sub') : ''}
       ${fila('Ventas netas', c.netas, '', 'fuerte')}
       ${fila('Cobranza de créditos', c.cobranza, '', 'sub')}
-      <div class="cj-met">${['Efectivo','Tarjeta','Crédito'].map(m=>`<span>${svg(ICON_PAGO[m])}${m}<b>${fmt(c.porMetodo[m]||0)}</b></span>`).join('')}</div>
+      <div class="cj-met">${METODOS.map(m=>`<span>${svg(ICON_PAGO[m])}${m}<b>${fmt(c.porMetodo[m]||0)}</b></span>`).join('')}</div>${c.transfPend && c.transfPend.length ? `<p class="cj-tp">⚠ Transferencias por confirmar: <b>${c.transfPend.length} · ${fmt(sumar(c.transfPend, r=> r.total))}</b></p>` : ''}
       <p class="sub" style="margin:8px 0 0">${c.nRecibos} ${c.nRecibos===1?'recibo':'recibos'} en este turno</p>
     </div>
     ${h.liquidacion ? `<div class="card cajon"><h3>Liquidación de camioneta</h3>${h.liquidacion.lineas.filter(l=> l.dif).map(l=>`<div class="cj-row"><span>${esc(l.nombre)}<small class="ir-s">cargó ${fmtExist(l.cargado)} · vendió ${fmtExist(l.vendido)} · contado ${fmtExist(l.contado)}</small></span><b class="${l.dif<0?'neg':''}">${l.dif>0?'+':''}${fmtExist(l.dif)}</b></div>`).join('') || '<p class="sub" style="margin:0">Todo cuadró.</p>'}${fila('Diferencia a costo', h.liquidacion.totalDif, '', 'fuerte')}</div>` : ''}
@@ -2352,7 +2356,7 @@ function viewTurnoActual(){
       ${c.devol ? fila('Devoluciones de clientes', c.devol, '-', 'sub') : ''}
       ${fila('Ventas netas', c.netas, '', 'fuerte')}
       ${fila('Cobranza de créditos', c.cobranza, '', 'sub')}
-      <div class="cj-met">${['Efectivo','Tarjeta','Crédito'].map(m=>`<span>${svg(ICON_PAGO[m])}${m}<b>${fmt(c.porMetodo[m]||0)}</b></span>`).join('')}</div>
+      <div class="cj-met">${METODOS.map(m=>`<span>${svg(ICON_PAGO[m])}${m}<b>${fmt(c.porMetodo[m]||0)}</b></span>`).join('')}</div>${c.transfPend && c.transfPend.length ? `<p class="cj-tp">⚠ Transferencias por confirmar: <b>${c.transfPend.length} · ${fmt(sumar(c.transfPend, r=> r.total))}</b></p>` : ''}
       <p class="sub" style="margin:8px 0 0">${c.nRecibos} ${c.nRecibos===1?'recibo':'recibos'} en este turno · importes netos por forma de pago</p>
     </div>
     <div class="card cajon"><h3>Camioneta</h3>
@@ -2434,9 +2438,10 @@ function calcCajon(t){
     gastosCaj: r2(sumar(DB.egresos.filter(e=> !e.cancelado && e.delCajon && e.turno===t.folio), e=> e.total) + sumar(DB.egresos.filter(e=> !e.cancelado).flatMap(e=> (e.pagos||[]).filter(p=> p.delCajon && p.turno===t.folio)), p=> p.monto))
   };
   c.efVentas = r2(c.cobrosEf - c.descEf - c.cancEf);
+  c.transfPend = transfPendientes(t.folio);
   c.teorico = r2(c.fondo + c.cobrosEf + c.abonosEf - (c.gastosCaj||0) - c.descEf - c.cancEf + c.depositado - c.salidas);
   c.netas = r2(c.brutas - c.promo - c.descTotal - c.cancTotal - c.devol);
-  ['Efectivo','Tarjeta','Crédito'].forEach(m=>{
+  METODOS.forEach(m=>{
     c.porMetodo[m] = r2(sumar(recs.filter(r=>r.metodo===m), r=>r.total) - sumar(descs.filter(d=>d.recibo.metodo===m), d=>d.monto));
   });
   return c;
@@ -3190,6 +3195,7 @@ function viewCobro(){
     <div class="pay-opts">
       <button class="pay" id="payEfectivo">${svg('cash')}<span>Efectivo</span></button>
       <button class="pay" id="payTarjeta">${svg('card')}<span>Tarjeta</span></button>
+      <button class="pay" id="payTransf">${svg('bank')}<span>Transferencia</span></button>
       <button class="pay" id="payCredito">${svg('creditos')}<span>Crédito</span></button>
     </div>
   </div>`;
@@ -3214,6 +3220,7 @@ function bindCobro(){
     registrarVenta('Efectivo', rec);
   };
   document.getElementById('payTarjeta').onclick = ()=> registrarVenta('Tarjeta', total);
+  document.getElementById('payTransf').onclick = ()=> registrarVenta('Transferencia', total);
   document.getElementById('payCredito').onclick = ()=>{
     const c = ticket().cliente;
     if(c && c.id) return autorizarCredito(abrirCredito);
@@ -3268,7 +3275,8 @@ function registrarVenta(metodo, recibido, credito, opts = {}){
     usuario:session.usuario, vendedor:session.nombre, cliente:t.cliente || null,
     ticketNombre:t.nombre || null, comentario:t.comentario || null, ...(t.origenRec && !t.entregaPedido ? {origenRec:t.origenRec} : {}),
     lineas:congelarLineas(t.lineas), total, metodo,
-    recibido: metodo==='Efectivo' ? recibido : (metodo==='Tarjeta' ? total : (metodo==='Crédito' ? (credito?.anticipo||0) : 0)),
+    recibido: metodo==='Efectivo' ? recibido : (metodo==='Tarjeta' || metodo==='Transferencia' ? total : (metodo==='Crédito' ? (credito?.anticipo||0) : 0)),
+    ...(metodo==='Transferencia' ? {transf:{confirmado:false}} : {}),
     cambio: metodo==='Efectivo' ? r2(recibido - total) : 0,
     saldo: metodo==='Crédito' ? r2(total - (credito?.anticipo||0)) : 0,
     credito: metodo==='Crédito' ? (credito || null) : null,
@@ -3298,7 +3306,8 @@ function registrarVenta(metodo, recibido, credito, opts = {}){
   moverDevoluciones(recibo.devoluciones, 1, '#' + recibo.folio);
   guardarTicket({lineas:[]});
   ultimoRecibo = recibo;
-  if(impCfg().auto || t.entregaPedido) setTimeout(()=> imprimirRecibo(recibo, {cajon: metodo==='Efectivo'}), 400);
+  if(impCfg().auto || t.entregaPedido || metodo==='Transferencia') setTimeout(()=> imprimirRecibo(recibo, {cajon: metodo==='Efectivo'}), 400);
+  if(metodo==='Transferencia' && telRecibo(recibo)) setTimeout(()=> pedirComprobante(recibo), 1600);
   else if(metodo==='Efectivo') abrirCajonSiAplica();
   ventaVista = 'hecho'; renderVenta();
 }
@@ -3319,10 +3328,12 @@ function viewHecho(){
       ${r.metodo==='Crédito' && r.credito?.anticipo ? `<dt>Anticipo</dt><dd>${fmt(r.credito.anticipo)}</dd>` : ''}
       ${r.metodo==='Crédito' ? `<dt>Saldo a crédito</dt><dd>${fmt(r.saldo)}</dd>` : ''}
       ${r.metodo==='Crédito' && r.credito?.fechaPago ? `<dt>Fecha de pago</dt><dd>${fechaCorta(r.credito.fechaPago)}</dd>` : ''}
+      ${r.metodo==='Transferencia' && r.transf ? `<dt>Comprobante</dt><dd>${r.transf.confirmado ? `<b class="pos">Recibido ✓</b><small style="display:block;color:var(--muted)">${fecha(r.transf.fecha)} · ${esc(r.transf.vendedor||'')}</small>` : '<b class="warn">Por confirmar</b>'}</dd>` : ''}
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
       ${ahorroEspecial(r) > 0 ? `<dt>Ahorro por precio especial</dt><dd class="pos">${fmt(ahorroEspecial(r))}</dd>` : ''}
     </dl>
     ${r.metodo==='Crédito' && r.cliente?.id ? bloqueDeuda(r) : ''}
+    ${r.metodo==='Transferencia' ? `<button class="btn rd-wa" id="hechoComp">${svg('whatsapp')}Pedir comprobante por WhatsApp</button>` : ''}
     <div class="tk-acts"><button class="btn ghost" id="hechoPrint">${svg('recibos')}Imprimir</button><button class="btn ghost" id="hechoShare">${svg('share')}Compartir</button></div>
     <button class="btn" id="nuevaVenta">Nueva venta</button>
   </div>`;
@@ -3341,6 +3352,7 @@ function bindHecho(){
   document.getElementById('nuevaVenta').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
   document.getElementById('hechoPrint').onclick = ()=> imprimirRecibo(ultimoRecibo);
   document.getElementById('hechoShare').onclick = ()=> compartirRecibo(ultimoRecibo);
+  const hc = document.getElementById('hechoComp'); if(hc) hc.onclick = ()=> pedirComprobante(ultimoRecibo);
 }
 
 /* ================= Clientes (selector básico) ================= */
@@ -5045,7 +5057,7 @@ function renderHeader(){
     const enInv = current==='inventario' && invVista!=='inicio';
     const enCat = current==='catalogo' && catVista!=='ver';
     const detalle = (current==='recibos' && reciboSel) || enCli || enTes || enCfg || enArt || enCred || enInv || enCat || enHist;
-    title.textContent = enHist ? 'Turno ' + turnoHistSel : enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea (GitHub)', nube:'Nube', datos:'Datos y respaldo', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
+    title.textContent = enHist ? 'Turno ' + turnoHistSel : enCat ? 'Pedidos recibidos' : enInv ? TITULOS_INV[invVista] : enCred ? ({cliente:'Estado de cuenta', abono:'Registrar abono', hecho:'Comprobante', reportes:'Reportes de cobranza', abonos:'Abonos registrados', condiciones:'Condiciones de crédito'})[credVista] : enTes ? 'Gestión de tesorería' : enCfg ? ({transf:'Datos para transferencia', promos:'Promociones', devol:'Devoluciones', impresoras:'Impresoras', gh:'Catálogo en línea (GitHub)', nube:'Nube', datos:'Datos y respaldo', ticketDatos:'Datos del ticket', impEdit: impBorr && impBorr.id ? 'Editar impresora' : 'Nueva impresora'})[cfgVista] : enArt ? (artSel ? 'Editar producto' : 'Nuevo producto')
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente', ficha:'Cliente'})[cliVista]
       : (m ? m.label : '');
@@ -5094,7 +5106,8 @@ function abrirMas(){
 
 /* ================= Recibos ================= */
 let reciboSel = null, reciboQ = '';
-const ICON_PAGO = {'Efectivo':'cash','Tarjeta':'card','Crédito':'creditos'};
+const ICON_PAGO = {'Efectivo':'cash','Tarjeta':'card','Transferencia':'bank','Crédito':'creditos'};
+const METODOS = ['Efectivo','Tarjeta','Transferencia','Crédito'];
 const fechaLarga = d => d.toLocaleDateString('es-MX',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
 const hora = iso => new Date(iso).toLocaleTimeString('es-MX',{hour:'numeric', minute:'2-digit'});
 
@@ -5121,7 +5134,7 @@ function listaRecibosHTML(){
     if(clave !== dia){ dia = clave; html += `<div class="rc-day">${fechaLarga(d)}</div>`; }
     html += `<button class="rc-row${recSel.has(r.id) ? ' sel' : ''}${recSel.size ? ' selmode' : ''}" data-id="${r.id}">
       <span class="rc-ic${r.metodo==='Crédito'?' cred':''}">${recSel.has(r.id) ? '<b class="rc-ok">✓</b>' : svg(ICON_PAGO[r.metodo]||'cash')}</span>
-      <span class="rc-main"><b class="${anulado(r)?'tachado':''}">${fmt(r.total)}${r.version>1?` <i class="tag-v">v${r.version}</i>`:''}${anulado(r)?' <i class="tag-c">Cancelado</i>':''}</b><small>${hora(fechaRec(r))}${r.metodo!=='Efectivo'?' · '+esc(r.metodo):''}${r.cliente?' · '+esc(r.cliente.nombre||''):''}</small></span>
+      <span class="rc-main"><b class="${anulado(r)?'tachado':''}">${fmt(r.total)}${r.version>1?` <i class="tag-v">v${r.version}</i>`:''}${anulado(r)?' <i class="tag-c">Cancelado</i>':''}${r.metodo==='Transferencia' && r.transf && !r.transf.confirmado && !anulado(r) ? ' <i class="tag-w">por confirmar</i>' : ''}</b><small>${hora(fechaRec(r))}${r.metodo!=='Efectivo'?' · '+esc(r.metodo):''}${r.cliente?' · '+esc(r.cliente.nombre||''):''}</small></span>
       <span class="rc-folio">#${esc(r.folio)}</span>
     </button>`;
   });
@@ -5183,6 +5196,21 @@ function menuRecibo(r){
 }
 /* Cambiar la forma de pago de un recibo (Efectivo, Tarjeta o Crédito), ajustando el saldo del cliente */
 /* Modificar un ticket: se carga en Venta; al cobrar, el original se cancela (regresa inventario y saldo) y queda reemplazado por el nuevo */
+/* ----- Transferencias: datos bancarios (solo en este celular) y comprobantes ----- */
+const datosTransf = ()=> store.get('datosTransf', {});
+function msgComprobante(r){
+  const d = datosTransf(), neg = (store.get('config').negocio || impCfg().encabezado || 'Merkalimentos');
+  const datos = [d.banco ? `Banco: ${d.banco}` : '', d.tarjeta ? `Tarjeta: ${d.tarjeta}` : '', d.cuenta ? `Cuenta: ${d.cuenta}` : '', d.clabe ? `CLABE: ${d.clabe}` : '', d.beneficiario ? `Beneficiario: ${d.beneficiario}` : ''].filter(Boolean);
+  return `Hola ${r.cliente?.nombre || ''}, gracias por tu compra. Tu ticket #${r.folio} es por *${fmt(r.total)}*.` +
+    (datos.length ? `\n\nDatos para tu transferencia:\n${datos.join('\n')}` : '') +
+    `\n\nTe pedimos amablemente nos compartas por este medio el *comprobante de tu transferencia*. ¡Gracias! — ${neg}`;
+}
+function pedirComprobante(r){ const tel = telRecibo(r); if(!tel){ toast('El cliente no tiene teléfono registrado'); return; } abrirWa(urlWa(tel, msgComprobante(r))); }
+function confirmarComprobante(r){
+  confirmar({titulo:'Comprobante recibido', ok:'Confirmar', texto:`¿Ya recibiste el comprobante de la transferencia por <b>${fmt(r.total)}</b> del ticket #${esc(r.folio)}?`,
+    alAceptar:()=>{ r.transf = {confirmado:true, fecha:new Date().toISOString(), vendedor:session.nombre}; r.sincronizado = false; DB.guardarRecibo(r); toast('Transferencia confirmada ✓'); current==='recibos' ? renderRecibos() : renderVenta(); }});
+}
+const transfPendientes = turnoFolio => DB.recibos.filter(r=> r.metodo==='Transferencia' && !anulado(r) && r.transf && !r.transf.confirmado && (!turnoFolio || r.turno===turnoFolio));
 /* Ticket por WhatsApp directo al chat del cliente */
 const telRecibo = r => r?.cliente?.telefono || (r?.cliente?.id && (clientes().find(c=> c.id===r.cliente.id)||{}).telefono) || '';
 function msgReciboWa(r){
@@ -5241,7 +5269,7 @@ function cambiarFormaPago(r, cliElegido){
   let nuevo = r.metodo==='Crédito' ? 'Efectivo' : r.metodo==='Efectivo' ? 'Tarjeta' : 'Efectivo';
   const bg = dialogo(`<h3>Cambiar forma de pago</h3>
     <p class="sub">Ticket #${esc(r.folio)} · <b>${fmt(r.total)}</b> · ahora: <b>${esc(r.metodo)}</b>${r.metodo==='Crédito' ? ` (saldo ${fmt(r.saldo||0)})` : ''}</p>
-    <div class="dias" id="cpMet">${['Efectivo','Tarjeta','Crédito'].map(m=>`<button class="dia${m===nuevo?' on':''}" data-m="${m}" ${m===r.metodo?'disabled':''}>${m}</button>`).join('')}</div>
+    <div class="dias" id="cpMet">${METODOS.map(m=>`<button class="dia${m===nuevo?' on':''}" data-m="${m}" ${m===r.metodo?'disabled':''}>${m}</button>`).join('')}</div>
     <div id="cpCred" class="hidden">
       <div class="cli-bar static" style="margin:10px 0">${svg('clientes')}<span><b id="cpCli">${cli ? esc(cli.nombre + (cli.tienda ? ' · ' + cli.tienda : '')) : 'Sin cliente'}</b><small>${cli ? (()=>{ const d = deudaCliente(cli.id); return d.recibos.length ? `Ya debe ${fmt(d.total)}` : 'Sin deuda pendiente'; })() : 'El crédito necesita un cliente'}</small></span><button class="lnk" id="cpCambiarCli">${cli ? 'Cambiar' : 'Elegir'}</button></div>
       <label for="cpFecha">Fecha de pago</label>
@@ -5280,6 +5308,7 @@ function cambiarFormaPago(r, cliElegido){
       r.cambiosPago = [...(r.cambiosPago||[]), {fecha:new Date().toISOString(), usuario:session.usuario, vendedor:session.nombre, de, a:nuevo, saldoAnterior:r.saldo||0, turno:ta?.folio || null}];
       if(nuevo==='Crédito'){ r.cliente = cli; r.credito = {fechaPago:fechaP, nota:bg.querySelector('#cpNota').value.trim(), anticipo:a}; r.recibido = a; r.saldo = r2(r.total - a); }
       else { r.credito = null; r.saldo = 0; r.recibido = r.total; }
+      if(nuevo==='Transferencia') r.transf = r.transf || {confirmado:false}; else delete r.transf;
       r.cambio = 0; r.metodo = nuevo; r.sincronizado = false;
       DB.guardarRecibo(r);
       toast(`Forma de pago cambiada: ${de} → ${nuevo}`); renderRecibos();
@@ -5782,6 +5811,11 @@ function viewConfig(){
   if(cfgVista==='gh') return viewGhCfg();
   if(cfgVista==='nube') return viewNubeCfg();
   if(cfgVista==='datos') return viewDatosCfg();
+  if(cfgVista==='transf'){ const d = datosTransf(), campo = (id, lbl, ph, im='text') => `<div class="gfield"><label for="${id}">${lbl}</label><input id="${id}" inputmode="${im}" autocomplete="off" value="${esc(d[id.slice(2)]||'')}" placeholder="${ph}"></div>`;
+    return `<div class="gform cf"><p class="sub">Estos datos se incluyen en el mensaje que pide el comprobante al cliente. Se guardan <b>solo en este celular</b>: no se publican en el catálogo ni en la nube.</p>
+      ${campo('dtbanco','Institución bancaria','Ej. HSBC')}${campo('dttarjeta','Número de tarjeta','16 dígitos','numeric')}${campo('dtcuenta','Número de cuenta','Opcional','numeric')}${campo('dtclabe','CLABE interbancaria','18 dígitos, opcional','numeric')}${campo('dtbeneficiario','Nombre del beneficiario','Como aparece en la cuenta')}
+      <button class="btn" id="dtGuardarTr">Guardar</button>
+      <p class="note-sm" style="text-align:left">Vista previa del mensaje:</p><pre class="ec-pre" id="dtPrev"></pre></div>`; }
   const c = impCfg();
   return `<div class="cl-home">
     <button class="cl-opt" id="optPromo"><span class="cl-opt-ic">${svg('articulos')}</span><span><b>Promociones</b><small>${store.get('articulos',[]).filter(a=>!a.borrado && a.promo).length} configuradas · ${articulos().filter(promoActiva).length} vigentes</small></span>${svg('chev')}</button>
@@ -5789,6 +5823,7 @@ function viewConfig(){
     <button class="cl-opt" id="optDatos"><span class="cl-opt-ic">${svg('download')}</span><span><b>Datos y respaldo</b><small>${store.get('ultimoRespaldo', null) ? 'Último respaldo ' + new Date(store.get('ultimoRespaldo')).toLocaleDateString('es-MX',{day:'numeric', month:'short'}) : 'Sin respaldos'} · borrar datos de prueba</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optNube"><span class="cl-opt-ic">${svg('share')}</span><span><b>Nube: catálogo y pedidos en línea</b><small>${fbUser ? 'Conectado · ' + esc(fbUser.email || '') + (fbVivo ? ' · recibiendo pedidos' : '') : fbCfg().email ? 'Conectando…' : 'Sin conectar'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optGh"><span class="cl-opt-ic">${svg('catalogo')}</span><span><b>Catálogo en línea</b><small>${ghCfg().token ? 'Clave de GitHub guardada' + (ghCfg().publicado ? ' · publicado ' + new Date(ghCfg().publicado).toLocaleDateString('es-MX',{day:'numeric',month:'short'}) : '') : 'Falta la clave para publicar'}</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optTransf"><span class="cl-opt-ic">${svg('bank')}</span><span><b>Datos para transferencia</b><small>${datosTransf().banco ? esc(datosTransf().banco) + (datosTransf().tarjeta ? ' · tarjeta ···' + esc(String(datosTransf().tarjeta).replace(/\s/g,'').slice(-4)) : '') : 'Banco, tarjeta, cuenta y CLABE para el mensaje al cliente'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optWa"><span class="cl-opt-ic">${svg('whatsapp')}</span><span><b>WhatsApp para enviar mensajes</b><small>${waApp()==='business' ? 'WhatsApp Business' : waApp()==='normal' ? 'WhatsApp normal' : 'Preguntar cada vez'}</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optImp"><span class="cl-opt-ic">${svg('recibos')}</span><span><b>Impresoras</b><small>${impSel() ? esc(impSel().nombre) + ' · ' + esc(CONEXIONES[impSel().conexion].nombre) + ' · ' + resumenImp(impSel()) : 'Ninguna configurada'}${impresoras().length > 1 ? ' · ' + impresoras().length + ' impresoras' : ''}</small></span>${svg('chev')}</button>
   </div>`;
@@ -5824,11 +5859,19 @@ function renderConfig(conservar){
     };
     document.getElementById('optNube').onclick = ()=>{ cfgVista='nube'; renderConfig(); if(fbCfg().email && !FB) fbCargar().then(()=> renderConfig(true)).catch(()=> renderConfig(true)); };
     document.getElementById('optDatos').onclick = ()=>{ cfgVista='datos'; renderConfig(); };
+    document.getElementById('optTransf').onclick = ()=>{ cfgVista='transf'; renderConfig(); };
     return;
   }
   if(cfgVista==='devol'){ document.getElementById('dvGuardar').onclick = guardarDevolCfg; return; }
   if(cfgVista==='gh'){ document.getElementById('ghGuardar').onclick = guardarGhForm; return; }
   if(cfgVista==='nube'){ bindNubeCfg(); return; }
+  if(cfgVista==='transf'){
+    const leer = ()=> Object.fromEntries(['banco','tarjeta','cuenta','clabe','beneficiario'].map(k=> [k, document.getElementById('dt'+k).value.trim()]));
+    const prev = ()=>{ const old = store.get('datosTransf', {}); store.set('datosTransf', leer()); document.getElementById('dtPrev').textContent = msgComprobante({cliente:{nombre:'Sra Ana María'}, folio:'1-251125-001', total:575.5}).replace(/\*/g,''); store.set('datosTransf', old); };
+    document.querySelectorAll('.gform input').forEach(i=> i.oninput = prev); prev();
+    document.getElementById('dtGuardarTr').onclick = ()=>{ store.set('datosTransf', leer()); toast('Datos guardados en este celular'); cfgVista = 'inicio'; renderConfig(); };
+    return;
+  }
   if(cfgVista==='datos'){ document.getElementById('dtResp').onclick = ()=> descargarRespaldo(); document.getElementById('dtRest').onchange = e=>{ const f = e.target.files[0]; if(f) restaurarRespaldo(f); }; const l = document.getElementById('dtLimpiar'); if(l) l.onclick = limpiarDatosPrueba; return; }
   if(cfgVista==='promos'){
     document.querySelectorAll('.pm-sw').forEach(sw=> sw.onchange = ()=>{
@@ -5884,11 +5927,13 @@ function viewReciboDetalle(r){
       ${(r.pagos||[]).length ? `<dt>Abonado</dt><dd>${fmt(abonado(r))} en ${r.pagos.length} ${r.pagos.length===1?'abono':'abonos'}</dd>` : ''}
       ${r.metodo==='Crédito' ? `<dt>Saldo pendiente</dt><dd>${fmt(r.saldo)}</dd>` : ''}
       ${r.metodo==='Crédito' && r.credito?.fechaPago ? `<dt>Fecha de pago</dt><dd>${fechaCorta(r.credito.fechaPago)}</dd>` : ''}
+      ${r.metodo==='Transferencia' && r.transf ? `<dt>Comprobante</dt><dd>${r.transf.confirmado ? `<b class="pos">Recibido ✓</b><small style="display:block;color:var(--muted)">${fecha(r.transf.fecha)} · ${esc(r.transf.vendedor||'')}</small>` : '<b class="warn">Por confirmar</b>'}</dd>` : ''}
       ${r.credito?.nota ? `<dt>Nota</dt><dd>${esc(r.credito.nota)}</dd>` : ''}
       ${(r.cambiosPago||[]).map(c=> `<dt>Cambio de pago</dt><dd>${esc(c.de)} → ${esc(c.a)}<small style="display:block;color:var(--muted)">${fecha(c.fecha)} · ${esc(c.vendedor||c.usuario)}</small></dd>`).join('')}
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
       ${ahorroEspecial(r) > 0 ? `<dt>Ahorro por precio especial</dt><dd class="pos">${fmt(ahorroEspecial(r))}</dd>` : ''}
     </dl>
+    ${r.metodo==='Transferencia' && r.transf && !r.transf.confirmado && !anulado(r) ? `<div class="tk-acts rd-tr"><button class="btn" id="rdCompOk">✓ Comprobante recibido</button>${telRecibo(r) ? `<button class="btn ghost" id="rdCompPide">${svg('whatsapp')}Pedir comprobante</button>` : ''}</div>` : ''}
     ${!anulado(r) && telRecibo(r) ? `<button class="btn rd-wa" id="rdWa">${svg('whatsapp')}Enviar por WhatsApp a ${esc((r.cliente?.nombre||'').split(' ').slice(0,2).join(' ') || 'cliente')}</button>` : ''}
     <div class="tk-acts"><button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir${r.version>1 ? ' v'+r.version : ''}</button><button class="btn ghost" id="rdShare">${svg('share')}Compartir</button></div>
   </div>`;
@@ -5907,6 +5952,8 @@ function renderRecibos(){
       const pb = document.getElementById('rdPrint'); if(pb) pb.onclick = ()=> imprimirRecibo(r);
       const sb = document.getElementById('rdShare'); if(sb) sb.onclick = ()=> compartirRecibo(r);
       const wb = document.getElementById('rdWa'); if(wb) wb.onclick = ()=> enviarReciboWa(r);
+      const co = document.getElementById('rdCompOk'); if(co) co.onclick = ()=> confirmarComprobante(r);
+      const cp = document.getElementById('rdCompPide'); if(cp) cp.onclick = ()=> pedirComprobante(r);
       document.querySelectorAll('[data-ir]').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.ir; reciboVista = 'detalle'; renderRecibos(); });
     }
     window.scrollTo(0,0); return;
@@ -8540,7 +8587,7 @@ function infResumen(comp){
     </div>` : '')(gastosRango(infDesde, infHasta))}
     <div class="card cajon inf-card"><h3>Ventas ${nombreModo}</h3>${leyenda(comp)}${barras('tiempo', sA.labels, sA.val, sB ? sB.val : null, {cada:sA.cada, tips:tipsT})}</div>
     <div class="card cajon inf-card"><h3>Por día de la semana</h3><p class="sub" style="margin:0 0 6px">Total vendido cada día de visita en el periodo</p>${leyenda(comp)}${barras('semana', DIAS_CORTOS, semA, rB ? semB : null)}</div>
-    <div class="card cajon inf-card"><h3>Forma de pago</h3>${['Efectivo','Tarjeta','Crédito'].map(m=>`<div class="cj-row"><span>${m}</span><b>${fmt(A.met[m]||0)} ${B ? delta(A.met[m]||0, B.met[m]||0) : ''}</b></div>`).join('')}</div>
+    <div class="card cajon inf-card"><h3>Forma de pago</h3>${METODOS.map(m=>`<div class="cj-row"><span>${m}</span><b>${fmt(A.met[m]||0)} ${B ? delta(A.met[m]||0, B.met[m]||0) : ''}</b></div>`).join('')}</div>
     ${cardCobranza(comp)}
   </div>`;
 }
