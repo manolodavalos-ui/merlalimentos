@@ -286,6 +286,7 @@ body.rc-con-sel #rcList{padding-bottom:130px}
 .rl-ayuda{margin:6px 0 0;font-size:.78rem;color:var(--muted);text-align:center}
 .rl-cli{align-items:center}.rl-cli>span:first-child{display:flex;flex-direction:column;min-width:0}.rl-cn{font-weight:600;font-size:.95rem}
 .rl-dia{font-style:normal;font-weight:700;color:var(--brand);background:#e5f2eb;border-radius:6px;padding:0 6px;margin-right:2px}.rl-dia.atr{color:var(--danger);background:#fdecea}
+.rl-ent{font-style:normal;font-weight:600;color:#5b6461}.rl-ent.atr{color:var(--danger)}
 .rl-cr{display:flex;align-items:center;gap:10px;flex:0 0 auto}
 .rl-map{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--brand)}.rl-map svg{width:18px;height:18px;stroke:currentColor}
 .rl-q .rl-map{margin-top:2px;width:30px;height:30px}
@@ -2070,7 +2071,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.55.1';
+const APP_VERSION = '0.55.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4526,6 +4527,8 @@ function pedidosRel(sel){
 }
 const relNombre = sel => { const f = k => { const t = fechaCorta(k); return t.charAt(0).toUpperCase() + t.slice(1); };
   return sel==='semana' ? `Semana pendiente (al ${diaCorto(semanaFin()).toLowerCase()})` : sel==='atrasadas' ? 'Atrasadas' : sel===hoyClave() ? 'Hoy · ' + f(sel) : sel===manana() ? 'Mañana · ' + f(sel) : f(sel); };
+/* Días de visita del cliente en corto: "L, J" (FS si es foodservice) */
+const diasVisitaTxt = c => c ? [...(c.diasVisita||[]).map(d=> ({lun:'L',mar:'M',mie:'Mi',jue:'J',vie:'V',sab:'S',dom:'D'})[d]).filter(Boolean), c.canal==='FS' ? 'FS' : ''].filter(Boolean).join(', ') : '';
 const diaCorto = k => { const x = kDate(k); return DIAS_CORTOS[(x.getDay()+6)%7] + ' ' + x.getDate(); };
 function relacionDia(sel){
   /* Todos los pedidos del rango (pendientes y ya entregados): el total no se achica al entregar. Lo que falta se compara solo contra lo pendiente. */
@@ -4564,7 +4567,7 @@ function filaProducto(x, M){
     <span class="rl-q"><b>${fmtCant(x.pid, x.cant)}</b>${x.pend <= 0.0005 ? `<i class="tag-v">entregado ✓</i>` : x.falta > 0 ? `<i class="tag-c">faltan ${fmtCant(x.pid, x.falta)}</i>` : `<i class="tag-v">alcanza</i>`}</span>
     ${abierto ? `<div class="rl-det">${esKg(x.pid) ? '<p class="rl-sep">Separar por entrega:</p>' : ''}${x.pedidos.map((d,i)=>{ const cl = clientes().find(c=> c.id===d.cid), atr = !d.ent && (d.fecha||'') < hoyClave();
         return `<div class="rl-cli" data-ped="${d.id}"><span>${esKg(x.pid) ? `<i class="rl-n">${i+1}</i>` : ''}<b class="rl-cn">${esc(d.cli)}</b>
-          <small><i class="rl-dia${atr ? ' atr' : ''}">${atr ? '⚠ ' : ''}${d.fecha ? diaCorto(d.fecha) : ''}</i> #${esc(d.folio)}${d.horario && !/cualquier/i.test(d.horario) ? ' · ' + esc(d.horario) : ''}${d.ent ? ' · entregado ✓' : ''}</small></span>
+          <small>${diasVisitaTxt(cl) ? `<i class="rl-dia">${diasVisitaTxt(cl)}</i> ` : ''}${relDia==='semana' || relDia==='atrasadas' || atr ? `<i class="rl-ent${atr ? ' atr' : ''}">${atr ? '⚠ ' : ''}entrega ${diaCorto(d.fecha)}</i> ` : ''}#${esc(d.folio)}${d.horario && !/cualquier/i.test(d.horario) ? ' · ' + esc(d.horario) : ''}${d.ent ? ' · entregado ✓' : ''}</small></span>
           <span class="rl-cr">${cl && cl.lat!=null ? `<a class="rl-map" href="${linkMapa(cl.lat, cl.lng)}" target="_blank" rel="noopener" aria-label="Ver en el mapa">${svg('mapa')}</a>` : ''}<b>${fmtCant(x.pid, d.cant)} ›</b></span></div>`; }).join('')}</div>`
       : `<span class="rl-inline">${inline} <b>▾</b></span>`}
   </div>`;
@@ -4580,7 +4583,7 @@ function vistaPorCliente(R, M){
     const cl = clientes().find(c=> c.id===x.cli.id);
     return `<div class="rl-cc${marc?' marcado':''}${todo?' ent':''}" data-mk="c:${x.k}">
       <div class="rl-cch">
-        <span class="rl-t" data-ped="${x.peds[0].id}" role="button"><b>${marc ? '<i class="rl-ok">✓</i> ' : ''}${esc(x.cli.tienda || x.cli.nombre || '')}</b><small>${x.cli.tienda ? esc(x.cli.nombre)+' · ' : ''}${x.peds.map(p=> '#'+esc(p.folio) + (relDia==='semana'||relDia==='atrasadas' ? ' ' + diaCorto(p.fechaEntrega) : '')).join(', ')} · ${esc(x.peds[0].horario||'')}</small></span>
+        <span class="rl-t" data-ped="${x.peds[0].id}" role="button"><b>${marc ? '<i class="rl-ok">✓</i> ' : ''}${esc(x.cli.tienda || x.cli.nombre || '')}</b><small>${diasVisitaTxt(cl) ? `<i class="rl-dia">${diasVisitaTxt(cl)}</i> ` : ''}${x.cli.tienda ? esc(x.cli.nombre)+' · ' : ''}${x.peds.map(p=> '#'+esc(p.folio) + (relDia==='semana'||relDia==='atrasadas' ? ' ' + diaCorto(p.fechaEntrega) : '')).join(', ')} · ${esc(x.peds[0].horario||'')}</small></span>
         <span class="rl-q"><b>${fmt(x.total)}</b>${todo ? '<i class="tag-v">entregado ✓</i>' : marc ? '<i class="tag-v">armado</i>' : ''}${cl && cl.lat!=null ? `<a class="rl-map" href="${linkMapa(cl.lat, cl.lng)}" target="_blank" rel="noopener" aria-label="Ver en el mapa">${svg('mapa')}</a>` : ''}</span></div>
       <div class="rl-ccl">${Object.values(x.lineas).map(l=> `<div><b>${fmtCant(l.pid, l.cant)}</b><span>${esc(l.nombre)}</span></div>`).join('')}</div>
     </div>`; }).join('');
