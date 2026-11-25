@@ -317,6 +317,7 @@ body.rc-con-sel #rcList{padding-bottom:130px}
 .rd-wa{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:16px 0 0;background:#1fa855}.rd-wa svg{width:20px;height:20px;stroke:currentColor}
 .tk-acts{align-items:stretch}.tk-acts .btn{margin:0!important;min-height:52px}
 .rd-num{width:100%;margin:10px 0 0}
+.cf-hist{display:flex;flex-direction:column;gap:4px;margin:6px 0 2px;font-size:.85rem}.cf-hist span{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding:3px 0}.cf-hist i{font-style:normal;color:var(--muted)}
 .cj-tp{margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#fff8e6;color:#7a5200;font-size:.88rem}
 .tag-w{font-style:normal;font-size:.7rem;font-weight:700;padding:2px 6px;border-radius:999px;background:#fff1cc;color:#7a5200;vertical-align:2px}
 .rd-tr{margin-top:16px}.rd-tr .btn{display:flex;align-items:center;justify-content:center;gap:6px}.rd-tr svg{width:18px;height:18px;stroke:currentColor}
@@ -2090,7 +2091,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.59.1';
+const APP_VERSION = '0.59.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3815,6 +3816,9 @@ function viewClienteFicha(c){
       <button class="cg-tk" id="cliTickets"${tk.length?'':' disabled'}>${svg('recibos')}<span><b>Ver tickets del cliente</b></span></button>
     </div>
     ${peds.length ? `<div class="card cajon"><h3>Ventas programadas</h3>${peds.map(p=> `<button class="cj-row cf-ped" data-cfped="${p.id}"><span>#${esc(p.folio)}<small class="ir-s">Entrega ${fechaCorta(p.fechaEntrega)}</small></span><b>${fmt(p.total)} ›</b></button>`).join('')}</div>` : ''}
+    ${(()=>{ const h = histCatDe(c.id); return `<div class="card cajon"><h3>Catálogo enviado</h3>
+      ${h.length ? fila('Envíos', `${h.length} · último ${fCorta2(h[0].f)}`) + `<div class="cf-hist">${h.slice(0,6).map(x=> `<span>${new Date(x.f).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}<i>${x.modo==='serie' ? 'envío del día' : x.modo==='anterior' ? 'registro previo' : 'individual'}${x.tel && soloDigitos(c.telefono||'') && !soloDigitos(c.telefono).endsWith(x.tel.slice(-10)) ? ' · a otro número' : ''}</i></span>`).join('')}</div>` : '<p class="note-sm" style="text-align:left;margin:4px 0">Aún no se le ha enviado el catálogo.</p>'}
+      <button class="cg-tk" id="cfCat">${svg('whatsapp')}<span><b>Enviar catálogo ahora</b></span></button></div>`; })()}
     <div class="card cajon"><h3>Crédito</h3>
       ${fila('Saldo pendiente', `<span class="${deuda.total>0?'neg':''}">${fmt(deuda.total)}</span>${deuda.recibos.length ? ` <small>(${deuda.recibos.length} ${deuda.recibos.length===1?'ticket':'tickets'})</small>` : ''}`)}
       ${fila('Condiciones', `${cc.limite ? 'Límite ' + fmt(cc.limite) + ' · ' : ''}${cc.dias} días${cc.bloqueado ? ' · <span class="neg">bloqueado</span>' : ''}`)}
@@ -3862,6 +3866,7 @@ function renderClientes(conservar){
   if(cliVista==='ficha'){
     const ed = document.getElementById('cfEditar'); if(ed) ed.onclick = ()=>{ cliVista = 'editar'; cliBorrador = null; renderClientes(); };
     const ec = document.getElementById('cfEdo'); if(ec) ec.onclick = ()=> opcionesEstadoCuenta(cliSel);
+    const ct = document.getElementById('cfCat'); if(ct) ct.onclick = ()=> enviarCatalogo(cliSel);
     document.querySelectorAll('[data-cfped]').forEach(b=> b.onclick = ()=>{ go('preventa'); pedidoSel = b.dataset.cfped; ventaVista = 'pedidoDet'; renderVenta(); });
     window.scrollTo(0,0); return;
   }
@@ -7257,7 +7262,7 @@ function elegirClienteSimple(cb, titulo = 'Enviar catálogo a…'){
     const conTel = ls.filter(c=> soloDigitos(c.telefono||'').length >= 10), pend = conTel.filter(c=> !enviadoHoy(c.id));
     bg.querySelector('#ecL').innerHTML = (ecDia ? `<p class="note-sm" style="text-align:left;margin:4px 0">${ls.length} ${ls.length===1?'cliente':'clientes'}${ecDia!=='FS' ? ' en orden de ruta' : ''}${conTel.length - pend.length ? ` · ${conTel.length - pend.length} ya enviados hoy ✓` : ''}${ls.length - conTel.length ? ` · ${ls.length - conTel.length} sin teléfono` : ''}</p>
         ${pend.length && !q ? `<button class="btn" id="ecTodos" style="margin:4px 0 10px">${svg('whatsapp')}Enviar a todos (${pend.length})</button>` : ''}` : '') + (ls.slice(0, ecDia ? 300 : 80)
-      .map(c=>`<button class="ea-row" data-id="${c.id}"><b>${esc(c.tienda || c.nombre)}${enviadoHoy(c.id) ? ' <i class="tag-v">enviado ✓</i>' : ''}</b><small>${c.tienda?esc(c.nombre)+' · ':''}${c.telefono ? esc(c.telefono) : 'sin teléfono'}${Object.keys(c.preciosEspeciales||{}).length ? ' · precios especiales' : ''}</small></button>`).join('') || '<p class="note-sm">Sin resultados</p>');
+      .map(c=>`<button class="ea-row" data-id="${c.id}"><b>${esc(c.tienda || c.nombre)}${enviadoHoy(c.id) ? ' <i class="tag-v">enviado ✓</i>' : ''}</b><small>${c.tienda?esc(c.nombre)+' · ':''}${c.telefono ? esc(c.telefono) : 'sin teléfono'}${Object.keys(c.preciosEspeciales||{}).length ? ' · precios especiales' : ''}${(h=> h.length ? ` · último catálogo ${fCorta2(h[0].f)} (${h.length} ${h.length===1?'envío':'envíos'})` : ' · <b class="warn">nunca enviado</b>')(histCatDe(c.id))}</small></button>`).join('') || '<p class="note-sm">Sin resultados</p>');
     bg.querySelectorAll('.ea-row').forEach(r=> r.onclick = ()=>{ bg.remove(); cb(r.dataset.id); });
     const tt = bg.querySelector('#ecTodos'); if(tt) tt.onclick = ()=>{ const et = ecDia==='FS' ? 'Foodservice' : (DIAS.find(d=> d[0]===ecDia)||[])[1] || ecDia; bg.remove(); iniciarSerie(pend.map(c=> c.id), et); }; };
   bindChipsDiasCli(bg, 'ecDias', d=>{ ecDia = d; pintar(); });
@@ -7266,8 +7271,17 @@ function elegirClienteSimple(cb, titulo = 'Enviar catálogo a…'){
 const msgCatalogo = (c, tok)=> `Hola ${c.nombre}, te comparto *Cliente consentido Merkalimentos*, nuestro catálogo${Object.keys(c.preciosEspeciales||{}).length ? ' con tus precios especiales' : ''}. Desde ahí puedes hacer tu pedido y lo puedes agregar a tu pantalla de inicio:\n${linkCatalogo(tok)}`;
 const catEnviados = ()=> store.get('catEnviados', {});
 const enviadoHoy = cid => { const v = catEnviados()[cid]; return !!v && hoyClave(new Date(v)) === hoyClave(); };
-function marcarEnviado(cid){ const m = catEnviados(); m[cid] = new Date().toISOString(); store.set('catEnviados', m); }
-function abrirCatalogoWa(c){ marcarEnviado(c.id); abrirWa(urlWa(c.telefono, msgCatalogo(c, tokenCliente(c.id)))); }
+/* Historial de envíos del catálogo por cliente (se incluye en el respaldo): {cid: [{f, modo, tel}]} */
+const catHist = ()=> store.get('catHist', {});
+const histCatDe = cid => (catHist()[cid] || []).slice().sort((a,b)=> b.f.localeCompare(a.f));
+function marcarEnviado(cid, modo = 'individual', tel = ''){
+  const ahora = new Date().toISOString(), m = catEnviados(); m[cid] = ahora; store.set('catEnviados', m);
+  const h = catHist(); h[cid] = [...(h[cid]||[]), {f:ahora, modo, tel:soloDigitos(tel||'')}].slice(-40); store.set('catHist', h);
+}
+(function migrarHistCat(){ const h = store.get('catHist', null); if(h) return; const m = store.get('catEnviados', {}), n = {};
+  Object.entries(m).forEach(([cid, f])=> n[cid] = [{f, modo:'anterior'}]); store.set('catHist', n); })();
+const fCorta2 = f => new Date(f).toLocaleDateString('es-MX', {day:'numeric', month:'short'});
+function abrirCatalogoWa(c, modo = 'individual'){ marcarEnviado(c.id, modo, c.telefono); abrirWa(urlWa(c.telefono, msgCatalogo(c, tokenCliente(c.id)))); }
 /* WhatsApp solo abre con un toque directo: después de publicar, se pide un toque para abrirlo */
 function botonParaAbrir(titulo, texto, ok, fn){
   const bg = dialogo(`<h3>${titulo}</h3><p class="sub">${texto}</p><div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">${svg('whatsapp')}${ok}</button></div>`);
@@ -7320,7 +7334,7 @@ function pintarSerie(){
     : `<div class="sc-top"><span><b>Envío terminado · ${esc(st.etiqueta)}</b><small>${env} de ${total} enviados${(st.saltados||[]).length ? ` · ${st.saltados.length} saltados` : ''}</small></span></div>
       <div class="sc-acts"><button class="btn" id="scFin">Listo</button></div>`;
   const on = (id, f)=>{ const b = el.querySelector('#' + id); if(b) b.onclick = f; };
-  on('scEnviar', ()=>{ const s2 = serieCat(), cc = clientes().find(x=> x.id===s2.ids[s2.idx]); if(!cc) return; abrirCatalogoWa(cc); s2.idx++; store.set('serieCat', s2); setTimeout(pintarSerie, 400); });
+  on('scEnviar', ()=>{ const s2 = serieCat(), cc = clientes().find(x=> x.id===s2.ids[s2.idx]); if(!cc) return; abrirCatalogoWa(cc, 'serie'); s2.idx++; store.set('serieCat', s2); setTimeout(pintarSerie, 400); });
   on('scSaltar', ()=>{ avanzarSerie(true); pintarSerie(); });
   on('scX', ()=> confirmar({titulo:'Terminar envío', ok:'Terminar', texto:`Llevas ${env} de ${total}. Puedes retomarlo después desde Enviar catálogo: los ya enviados hoy aparecen con ✓.`, alAceptar: terminarSerie}));
   on('scFin', terminarSerie);
