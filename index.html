@@ -314,6 +314,8 @@ body.rc-con-sel #rcList{padding-bottom:130px}
 .pr-mas{display:block;margin:12px auto}.pr-pegar{text-align:center;margin:18px 16px 0;padding-top:12px;border-top:1px dashed var(--line)}.pr-pegar .lnk{display:inline-flex;align-items:center;gap:6px}.pr-pegar svg{width:16px;height:16px;stroke:currentColor}.pr-pegar small{display:block;color:var(--muted);margin-top:2px}
 .pr-aviso{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:60;display:flex;align-items:center;gap:10px;background:#1f2a24;color:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.25)}.pr-aviso span{flex:1;font-weight:600}.pr-aviso .btn{width:auto;margin:0;min-height:0;padding:8px 14px}.pr-x{background:none;border:0;color:#fff;font-size:1rem;padding:4px}
 .cb-mod{display:block;margin-top:6px;padding:6px 10px;border-radius:10px;background:#fff8e6;color:#7a5200!important;font-size:.85rem}
+.rd-wa{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:16px 0 0;background:#1fa855}.rd-wa svg{width:20px;height:20px;stroke:currentColor}
+.tk-acts{align-items:stretch}.tk-acts .btn{margin:0!important;min-height:52px}
 #cpMet .dia:disabled{opacity:.4;text-decoration:line-through}
 .pd-edit-g{margin:8px 0 4px}
 .pd-volver{display:block;width:100%;margin:8px 0 0;min-height:0;padding:10px 12px;font-size:.95rem}
@@ -2084,7 +2086,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.57.0';
+const APP_VERSION = '0.57.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -5167,6 +5169,17 @@ function menuRecibo(r){
 }
 /* Cambiar la forma de pago de un recibo (Efectivo, Tarjeta o Crédito), ajustando el saldo del cliente */
 /* Modificar un ticket: se carga en Venta; al cobrar, el original se cancela (regresa inventario y saldo) y queda reemplazado por el nuevo */
+/* Ticket por WhatsApp directo al chat del cliente */
+const telRecibo = r => r?.cliente?.telefono || (r?.cliente?.id && (clientes().find(c=> c.id===r.cliente.id)||{}).telefono) || '';
+function msgReciboWa(r){
+  const neg = (store.get('config').negocio || impCfg().encabezado || 'Merkalimentos');
+  const f = new Date(fechaRec(r)).toLocaleDateString('es-MX', {day:'numeric', month:'long'});
+  const ls = (r.lineas||[]).map(l=>{ const q = restante(r, l); return q > 0 ? `${l.porKilo ? fmtKg(q) + ' kg' : q} x ${nombreTk(l)} — ${fmt(importeCon(l, q))}` : ''; }).filter(Boolean);
+  const pago = r.metodo==='Crédito' ? `Crédito · saldo ${fmt(r.saldo||0)}${r.credito?.fechaPago ? ' · pagar antes del ' + new Date(r.credito.fechaPago + 'T12:00').toLocaleDateString('es-MX', {day:'numeric', month:'long'}) : ''}` : r.metodo;
+  const ah = r2(ahorroRecibo(r) + ahorroEspecial(r));
+  return `Hola ${r.cliente?.nombre || ''}, te comparto tu ticket del ${f}.\n\n*Ticket #${r.folio}*\n` + ls.join('\n') +
+    `${totalDev(r) ? `\nDevoluciones: −${fmt(totalDev(r))}` : ''}\n*Total: ${fmt(r.total)}*\nPago: ${pago}${ah > 0 ? `\nAhorraste: ${fmt(ah)}` : ''}\n\n¡Gracias por tu compra! — ${neg}`;
+}
 function modificarRecibo(r){
   if(anulado(r)){ toast('El ticket ya está cancelado'); return; }
   if((r.version||1) > 1 || descuentosDe(r).length){ toast('Este ticket tiene descuentos (versiones): no se puede modificar'); return; }
@@ -5846,6 +5859,7 @@ function viewReciboDetalle(r){
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
       ${ahorroEspecial(r) > 0 ? `<dt>Ahorro por precio especial</dt><dd class="pos">${fmt(ahorroEspecial(r))}</dd>` : ''}
     </dl>
+    ${!anulado(r) && telRecibo(r) ? `<button class="btn rd-wa" id="rdWa">${svg('whatsapp')}Enviar por WhatsApp a ${esc((r.cliente?.nombre||'').split(' ').slice(0,2).join(' ') || 'cliente')}</button>` : ''}
     <div class="tk-acts"><button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir${r.version>1 ? ' v'+r.version : ''}</button><button class="btn ghost" id="rdShare">${svg('share')}Compartir</button></div>
   </div>`;
 }
@@ -5862,6 +5876,7 @@ function renderRecibos(){
     else {
       const pb = document.getElementById('rdPrint'); if(pb) pb.onclick = ()=> imprimirRecibo(r);
       const sb = document.getElementById('rdShare'); if(sb) sb.onclick = ()=> compartirRecibo(r);
+      const wb = document.getElementById('rdWa'); if(wb) wb.onclick = ()=> abrirWa(urlWa(telRecibo(r), msgReciboWa(r)));
       document.querySelectorAll('[data-ir]').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.ir; reciboVista = 'detalle'; renderRecibos(); });
     }
     window.scrollTo(0,0); return;
