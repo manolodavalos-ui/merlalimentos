@@ -316,6 +316,7 @@ body.rc-con-sel #rcList{padding-bottom:130px}
 .cb-mod{display:block;margin-top:6px;padding:6px 10px;border-radius:10px;background:#fff8e6;color:#7a5200!important;font-size:.85rem}
 .rd-wa{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:16px 0 0;background:#1fa855}.rd-wa svg{width:20px;height:20px;stroke:currentColor}
 .tk-acts{align-items:stretch}.tk-acts .btn{margin:0!important;min-height:52px}
+.rd-num{width:100%;margin:10px 0 0}
 .cj-tp{margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#fff8e6;color:#7a5200;font-size:.88rem}
 .tag-w{font-style:normal;font-size:.7rem;font-weight:700;padding:2px 6px;border-radius:999px;background:#fff1cc;color:#7a5200;vertical-align:2px}
 .rd-tr{margin-top:16px}.rd-tr .btn{display:flex;align-items:center;justify-content:center;gap:6px}.rd-tr svg{width:18px;height:18px;stroke:currentColor}
@@ -2089,7 +2090,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.59.0';
+const APP_VERSION = '0.59.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3333,7 +3334,7 @@ function viewHecho(){
       ${ahorroEspecial(r) > 0 ? `<dt>Ahorro por precio especial</dt><dd class="pos">${fmt(ahorroEspecial(r))}</dd>` : ''}
     </dl>
     ${r.metodo==='Crédito' && r.cliente?.id ? bloqueDeuda(r) : ''}
-    ${r.metodo==='Transferencia' ? `<button class="btn rd-wa" id="hechoComp">${svg('whatsapp')}Pedir comprobante por WhatsApp</button>` : ''}
+    ${r.metodo==='Transferencia' ? `<button class="btn rd-wa" id="hechoComp">${svg('whatsapp')}Pedir comprobante por WhatsApp</button>${datosTransf().tarjeta || datosTransf().clabe ? `<button class="btn ghost rd-num" id="hechoNum">Enviar solo el número (para copiar)</button>` : ''}` : ''}
     <div class="tk-acts"><button class="btn ghost" id="hechoPrint">${svg('recibos')}Imprimir</button><button class="btn ghost" id="hechoShare">${svg('share')}Compartir</button></div>
     <button class="btn" id="nuevaVenta">Nueva venta</button>
   </div>`;
@@ -3353,6 +3354,7 @@ function bindHecho(){
   document.getElementById('hechoPrint').onclick = ()=> imprimirRecibo(ultimoRecibo);
   document.getElementById('hechoShare').onclick = ()=> compartirRecibo(ultimoRecibo);
   const hc = document.getElementById('hechoComp'); if(hc) hc.onclick = ()=> pedirComprobante(ultimoRecibo);
+  const hn = document.getElementById('hechoNum'); if(hn) hn.onclick = ()=> enviarNumeroTransf(ultimoRecibo);
 }
 
 /* ================= Clientes (selector básico) ================= */
@@ -5200,12 +5202,16 @@ function menuRecibo(r){
 const datosTransf = ()=> store.get('datosTransf', {});
 function msgComprobante(r){
   const d = datosTransf(), neg = (store.get('config').negocio || impCfg().encabezado || 'Merkalimentos');
-  const datos = [d.banco ? `Banco: ${d.banco}` : '', d.tarjeta ? `Tarjeta: ${d.tarjeta}` : '', d.cuenta ? `Cuenta: ${d.cuenta}` : '', d.clabe ? `CLABE: ${d.clabe}` : '', d.beneficiario ? `Beneficiario: ${d.beneficiario}` : ''].filter(Boolean);
+  const num = x => '```' + String(x).replace(/\s/g,'') + '```';   /* sin espacios y en bloque para copiarlo fácil */
+  const datos = [d.banco ? `Banco: ${d.banco}` : '', d.tarjeta ? `Tarjeta:\n${num(d.tarjeta)}` : '', d.cuenta ? `Cuenta:\n${num(d.cuenta)}` : '', d.clabe ? `CLABE:\n${num(d.clabe)}` : '', d.beneficiario ? `Beneficiario: ${d.beneficiario}` : ''].filter(Boolean);
   return `Hola ${r.cliente?.nombre || ''}, gracias por tu compra. Tu ticket #${r.folio} es por *${fmt(r.total)}*.` +
     (datos.length ? `\n\nDatos para tu transferencia:\n${datos.join('\n')}` : '') +
     `\n\nTe pedimos amablemente nos compartas por este medio el *comprobante de tu transferencia*. ¡Gracias! — ${neg}`;
 }
 function pedirComprobante(r){ const tel = telRecibo(r); if(!tel){ toast('El cliente no tiene teléfono registrado'); return; } abrirWa(urlWa(tel, msgComprobante(r))); }
+/* Segundo mensaje con solo el número: en WhatsApp basta mantenerlo presionado para copiarlo completo */
+function enviarNumeroTransf(r){ const d = datosTransf(), n = String(d.clabe || d.tarjeta || d.cuenta || '').replace(/\s/g,''); const tel = telRecibo(r);
+  if(!n){ toast('Captura tus datos en Configuración → Datos para transferencia'); return; } if(!tel){ toast('El cliente no tiene teléfono registrado'); return; } abrirWa(urlWa(tel, n)); }
 function confirmarComprobante(r){
   confirmar({titulo:'Comprobante recibido', ok:'Confirmar', texto:`¿Ya recibiste el comprobante de la transferencia por <b>${fmt(r.total)}</b> del ticket #${esc(r.folio)}?`,
     alAceptar:()=>{ r.transf = {confirmado:true, fecha:new Date().toISOString(), vendedor:session.nombre}; r.sincronizado = false; DB.guardarRecibo(r); toast('Transferencia confirmada ✓'); current==='recibos' ? renderRecibos() : renderVenta(); }});
@@ -5867,7 +5873,7 @@ function renderConfig(conservar){
   if(cfgVista==='nube'){ bindNubeCfg(); return; }
   if(cfgVista==='transf'){
     const leer = ()=> Object.fromEntries(['banco','tarjeta','cuenta','clabe','beneficiario'].map(k=> [k, document.getElementById('dt'+k).value.trim()]));
-    const prev = ()=>{ const old = store.get('datosTransf', {}); store.set('datosTransf', leer()); document.getElementById('dtPrev').textContent = msgComprobante({cliente:{nombre:'Sra Ana María'}, folio:'1-251125-001', total:575.5}).replace(/\*/g,''); store.set('datosTransf', old); };
+    const prev = ()=>{ const old = store.get('datosTransf', {}); store.set('datosTransf', leer()); document.getElementById('dtPrev').textContent = msgComprobante({cliente:{nombre:'Sra Ana María'}, folio:'1-251125-001', total:575.5}).replace(/\*|```/g,''); store.set('datosTransf', old); };
     document.querySelectorAll('.gform input').forEach(i=> i.oninput = prev); prev();
     document.getElementById('dtGuardarTr').onclick = ()=>{ store.set('datosTransf', leer()); toast('Datos guardados en este celular'); cfgVista = 'inicio'; renderConfig(); };
     return;
@@ -5933,7 +5939,7 @@ function viewReciboDetalle(r){
       ${ahorroRecibo(r) > 0 ? `<dt>Ahorro por promociones</dt><dd class="pos">${fmt(ahorroRecibo(r))}</dd>` : ''}
       ${ahorroEspecial(r) > 0 ? `<dt>Ahorro por precio especial</dt><dd class="pos">${fmt(ahorroEspecial(r))}</dd>` : ''}
     </dl>
-    ${r.metodo==='Transferencia' && r.transf && !r.transf.confirmado && !anulado(r) ? `<div class="tk-acts rd-tr"><button class="btn" id="rdCompOk">✓ Comprobante recibido</button>${telRecibo(r) ? `<button class="btn ghost" id="rdCompPide">${svg('whatsapp')}Pedir comprobante</button>` : ''}</div>` : ''}
+    ${r.metodo==='Transferencia' && r.transf && !r.transf.confirmado && !anulado(r) ? `<div class="tk-acts rd-tr"><button class="btn" id="rdCompOk">✓ Comprobante recibido</button>${telRecibo(r) ? `<button class="btn ghost" id="rdCompPide">${svg('whatsapp')}Pedir comprobante</button>` : ''}</div>${telRecibo(r) && (datosTransf().tarjeta || datosTransf().clabe) ? `<button class="btn ghost rd-num" id="rdNum">Enviar solo el número (para copiar)</button>` : ''}` : ''}
     ${!anulado(r) && telRecibo(r) ? `<button class="btn rd-wa" id="rdWa">${svg('whatsapp')}Enviar por WhatsApp a ${esc((r.cliente?.nombre||'').split(' ').slice(0,2).join(' ') || 'cliente')}</button>` : ''}
     <div class="tk-acts"><button class="btn ghost" id="rdPrint">${svg('recibos')}Imprimir${r.version>1 ? ' v'+r.version : ''}</button><button class="btn ghost" id="rdShare">${svg('share')}Compartir</button></div>
   </div>`;
@@ -5954,6 +5960,7 @@ function renderRecibos(){
       const wb = document.getElementById('rdWa'); if(wb) wb.onclick = ()=> enviarReciboWa(r);
       const co = document.getElementById('rdCompOk'); if(co) co.onclick = ()=> confirmarComprobante(r);
       const cp = document.getElementById('rdCompPide'); if(cp) cp.onclick = ()=> pedirComprobante(r);
+      const rn = document.getElementById('rdNum'); if(rn) rn.onclick = ()=> enviarNumeroTransf(r);
       document.querySelectorAll('[data-ir]').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.ir; reciboVista = 'detalle'; renderRecibos(); });
     }
     window.scrollTo(0,0); return;
