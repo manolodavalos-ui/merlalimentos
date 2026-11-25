@@ -557,8 +557,8 @@ i.muted{font-style:normal;color:var(--muted);font-weight:500}
 .tk-prev{margin:6px 0 14px}
 .tk-prev b{display:block;font-size:.85rem;color:var(--brand);margin-bottom:6px}
 .tk-prev pre{background:#fffdf5;border:1px dashed var(--line);border-radius:8px;padding:10px;font-size:11px;line-height:1.35;overflow-x:auto;white-space:pre;font-family:ui-monospace,monospace}
-#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare,#avisarCli,#avisarImg,#rlCargar,#pdEntregar,#ecTodos{display:flex;align-items:center;justify-content:center;gap:8px}
-#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg,#avisarCli svg,#avisarImg svg,#rlCargar svg,#pdEntregar svg,#ecTodos svg{width:20px;height:20px;stroke:currentColor}
+#fbPublicar,#impPrueba,#hechoPrint,#hechoShare,#rdPrint,#rdShare,#avisarCli,#avisarImg,#rlCargar,#pdEntregar,#ecTodos{display:flex;align-items:center;justify-content:center;gap:8px}
+#fbPublicar svg,#impPrueba svg,#hechoPrint svg,#hechoShare svg,#rdPrint svg,#rdShare svg,#avisarCli svg,#avisarImg svg,#rlCargar svg,#pdEntregar svg,#ecTodos svg{width:20px;height:20px;stroke:currentColor}
 .tk-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 12px}.tk-acts .btn{display:flex;align-items:center;justify-content:center;gap:8px}.tk-acts .btn svg{width:20px;height:20px;flex:none;stroke:currentColor}.tk-acts .btn{margin:0}
 
 .add-prod{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.03em}
@@ -2086,7 +2086,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.57.2';
+const APP_VERSION = '0.58.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2177,7 +2177,7 @@ function renderMenu(){
     if(m.sep) return '<hr>';
     const ok = puede(m.id);
     return `<button data-id="${m.id}" class="${m.id===current?'active':''}" ${ok?'':'disabled'}>
-      ${svg(m.id)}<span>${m.label}</span>${(m.id==='catalogo' || m.id==='preventa') && ok && nuevosRecibidos() ? `<i class="cat-badge">${nuevosRecibidos()}</i>` : ''}${ok?'':svg('lock','lock')}</button>`;
+      ${svg(m.id)}<span>${m.label}</span>${m.id==='preventa' && ok && nuevosRecibidos() ? `<i class="cat-badge">${nuevosRecibidos()}</i>` : ''}${ok?'':svg('lock','lock')}</button>`;
   }).join('');
   el.querySelectorAll('button[data-id]').forEach(b=> b.onclick = ()=>{ if(b.dataset.id==='turno') turnoVista = 'resumen'; go(b.dataset.id); closeDrawer(); });
 }
@@ -3637,6 +3637,7 @@ function viewClientesInicio(){
   const n = clientes().length;
   return `<div class="cl-home">
     <button class="cl-opt" id="optCrear"><span class="cl-opt-ic">${svg('userAdd')}</span><span><b>Crear cliente</b><small>Registrar un cliente nuevo con su ubicación</small></span>${svg('chev')}</button>
+    <button class="cl-opt" id="optEnviarCat"><span class="cl-opt-ic">${svg('whatsapp')}</span><span><b>Enviar catálogo</b><small>A un cliente o a todos los de un día, por WhatsApp</small></span>${svg('chev')}</button>
     <button class="cl-opt" id="optLista"><span class="cl-opt-ic">${svg('clientes')}</span><span><b>Clientes guardados</b><small>${n} ${n===1?'cliente registrado':'clientes registrados'} · buscar, editar y ubicar</small></span>${svg('chev')}</button>
   </div>`;
 }
@@ -3860,6 +3861,7 @@ function renderClientes(conservar){
   }
   document.getElementById('optCrear').onclick = ()=>{ cliVista='crear'; cliSel=null; renderClientes(); };
   document.getElementById('optLista').onclick = ()=>{ cliVista='lista'; renderClientes(); };
+  document.getElementById('optEnviarCat').onclick = ()=> elegirClienteSimple(enviarCatalogo);
 }
 function bindFilasClientes(){
   document.querySelectorAll('.cl-row.cg').forEach(b=> b.onclick = ()=>{ cliSel = b.dataset.id; cliDesde = null; cliVista = 'ficha'; renderClientes(); });
@@ -5053,6 +5055,7 @@ function renderHeader(){
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
     const hn = document.getElementById('hCliNuevo'); if(hn) hn.onclick = ()=>{ cliVista='crear'; cliSel=null; renderClientes(); };
     if(enArt){ acts.innerHTML = '<button class="head-txt" id="hArtGuardar">GUARDAR</button>'; document.getElementById('hArtGuardar').onclick = guardarArticulo; }
+    else if(current==='articulos' && session.rol==='admin'){ acts.innerHTML = `<button class="icon-btn" id="hArtMenu" aria-label="Más opciones">${svg('more')}</button>`; document.getElementById('hArtMenu').onclick = menuArticulos; }
     if(current==='recibos' && reciboSel && reciboVista==='detalle'){
       const r = DB.recibos.find(x=>x.id===reciboSel);
       if(r && !anulado(r)){ acts.innerHTML = `<button class="icon-btn" id="hRecMenu" aria-label="Opciones del recibo">${svg('more')}</button>`; document.getElementById('hRecMenu').onclick = ()=> menuRecibo(r); }
@@ -5060,6 +5063,17 @@ function renderHeader(){
     mb.innerHTML = svg(detalle ? 'back' : 'menu');
     mb.classList.toggle('keep', !!detalle);
   }
+}
+function menuArticulos(){
+  if(document.querySelector('.popover')) return;
+  const pop = document.createElement('div'); pop.className = 'popover';
+  const est = fbUser ? (fbCfg().publicado ? 'Última: ' + new Date(fbCfg().publicado).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) + (fbCfg().publica !== false && nubePendiente() ? ' · cambios por subir' : ' ✓') : 'Sin publicar') : '';
+  pop.innerHTML = `<button id="paPub">${svg('share')}<span>Publicar catálogo ahora${est ? `<small style="display:block;color:var(--muted);font-weight:400">${est}</small>` : ''}</span></button>`;
+  document.body.appendChild(pop);
+  const cerrar = ()=>{ pop.remove(); document.removeEventListener('pointerdown', fuera, true); };
+  const fuera = e=>{ if(!pop.contains(e.target)) cerrar(); };
+  setTimeout(()=> document.addEventListener('pointerdown', fuera, true), 0);
+  pop.querySelector('#paPub').onclick = ()=>{ cerrar(); fbListo() ? publicarNubeConAviso() : publicarConAviso(); };
 }
 function abrirMas(){
   if(document.querySelector('.popover')) return;
@@ -6243,15 +6257,8 @@ function bindTilesArt(){
 /* ================= Catálogo (vista para mostrar a clientes) ================= */
 function viewCatalogo(){
   if(catVista==='pedidos') return viewPedidosRec();
-  const lista = articulos(), adm = session.rol==='admin', g = ghCfg(), nRec = nuevosRecibidos();
-  const top = `<div class="cat-top">
-    <div class="cr-acc" style="padding:0">
-      <button class="ub-b" id="catEnviar">${svg('whatsapp')}Enviar catálogo a un cliente</button>
-      <button class="ub-b" id="catPed">${svg('recibos')}Pedidos recibidos${nRec ? ` <i class="cat-badge">${nRec}</i>` : ''}</button>
-      ${adm ? `<button class="ub-b" id="catPub">${svg('share')}Publicar</button>` : ''}
-    </div>
-    ${adm && fbUser ? `<p class="cat-est">Nube: ${fbCfg().publicado ? 'actualizado ' + new Date(fbCfg().publicado).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'sin publicar'}${fbCfg().publica === false ? ' · este celular no publica' : nubePendiente() ? ' · <b class="neg">subiendo cambios…</b>' : ' ✓'}${fbVivo ? ' · pedidos en línea ✓' : ''}</p>` : adm ? `<p class="cat-est">${!g.token ? 'Para publicar, guarda la clave de GitHub en Configuración → Catálogo en línea' : g.publicado ? `Publicado ${new Date(g.publicado).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${catalogoPendiente() ? ' · <b class="warn">hay cambios sin publicar</b>' : ' · al día'}` : '<b class="warn">Aún no se ha publicado</b>'}</p>` : ''}
-  </div>`;
+  const lista = articulos();
+  const top = '';
   const html = categorias().map(sec=>{
     const ps = lista.filter(p=> p.seccion===sec);
     return ps.length ? `<div class="sec-title">${esc(sec)}</div>` + ps.map(tileHTML).join('') : '';
@@ -6262,9 +6269,6 @@ function viewCatalogo(){
 function renderCatalogo(){
   document.getElementById('view').innerHTML = viewCatalogo(); renderHeader();
   if(catVista==='pedidos'){ bindPedidosRec(renderCatalogo); return; }
-  document.getElementById('catEnviar').onclick = ()=> elegirClienteSimple(enviarCatalogo);
-  document.getElementById('catPed').onclick = ()=>{ catVista = 'pedidos'; renderCatalogo(); window.scrollTo(0,0); };
-  const pub = document.getElementById('catPub'); if(pub) pub.onclick = ()=> fbListo() ? publicarNubeConAviso() : publicarConAviso();
   const orden = [...document.querySelectorAll('#catGrid .tile')].map(t=> t.dataset.pid);
   document.querySelectorAll('#catGrid .tile').forEach(t=>{
     let ultimo = 0;
@@ -7664,7 +7668,7 @@ function viewNubeCfg(){
     <div class="cj-row"><span>Avisos del sistema</span><b>${notif}</b></div>
     <label class="nb-sw"><input type="checkbox" id="fbPublica" ${c.publica !== false ? 'checked' : ''}><span><b>Este celular actualiza el catálogo</b><small>Déjalo activado solo en el celular donde capturas productos, precios y clientes (TPV1). En el de respaldo desactívalo.</small></span></label>
     <div class="tk-acts">
-      <button class="btn ghost" id="fbPublicar"${c.publica === false ? ' disabled' : ''}>Actualizar ahora</button>
+      <button class="btn ghost" id="fbPublicar"${c.publica === false ? ' disabled' : ''}>${svg('share')}Publicar catálogo ahora</button>
       <button class="btn ghost" id="fbNotif"${'Notification' in window && Notification.permission==='default' ? '' : ' disabled'}>Activar avisos</button>
     </div>
     <details class="nb-reglas"><summary>Reglas de seguridad de Firestore</summary>
@@ -9449,7 +9453,7 @@ function enterApp(){
   updateShiftPill();
   go('turno');
   const pr = store.get('abrirPedidoRec', null);
-  if(pr){ store.del('abrirPedidoRec'); go('catalogo'); catVista = 'pedidos'; renderCatalogo(); setTimeout(()=> detallePedidoRec(pr), 100); }
+  if(pr){ store.del('abrirPedidoRec'); go('preventa'); prTab = 'nuevos'; prQ = ''; prDia = null; prVis = ''; ventaVista = 'recibidos'; renderVenta(); setTimeout(()=> detallePedidoRec(pr), 100); }
   try{ const v = sessionStorage.getItem('mk_volver'); sessionStorage.removeItem('mk_volver'); if(v && v!=='turno' && puede(v)) go(v); }catch(_){}
 }
 
