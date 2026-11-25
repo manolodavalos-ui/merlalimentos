@@ -2086,7 +2086,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.57.1';
+const APP_VERSION = '0.57.2';
 
 /* ================= Íconos ================= */
 const I = {
@@ -5180,6 +5180,22 @@ function msgReciboWa(r){
   return `Hola ${r.cliente?.nombre || ''}, te comparto tu ticket del ${f}.\n\n*Ticket #${r.folio}*\n` + ls.join('\n') +
     `${totalDev(r) ? `\nDevoluciones: −${fmt(totalDev(r))}` : ''}\n*Total: ${fmt(r.total)}*\nPago: ${pago}${ah > 0 ? `\nAhorraste: ${fmt(ah)}` : ''}\n\n¡Gracias por tu compra! — ${neg}`;
 }
+/* Envía el ticket como imagen (y el estado de cuenta si es crédito). Un enlace directo al chat solo admite texto,
+   así que se usa el menú de compartir del teléfono con las imágenes; sin esa opción, se abre el chat con el texto */
+async function enviarReciboWa(r){
+  const f = new Date(fechaRec(r)).toLocaleDateString('es-MX', {day:'numeric', month:'long'});
+  const cid = r.cliente?.id, deuda = r.metodo==='Crédito' && cid ? deudaCliente(cid) : null;
+  let txt = `Hola ${r.cliente?.nombre || ''}, te comparto tu ticket del ${f}.\n\n*Ticket #${r.folio}*`;
+  if(deuda && deuda.total > 0) txt += `\n\nEsta compra quedó a crédito. Tu saldo pendiente es de *${fmt(deuda.total)}*; te anexo tu estado de cuenta.`;
+  const archivos = [];
+  try{ const b = await imagenTicket(r); if(b) archivos.push(new File([b], limpiarNombreArchivo('Ticket ' + r.folio) + '.png', {type:'image/png'})); }catch(_){}
+  if(deuda && deuda.total > 0){ try{ const b = await imagenTicket({tipo:'estado', cid}); if(b) archivos.push(new File([b], limpiarNombreArchivo('Estado de cuenta ' + (r.cliente.tienda || r.cliente.nombre || '')) + '.png', {type:'image/png'})); }catch(_){} }
+  if(archivos.length && navigator.canShare && navigator.canShare({files:archivos})){
+    try{ await navigator.clipboard?.writeText(txt.replace(/\*/g, '')); }catch(_){}
+    try{ await navigator.share({files:archivos, text:txt}); toast('Elige WhatsApp Business y el chat del cliente'); return; }catch(e){ if(e && e.name==='AbortError') return; }
+  }
+  abrirWa(urlWa(telRecibo(r), msgReciboWa(r)));
+}
 function modificarRecibo(r){
   if(anulado(r)){ toast('El ticket ya está cancelado'); return; }
   if((r.version||1) > 1 || descuentosDe(r).length){ toast('Este ticket tiene descuentos (versiones): no se puede modificar'); return; }
@@ -5876,7 +5892,7 @@ function renderRecibos(){
     else {
       const pb = document.getElementById('rdPrint'); if(pb) pb.onclick = ()=> imprimirRecibo(r);
       const sb = document.getElementById('rdShare'); if(sb) sb.onclick = ()=> compartirRecibo(r);
-      const wb = document.getElementById('rdWa'); if(wb) wb.onclick = ()=> abrirWa(urlWa(telRecibo(r), msgReciboWa(r)));
+      const wb = document.getElementById('rdWa'); if(wb) wb.onclick = ()=> enviarReciboWa(r);
       document.querySelectorAll('[data-ir]').forEach(b=> b.onclick = ()=>{ reciboSel = b.dataset.ir; reciboVista = 'detalle'; renderRecibos(); });
     }
     window.scrollTo(0,0); return;
