@@ -244,7 +244,11 @@ main.flush{padding:0}
 .cf .cg-acts{background:none;padding:0}
 .cf-ped{width:100%;background:none;border:0;border-bottom:1px solid var(--line,#eee);font:inherit;text-align:left;cursor:pointer;color:inherit}
 .cf .cg-tk{margin:10px 0 0;width:100%}.cf #cfEditar{width:100%;margin:6px 0 20px}
-.pd-wrap{padding-bottom:24px}
+.pd-wrap{padding-bottom:24px}.pd-wrap.con-acc{padding-bottom:110px}
+.pd-card.selmode{display:grid;grid-template-columns:auto 1fr}.pd-card.selmode .pd-chk{margin:14px 0 0 12px}.pd-card.selmode .pd-acts{grid-column:1/-1}.pd-card.sel{background:#f1f8f4;border-color:var(--brand)}
+.pd-selbar{display:flex;justify-content:space-between;align-items:center;margin:10px 0 0;font-size:.88rem;color:var(--muted)}
+.pd-selacc{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:3fr 2fr;gap:8px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);box-shadow:0 -4px 12px rgba(0,0,0,.08)}.pd-selacc .btn{margin:0}
+.icon-btn.cli-ok{background:rgba(255,255,255,.18);border-radius:12px}
 .pd-dias{position:sticky;top:0;z-index:3;background:var(--bg,#f3f5f4);padding:10px 16px!important;margin:0!important;border-bottom:1px solid var(--line,#e3e7e5)!important;overflow-x:auto}
 .pd-dias .dia{flex:0 0 auto}.pd-dias .dia b{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:999px;background:rgba(31,111,74,.12);font-size:.8em}
 .pd-dias .dia.on b{background:rgba(255,255,255,.25)}.pd-dias .dia.vacio{opacity:.55}.pd-dias .dia.atr{color:#c0392b;border-color:#e8b4ad}.pd-dias .dia.atr.on{background:#c0392b;color:#fff}
@@ -2051,7 +2055,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.54.0';
+const APP_VERSION = '0.54.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -2096,6 +2100,7 @@ const I = {
   search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
   close:'<path d="M18 6L6 18M6 6l12 12"/>',
   userAdd:'<circle cx="10" cy="8" r="4"/><path d="M3 21a7 7 0 0 1 14 0M20 8v6M17 11h6"/>',
+  userOk:'<circle cx="10" cy="8" r="4"/><path d="M3 21a7 7 0 0 1 14 0M16 11l2.2 2.2L22.5 9"/>',
   more:'<circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/>'
 };
 const svg = (name, cls='') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${I[name]}</svg>`;
@@ -2913,6 +2918,17 @@ function renderVenta(){
       document.querySelectorAll('[data-pd]').forEach(b=> b.onclick = ()=>{ pedDia = b.dataset.pd; renderVenta(); });
       document.querySelectorAll('[data-pe]').forEach(b=> b.onclick = ()=>{ pedEstado = b.dataset.pe; renderVenta(); });
       const cal = document.getElementById('pdCal'); if(cal) cal.onclick = calendarioPedidos;
+      document.querySelectorAll('[data-psel]').forEach(b=> b.onclick = e=>{ e.stopPropagation(); const id = b.dataset.psel; pedSel.has(id) ? pedSel.delete(id) : pedSel.add(id); const y = window.scrollY; renderVenta(); window.scrollTo(0, y); });
+      const st = document.getElementById('pdSelTodo'); if(st) st.onclick = ()=>{ const ls = pedidosFiltrados(); if(pedSel.size===ls.length) pedSel.clear(); else ls.forEach(p=> pedSel.add(p.id)); renderVenta(); };
+      const aplicarRepro = fechaN =>{ const hechos = reprogramarPedidos([...pedSel], fechaN, fechaN===hoyClave() ? 'Programada para hoy (estaba atrasada)' : 'Reprogramada (estaba atrasada)'); pedSel.clear();
+        toast(`${hechos.length} ${hechos.length===1 ? 'venta' : 'ventas'} ${fechaN===hoyClave() ? 'programadas para hoy' : 'reprogramadas al ' + fechaCorta(fechaN)}`);
+        pedDia = fechaN; renderVenta(); if(hechos.some(p=> telPedidoProg(p))) dialogoAvisosReprog(hechos, ()=>{}, 'Listo'); };
+      const ph = document.getElementById('pdHoy'); if(ph) ph.onclick = ()=> aplicarRepro(hoyClave());
+      const pr = document.getElementById('pdRepro'); if(pr) pr.onclick = ()=>{
+        const bg = dialogo(`<h3>Reprogramar ${pedSel.size} ${pedSel.size===1?'venta':'ventas'}</h3><label class="cj-l">Nueva fecha de entrega</label><input class="field" id="prFecha" type="date" min="${hoyClave()}" value="${manana()}">
+          <div class="sheet-actions"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn" data-a="si">Reprogramar</button></div>`);
+        bg.querySelector('[data-a="no"]').onclick = ()=> bg.remove();
+        bg.querySelector('[data-a="si"]').onclick = ()=>{ const v = bg.querySelector('#prFecha').value; if(!v || v < hoyClave()){ toast('Elige una fecha de hoy en adelante'); return; } bg.remove(); aplicarRepro(v); }; };
       document.querySelectorAll('[data-entregar]').forEach(b=> b.onclick = e=>{ e.stopPropagation(); entregarPedidoProg(b.dataset.entregar); });
       document.querySelectorAll('[data-wa]').forEach(b=> b.onclick = e=>{ e.stopPropagation(); const p = DB.pedidos.find(x=> x.id===b.dataset.wa); if(p) abrirWa(urlWa(telPedidoProg(p), `Hola ${p.cliente?.nombre || ''}, `)); });
       const on = document.querySelector('#pdDias .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'});
@@ -4451,22 +4467,25 @@ function dialogoReprogramar(alTerminar){
     if(!fechaN || fechaN <= hoy){ toast('Elige una fecha posterior a hoy'); return; }
     const ids = [...bg.querySelectorAll('.rp-row input:checked')].map(x=> x.dataset.id);
     if(!ids.length){ toast('Marca al menos un pedido'); return; }
-    const hechos = ids.map(id=> DB.pedidos.find(x=> x.id===id)).filter(Boolean).map(p=>{
-      p.historial = [...(p.historial||[]), {fecha:new Date().toISOString(), usuario:session.nombre, total:p.total, productos:cuentaTicket(p), fechaEntrega:p.fechaEntrega, motivo:'Reprogramada al cerrar turno'}];
-      p.reprogramado = {fecha:new Date().toISOString(), de:p.fechaEntrega, a:fechaN, usuario:session.nombre};
-      p.fechaEntrega = fechaN; delete p.repartoMarcado; p.sincronizado = false;
-      DB.guardarPedido(p); pushPedidoNube(p); return p;
-    });
+    const hechos = reprogramarPedidos(ids, fechaN, 'Reprogramada al cerrar turno');
     bg.remove(); toast(`${hechos.length} ${hechos.length===1 ? 'pedido reprogramado' : 'pedidos reprogramados'} al ${fechaCorta(fechaN)}`);
     dialogoAvisosReprog(hechos, alTerminar);
   };
 }
-function dialogoAvisosReprog(ps, alTerminar){
+function reprogramarPedidos(ids, fechaN, motivo){
+  return ids.map(id=> DB.pedidos.find(x=> x.id===id)).filter(p=> p && p.estado==='Programado').map(p=>{
+    p.historial = [...(p.historial||[]), {fecha:new Date().toISOString(), usuario:session.nombre, total:p.total, productos:cuentaTicket(p), fechaEntrega:p.fechaEntrega, motivo}];
+    p.reprogramado = {fecha:new Date().toISOString(), de:p.fechaEntrega, a:fechaN, usuario:session.nombre};
+    p.fechaEntrega = fechaN; delete p.repartoMarcado; p.sincronizado = false;
+    DB.guardarPedido(p); pushPedidoNube(p); return p;
+  });
+}
+function dialogoAvisosReprog(ps, alTerminar, txtFin = 'Continuar con el cierre'){
   const bg = dialogo(`<h3>Avisar a los clientes</h3>
     <p class="sub">Se envía una disculpa con la nueva fecha de entrega por WhatsApp.</p>
     <div class="rp-ls">${ps.map(p=> `<div class="rp-av"><span><b>${esc(p.cliente?.tienda || p.cliente?.nombre || '')}</b><small>#${esc(p.folio)} · ${fmt(p.total)}</small></span>
       ${telPedidoProg(p) ? `<button class="btn ghost" data-av="${p.id}">${svg('whatsapp')}Avisar</button>` : '<small class="muted">Sin teléfono</small>'}</div>`).join('')}</div>
-    <div class="sheet-actions rp-fin"><button class="btn" data-a="ok">Continuar con el cierre</button></div>`);
+    <div class="sheet-actions rp-fin"><button class="btn" data-a="ok">${txtFin}</button></div>`);
   bg.querySelectorAll('[data-av]').forEach(b=> b.onclick = ()=>{ const p = DB.pedidos.find(x=> x.id===b.dataset.av); if(p && avisarReprogramacion(p)){ b.classList.add('hecho'); b.innerHTML = '✓ Avisado'; } });
   bg.querySelector('[data-a="ok"]').onclick = ()=>{ bg.remove(); alTerminar(); };
 }
@@ -4703,7 +4722,7 @@ function viewPedidoDet(){
   </div>`;
 }
 let pedVerCanc = false;
-let pedDia = null, pedEstado = 'pend', pedCalMes = null;   /* pedDia: 'AAAA-MM-DD' | 'atrasadas' | 'todas' */
+let pedDia = null, pedEstado = 'pend', pedCalMes = null, pedSel = new Set();   /* pedDia: 'AAAA-MM-DD' | 'atrasadas' | 'todas' */
 const ESTADO_PED = {pend:'Programado', ent:'Entregado', canc:'Cancelado'};
 function pedidosFiltrados(dia = pedDia){
   const hoy = hoyClave(), est = ESTADO_PED[pedEstado];
@@ -4746,7 +4765,9 @@ function viewPedidos(){
       const cls = p.estado==='Cancelado' ? 'canc' : p.estado==='Entregado' ? 'ent' : atr ? 'atr' : p.reprogramado ? 'rep' : 'pend';
       const tel = telPedidoProg(p), n = cuentaTicket(p);
       const tag = p.estado==='Cancelado' ? '<i class="tag-c">Cancelada</i>' : p.estado==='Entregado' ? '<i class="tag-v">Entregada ✓</i>' : atr ? '<i class="tag-c">Atrasada</i>' : p.reprogramado ? '<i class="tag-c">Reprogramada</i>' : p.editado ? '<i class="tag-v">Modificada</i>' : '';
-      lista += `<div class="pd-card ${cls}">
+      const selMode = pedDia==='atrasadas' && pedEstado==='pend', sel = pedSel.has(p.id);
+      lista += `<div class="pd-card ${cls}${selMode ? ' selmode' : ''}${sel ? ' sel' : ''}">
+        ${selMode ? `<button class="rl-chk pd-chk${sel?' on':''}" data-psel="${p.id}" aria-label="Seleccionar">${sel ? '✓' : ''}</button>` : ''}
         <div class="pd-main" role="button" data-ped="${p.id}">
           <div class="pd-top"><span class="pd-cli"><b>${esc(p.cliente?.tienda || p.cliente?.nombre || '')}</b>${p.cliente?.tienda ? `<small>${esc(p.cliente.nombre)}</small>` : ''}</span><b class="pd-tot">${fmt(p.total)}</b></div>
           <div class="pd-meta">${esc(p.horario || 'Cualquier hora')} · ${n} ${n===1?'producto':'productos'} · #${esc(p.folio)} ${tag}</div>
@@ -4756,7 +4777,11 @@ function viewPedidos(){
       </div>`;
     });
   }
-  return `<div class="rc-wrap pd-wrap">${chips}<div class="cr-pad pd-head">${estados}${resumen}</div>${lista}</div>`;
+  const selMode = pedDia==='atrasadas' && pedEstado==='pend' && ls.length;
+  if(!selMode) pedSel.clear(); else [...pedSel].forEach(id=>{ if(!ls.some(p=> p.id===id)) pedSel.delete(id); });
+  const barraSel = selMode ? `<div class="pd-selbar"><button class="lnk" id="pdSelTodo">${pedSel.size===ls.length ? 'Quitar selección' : 'Seleccionar todas'}</button><span>${pedSel.size} de ${ls.length} seleccionadas</span></div>` : '';
+  const accSel = selMode && pedSel.size ? `<div class="pd-selacc"><button class="btn" id="pdHoy">Programar para hoy (${pedSel.size})</button><button class="btn ghost" id="pdRepro">Reprogramar…</button></div>` : '';
+  return `<div class="rc-wrap pd-wrap${accSel ? ' con-acc' : ''}">${chips}<div class="cr-pad pd-head">${estados}${resumen}${barraSel}</div>${lista}${accSel}</div>`;
 }
 const ordenHorario = h => /mañana/i.test(h||'') ? 1 : /tarde/i.test(h||'') ? 2 : /noche/i.test(h||'') ? 3 : 4;
 function calendarioDias({sel, contar, nota, alElegir}){
@@ -4939,7 +4964,7 @@ function renderHeader(){
   } else if(enVenta()){
     title.innerHTML = `<button class="ticket-btn" id="ticketBtn">${txtModo('Ticket','Pedido','Cotización')} <span class="tbadge" id="tBadge">${cuentaTicket(ticket())}</span></button>`;
     pill.classList.add('hidden');
-    acts.innerHTML = (esCot() ? '' : `<button class="icon-btn" id="hCliente" aria-label="Agregar cliente">${svg('userAdd')}</button>`) +
+    acts.innerHTML = (esCot() ? '' : `<button class="icon-btn${ticket().cliente ? ' cli-ok' : ''}" id="hCliente" aria-label="${ticket().cliente ? 'Cambiar cliente' : 'Agregar cliente'}">${svg(ticket().cliente ? 'userOk' : 'userAdd')}</button>`) +
                       `<button class="icon-btn" id="hMas" aria-label="Más opciones">${svg('more')}</button>`;
     const atras = ventaVista==='ticket' || esPre() || esCot();
     mb.innerHTML = svg(atras ? 'back' : 'menu');
