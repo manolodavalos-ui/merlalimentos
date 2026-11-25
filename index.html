@@ -305,6 +305,7 @@ body.rc-con-sel #rcList{padding-bottom:130px}
 .rl-ccl{padding:0 14px 12px 52px;font-size:.9rem}.rl-ccl div{display:flex;gap:8px;padding:3px 0;border-top:1px dashed #edf0ee}.rl-ccl b{min-width:54px;color:var(--brand)}
 .pr-wrap{padding-bottom:20px}.pr-tabs{margin-bottom:10px}.pr-tabs .pr-n{font-style:normal;background:#fff;color:var(--brand);border-radius:999px;padding:0 7px;margin-left:2px;font-size:.85em}.pr-tabs button:not(.on) .pr-n{background:var(--brand);color:#fff}
 .pr-q{margin:0 0 4px;border-radius:10px;border:1px solid var(--line)}
+.pr-vis{display:flex;align-items:center;gap:6px;margin-top:6px}.pr-vis>span{font-size:.8rem;color:var(--muted);flex:0 0 auto}.pr-vis-d{padding:4px 0!important;border:0!important;margin:0!important;overflow-x:auto;flex:1;min-width:0}.pr-vis-d .dia{flex:0 0 auto;padding:5px 11px;font-size:.85rem}
 .pr-card{background:#fff;margin:10px 16px;border:1px solid var(--line);border-left:6px solid #e6b800;border-radius:14px;padding:12px 14px;cursor:pointer}.pr-card.nuevo{background:#fff8e6;border-color:#f0d48a;border-left-color:#e6b800}
 .pr-top{display:flex;justify-content:space-between;gap:10px}.pr-top span{display:flex;flex-direction:column;min-width:0}.pr-top b{font-size:1.05rem}.pr-top small{color:var(--muted)}.pr-tot{font-size:1.15rem;white-space:nowrap}
 .pr-cn{font-style:normal;font-size:.7rem;font-weight:700;background:#e6f1fb;color:#0c447c;border-radius:999px;padding:1px 7px;align-self:flex-start;margin-top:2px}
@@ -2082,7 +2083,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.56.0';
+const APP_VERSION = '0.56.1';
 
 /* ================= Íconos ================= */
 const I = {
@@ -4371,7 +4372,7 @@ function bindInicioPre(){
   document.getElementById('optRelacion').onclick = ()=>{ relDesde = 'inicioPre'; relDia = null; ventaVista = 'relacion'; renderVenta(); };
   document.getElementById('optProgramar').onclick = ()=>{ ventaVista = 'grid'; renderVenta(); };
   document.getElementById('optProgramadas').onclick = ()=>{ pedDia = null; pedEstado = 'pend'; ventaVista = 'pedidos'; renderVenta(); };
-  document.getElementById('optRecibidos').onclick = ()=>{ prTab = nuevosRecibidos() ? 'nuevos' : 'atendidos'; prQ = ''; ventaVista = 'recibidos'; renderVenta(); };
+  document.getElementById('optRecibidos').onclick = ()=>{ prTab = nuevosRecibidos() ? 'nuevos' : 'atendidos'; prQ = ''; prDia = null; prVis = ''; ventaVista = 'recibidos'; renderVenta(); };
 }
 /* ----- Editar y cancelar ventas programadas ----- */
 function editarPedidoProg(id){
@@ -7248,7 +7249,9 @@ async function pegarPedido(){
   setTimeout(()=> bg.querySelector('#ppTxt').focus(), 50);
 }
 const totalPedRec = p => r2(p.lineas.reduce((s,l)=> s + l.precio*l.cantidad, 0));
-let prTab = 'nuevos', prQ = '', prDias = 7;
+let prTab = 'nuevos', prQ = '', prDias = 7, prDia = null, prVis = '';   /* prDia: fecha en que llegó ('AAAA-MM-DD' | 'todos'); prVis: día de visita del cliente */
+const diaRec = p => hoyClave(new Date(p.recibido || p.fecha));
+const pasaVisRec = p => { if(!prVis) return true; const c = p.clienteId ? clientes().find(x=> x.id===p.clienteId) : null; return c ? pasaDiaCli(c, prVis) : false; };
 const haceTxt = f => { const m = Math.round((Date.now() - new Date(f)) / 60000); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m/60)} h` : new Date(f).toLocaleDateString('es-MX', {day:'numeric', month:'short'}); };
 /* En qué terminó un pedido atendido: venta programada o venta directa */
 function destinoPedRec(p){
@@ -7261,10 +7264,21 @@ function destinoPedRec(p){
 function viewPedidosRec(){
   const todos = pedidosRecibidos(), q = prQ.trim(), est = {nuevos:'Nuevo', atendidos:'Atendido', descartados:'Descartado'}[prTab];
   const n = k => todos.filter(p=> p.estado===k).length;
-  let ls = todos.filter(p=> p.estado===est && (!q || coincideBusqueda([p.cliente.tienda, p.cliente.nombre, p.cliente.telefono].filter(Boolean).join(' '), q)))
+  const base = todos.filter(p=> p.estado===est && pasaVisRec(p) && (!q || coincideBusqueda([p.cliente.tienda, p.cliente.nombre, p.cliente.telefono].filter(Boolean).join(' '), q)));
+  let ls = base.slice()
     .sort((a,b)=> (b.recibido||b.fecha).localeCompare(a.recibido||a.fecha));
   const tabs = `<div class="seg pr-tabs">${[['nuevos','Nuevos','Nuevo'],['atendidos','Atendidos','Atendido'],['descartados','Descartados','Descartado']].map(([k,t,e])=>`<button class="${prTab===k?'on':''}" data-prt="${k}">${t}${k==='nuevos' && n(e) ? ` <i class="pr-n">${n(e)}</i>` : ''}</button>`).join('')}</div>`;
-  const buscar = `<div class="rc-search pr-q">${svg('search')}<input id="prQ" placeholder="Buscar tienda o cliente" value="${esc(prQ)}" autocomplete="off"></div>`;
+  const buscar = `<div class="rc-search pr-q">${svg('search')}<input id="prQ" placeholder="Buscar tienda o cliente" value="${esc(prQ)}" autocomplete="off"></div>
+    <div class="pr-vis"><span>Visita:</span>${chipsDiasCli(prVis, 'prVisD', 'pr-vis-d')}</div>`;
+  let filaDias = '';
+  if(prTab!=='nuevos'){
+    const hoy = hoyClave(), dias = Array.from({length:7}, (_,i)=> sumaDias(hoy, -i)), cnt = k => base.filter(p=> diaRec(p)===k).length;
+    if(!prDia) prDia = cnt(hoy) ? hoy : 'todos';
+    const fuera = /^\d{4}-/.test(prDia) && !dias.includes(prDia);
+    filaDias = `<div class="dias filtro pd-dias" id="prDiasR">${dias.map((d,i)=>{ const n = cnt(d); return `<button class="dia${prDia===d?' on':''}${n?'':' vacio'}" data-prdia="${d}">${i===0?'Hoy':i===1?'Ayer':diaCorto(d)}${n ? ` <b>${n}</b>` : ''}</button>`; }).join('')}
+      ${fuera ? `<button class="dia on" data-prdia="${prDia}">${diaCorto(prDia)} <b>${cnt(prDia)}</b></button>` : ''}
+      <button class="dia${prDia==='todos'?' on':''}" data-prdia="todos">Todos <b>${base.length}</b></button><button class="dia" id="prCal" aria-label="Calendario">📅</button></div>`;
+  }
   let cuerpo = '';
   if(prTab==='nuevos'){
     cuerpo = ls.length ? ls.map(p=>{ const t = totalPedRec(p), np = p.lineas.length, tel = telPedRec(p);
@@ -7278,22 +7292,27 @@ function viewPedidosRec(){
       </div>`; }).join('')
       : `<div class="rc-empty">${svg('catalogo')}<p>No hay pedidos nuevos${q ? ' que coincidan' : ''}.</p><small class="muted">${fbUser ? 'Los pedidos del catálogo llegan aquí solos.' : ''}</small></div>`;
   } else {
-    const limite = sumaDias(hoyClave(), -prDias), viejos = q ? 0 : ls.filter(p=> hoyClave(new Date(p.recibido||p.fecha)) < limite).length;
-    if(!q) ls = ls.filter(p=> hoyClave(new Date(p.recibido||p.fecha)) >= limite);
+    if(prDia!=='todos') ls = ls.filter(p=> diaRec(p)===prDia);
+    const viejos = 0;
     let dia = '';
     const grupos = {}; ls.forEach(p=>{ const k = hoyClave(new Date(p.recibido||p.fecha)); (grupos[k] = grupos[k] || []).push(p); });
     cuerpo = Object.keys(grupos).sort().reverse().map(k=>{ const g = grupos[k];
       return `<div class="rc-day pr-dia"><span>${(t=> t.charAt(0).toUpperCase() + t.slice(1))(fechaCorta(k))}</span><span>${g.length} ${g.length===1?'pedido':'pedidos'} · ${fmt(sumar(g, totalPedRec))}</span></div>` +
         g.map(p=>{ const d = prTab==='atendidos' ? destinoPedRec(p) : {txt:'Descartado', cls:'neg'};
           return `<button class="rc-row pr-at" data-prd="${p.id}"><span class="rc-main"><b>${esc(p.cliente.tienda || p.cliente.nombre)}</b><small>${new Date(p.recibido||p.fecha).toLocaleTimeString('es-MX',{hour:'numeric',minute:'2-digit'})} · <span class="pr-d ${d.cls}">${esc(d.txt)}</span></small></span><span class="rc-folio">${fmt(totalPedRec(p))} ›</span></button>`; }).join(''); }).join('')
-      || `<div class="rc-empty"><p>No hay pedidos ${prTab==='atendidos'?'atendidos':'descartados'} ${q ? 'que coincidan' : 'en los últimos ' + prDias + ' días'}.</p></div>`;
+      || `<div class="rc-empty"><p>No hay pedidos ${prTab==='atendidos'?'atendidos':'descartados'}${prDia!=='todos' ? ' ' + (prDia===hoyClave() ? 'de hoy' : 'del ' + diaCorto(prDia)) : ''}${q || prVis ? ' con este filtro' : ''}.</p></div>`;
     if(viejos) cuerpo += `<button class="lnk pr-mas" id="prVerMas">Ver días anteriores (${viejos})</button>`;
   }
-  return `<div class="rc-wrap pr-wrap"><div class="cr-pad" style="padding-top:12px">${tabs}${buscar}</div>${cuerpo}
+  return `<div class="rc-wrap pr-wrap"><div class="cr-pad" style="padding-top:12px">${tabs}${buscar}</div>${filaDias}${cuerpo}
     <div class="pr-pegar"><button class="lnk" id="prPegar">${svg('copy')}Pegar pedido de WhatsApp</button><small>${fbUser ? 'Solo si un cliente te lo mandó por WhatsApp.' : 'Copia el mensaje del cliente y pégalo aquí.'}</small></div></div>`;
 }
 function bindPedidosRec(rerender){
-  document.querySelectorAll('[data-prt]').forEach(b=> b.onclick = ()=>{ prTab = b.dataset.prt; prDias = 7; rerender(); });
+  document.querySelectorAll('[data-prt]').forEach(b=> b.onclick = ()=>{ prTab = b.dataset.prt; prDia = null; rerender(); });
+  document.querySelectorAll('[data-prdia]').forEach(b=> b.onclick = ()=>{ prDia = b.dataset.prdia; rerender(); });
+  bindChipsDiasCli(document, 'prVisD', d=>{ prVis = d; rerender(); });
+  const on = document.querySelector('#prDiasR .dia.on'); if(on) on.scrollIntoView({inline:'center', block:'nearest'});
+  const cal = document.getElementById('prCal'); if(cal) cal.onclick = ()=>{ const est = {atendidos:'Atendido', descartados:'Descartado'}[prTab];
+    calendarioDias({sel:prDia, contar:k=> pedidosRecibidos().filter(p=> p.estado===est && diaRec(p)===k).length, nota:'El número indica los pedidos que llegaron cada día.', alElegir:k=>{ prDia = k; rerender(); }}); };
   const q = document.getElementById('prQ'); if(q) q.oninput = ()=>{ prQ = q.value; const pos = q.selectionStart; rerender(); const q2 = document.getElementById('prQ'); if(q2){ q2.focus(); try{ q2.setSelectionRange(pos, pos); }catch(_){} } };
   const vm = document.getElementById('prVerMas'); if(vm) vm.onclick = ()=>{ prDias += 30; rerender(); };
   const pg = document.getElementById('prPegar'); if(pg) pg.onclick = pegarPedido;
