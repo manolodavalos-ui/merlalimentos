@@ -144,6 +144,11 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 .lat-i span{width:26px;text-align:center;font-size:1.15rem}.lat-i b{flex:1;font-weight:600}
 .lat-i i{font-style:normal;background:var(--brand);color:#fff;border-radius:999px;padding:1px 8px;font-size:.76rem;font-weight:700}.lat-i i.v{background:#e0a800;color:#3a2a00}.lat-i i.a{background:var(--gold);color:#3a2a00}
 .lat-sep{height:1px;background:var(--line);margin:6px 0}
+.inst-ban{display:flex;align-items:stretch;margin:10px auto 0;max-width:420px;background:#fff;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.15);overflow:hidden;text-align:left}
+.inst-ban #btnInst{flex:1;display:flex;align-items:center;gap:10px;padding:10px 12px;color:#1d3b2c;text-align:left}.inst-ban #btnInst>span:first-child{font-size:1.5rem}
+.inst-ban b{display:block;font-size:.95rem}.inst-ban small{display:block;font-size:.78rem;color:#5b6b63}
+.inst-ban i{font-style:normal;background:var(--brand);color:#fff;font-weight:800;font-size:.85rem;padding:8px 12px;border-radius:999px;margin-left:auto;white-space:nowrap}
+.inst-x{padding:0 12px;color:#8a958f;font-size:1rem;border-left:1px solid var(--line)}
 .vale-ban{display:block;margin:10px auto 0;max-width:420px;width:100%;background:linear-gradient(135deg,#fff8e1,#ffe9a8);color:#5a3e00;border-radius:12px;padding:10px 12px;font-size:.88rem;text-align:left;box-shadow:0 4px 14px rgba(0,0,0,.15)}
 .vale-ln{background:#fff8e1;border-radius:10px;padding:10px;margin-top:6px;border-bottom:0}.vale-ln .im{color:#7a5600}
 .vale-it{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}.vale-it>b{font-size:1.2rem;min-width:70px;color:#7a5600}
@@ -613,6 +618,10 @@ function guardarEnHistorial(o){ const l = misPedidos().filter(x=> x.id!==o.id); 
 function pintarBotonMis(){ const el = document.getElementById('misPed'); if(!el) return; const n = misPedidos().length;
   const va = valeActivo();
   el.innerHTML = va ? `<button class="vale-ban" id="btnVale">🎟️ Tienes un vale de <b>${fmt(va.m)}</b> para tu próximo pedido${va.v ? ` · vence ${new Date(va.v + 'T12:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'})}` : ''}</button>` : '';
+  const ocultoHasta = Number(ls.get('mkcat_instOculto', 0)) || 0;
+  if(puedeInstalar() && Date.now() > ocultoHasta) el.insertAdjacentHTML('beforeend', `<div class="inst-ban"><button id="btnInst"><span>📲</span><span><b>Instala la app</b><small>Pide más rápido y participa por vales de descuento</small></span><i>Instalar</i></button><button class="inst-x" id="btnInstX" aria-label="Ocultar">✕</button></div>`);
+  const bi = el.querySelector('#btnInst'); if(bi) bi.onclick = instalar;
+  const bx = el.querySelector('#btnInstX'); if(bx) bx.onclick = ()=>{ ls.set('mkcat_instOculto', Date.now() + 3*864e5); pintarBotonMis(); };
   const bv = el.querySelector('#btnVale'); if(bv) bv.onclick = verVales;
   const dot = document.getElementById('menuDot'); if(dot) dot.style.display = (puedeInstalar() || valesPorActivar().length) ? 'block' : 'none'; }
 async function verMisPedidos(){
@@ -1067,11 +1076,16 @@ async function quitarAcceso(mid, h){
 let promptInst = null;
 const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints > 1);
 const instalada = ()=> window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-const puedeInstalar = ()=> !instalada() && (!!promptInst || esIOS);
+const puedeInstalar = ()=> !instalada();
+const enAppAjena = /WhatsApp|FBAN|FBAV|Instagram|Line\/|; wv\)/i.test(navigator.userAgent);   /* navegador interno de WhatsApp, Facebook, etc. */
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); promptInst = e; pintarBotonMis(); });
 window.addEventListener('appinstalled', ()=>{ promptInst = null; pintarBotonMis(); toast('¡Listo! Ya tienes la app en tu inicio'); });
 async function instalar(){
   if(promptInst){ promptInst.prompt(); try{ await promptInst.userChoice; }catch(_){} promptInst = null; pintarBotonMis(); return; }
+  if(enAppAjena){ hoja(`<h3>Instalar la app</h3><p class="sub">Estás viendo el catálogo dentro de otra aplicación. Para instalarlo:</p>
+    <ol class="pasos-i"><li>Toca los <b>⋮</b> (tres puntos) arriba a la derecha.</li><li>Elige <b>Abrir en Chrome</b>${esIOS ? ' (o <b>Abrir en Safari</b>)' : ''}.</li><li>Ya en el navegador, abre el menú <b>☰</b> y toca <b>Instalar app</b>.</li></ol>`, true); return; }
+  if(!esIOS){ hoja(`<h3>Instalar la app</h3><p class="sub">Desde Chrome:</p>
+    <ol class="pasos-i"><li>Toca los <b>⋮</b> (tres puntos) arriba a la derecha.</li><li>Elige <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.</li><li>Toca <b>Instalar</b>.</li></ol><p class="sub">Aparecerá el ícono de Cliente consentido en tu inicio.</p>`, true); return; }
   hoja(`<h3>Instalar en tu iPhone</h3><p class="sub">Así tendrás tu catálogo como una app en la pantalla de inicio:</p>
     <ol class="pasos-i"><li>Toca el botón <b>Compartir</b> <span class="ico">⬆︎</span> abajo en Safari.</li><li>Elige <b>Agregar a inicio</b>.</li><li>Toca <b>Agregar</b>.</li></ol>
     <p class="sub">Si no ves la opción, abre este enlace en <b>Safari</b>.</p>`, true);
