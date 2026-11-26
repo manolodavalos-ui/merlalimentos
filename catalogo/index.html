@@ -134,6 +134,15 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 .toast.on{opacity:1}
 .pie{text-align:center;color:var(--muted);font-size:.78rem;padding:10px 0 30px}
 .cargando{text-align:center;color:var(--muted);padding:60px 20px}
+.visita{margin:10px auto 0;max-width:420px;background:#fff;color:#1d3b2c;border-radius:12px;padding:9px 12px;font-size:.86rem;text-align:left;border-left:5px solid #2f6fd6;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.visita.hoy{border-left-color:#1f9d55}.visita.prox{border-left-color:#c9d3ce;color:#4b5a53}
+.sug{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:linear-gradient(135deg,#fff8e1,#fff3cd);border:1px solid #f2d27a;display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.sug span{font-size:.84rem;color:#7a5600;font-weight:600}.sug b{font-size:1.15rem;color:#5a3e00;grid-row:span 2}.sug small{font-size:.76rem;color:#8a6a1a}
+.acc-l{border:1px solid var(--line);border-radius:12px;margin:6px 0 4px}
+.acc-r{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}.acc-r:last-child{border-bottom:0}
+.acc-r small{display:block;color:var(--muted);font-size:.78rem}.acc-q{color:var(--danger);font-weight:700;font-size:.84rem}
+.pasos-i{margin:8px 0 12px 20px;line-height:1.9}.pasos-i .ico{display:inline-block;border:1px solid #ccc;border-radius:6px;padding:0 5px}
+
 </style>
 </head>
 <body>
@@ -583,7 +592,10 @@ const misPedidos = ()=>{
 async function refrescarCliNube(){ if(!tok) return; try{ const {m, db} = await conLimite(nube(), 8000); const c = await conLimite(m.getDoc(m.doc(db, 'clientesCat', tok)), 8000); if(c.exists()){ CLI = c.data(); ls.set(K + '_cli', CLI); } }catch(_){} }
 function guardarEnHistorial(o){ const l = misPedidos().filter(x=> x.id!==o.id); l.unshift(o); ls.set(K + '_pedidos', l.slice(0, 30)); pintarBotonMis(); }
 function pintarBotonMis(){ const el = document.getElementById('misPed'); if(!el) return; const n = misPedidos().length;
-  el.innerHTML = `<button class="mis-btn" id="btnMis">📋 Mis pedidos${n ? ` <i>${n}</i>` : ''}</button>`; const b = el.querySelector('#btnMis'); if(b) b.onclick = verMisPedidos; }
+  el.innerHTML = `<button class="mis-btn" id="btnMis">📋 Mis pedidos${n ? ` <i>${n}</i>` : ''}</button>${esDueno() && CLI ? ` <button class="mis-btn" id="btnAcc">👥 Compartir</button>` : ''}${puedeInstalar() ? ` <button class="mis-btn" id="btnInst">📲 Instalar app</button>` : ''}`;
+  const b = el.querySelector('#btnMis'); if(b) b.onclick = verMisPedidos;
+  const a = el.querySelector('#btnAcc'); if(a) a.onclick = verAccesos;
+  const i = el.querySelector('#btnInst'); if(i) i.onclick = instalar; }
 async function verMisPedidos(){
   await refrescarCliNube(); pintarBotonMis();
   const l = misPedidos();
@@ -606,8 +618,14 @@ async function pintarUltimo(){
   el.innerHTML = barraSeg(sg, u);
 }
 const conLimite = (p, ms) => Promise.race([p, new Promise((_, rej)=> setTimeout(()=> rej(new Error('tiempo')), ms))]);
-const tok = (()=>{ const q = new URLSearchParams(location.search).get('c'); try{ if(q){ localStorage.setItem('mkcat_tok', q); return q; } return localStorage.getItem('mkcat_tok') || ''; }catch(_){ return q || ''; } })();
-const K = 'mkcat_' + (tok || 'general');
+/* Quién abre: el dueño entra con ?c=token; una persona invitada (encargado o familiar) entra con ?m=id y su token se resuelve en la nube */
+const QS = new URLSearchParams(location.search);
+let MID = (()=>{ const m = QS.get('m'), c = QS.get('c'); try{ if(m){ localStorage.setItem('mkcat_mid', m); return m; } if(c){ localStorage.removeItem('mkcat_mid'); return ''; } return localStorage.getItem('mkcat_mid') || ''; }catch(_){ return m || ''; } })();
+let ACC = (()=>{ try{ return MID ? JSON.parse(localStorage.getItem('mkcat_acc_' + MID) || 'null') : null; }catch(_){ return null; } })();
+let tok = (()=>{ if(MID) return ACC?.tok || ''; const q = QS.get('c'); try{ if(q){ localStorage.setItem('mkcat_tok', q); return q; } return localStorage.getItem('mkcat_tok') || ''; }catch(_){ return q || ''; } })();
+let K = 'mkcat_' + (tok || 'general');
+const esDueno = ()=> !!tok && !MID;
+const yo = ()=> MID ? (ACC ? {n:ACC.n, rol:ACC.rol, m:MID} : null) : (CLI ? {n:CLI.n, rol:'Dueño'} : null);
 const mem = {};
 const ls = { get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(_){ return k in mem ? mem[k] : d; } },
              set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(_){ mem[k] = v; } } };
@@ -623,8 +641,17 @@ const foto = p => !p.f ? '' : (FOTOS[p.f] || (String(p.f).startsWith('data:') ? 
 const prodPorId = id => D.productos.find(p=> p.id===id);
 const guardarCarrito = ()=> ls.set(K + '_carrito', carrito);
 
+async function resolverAcceso(){
+  if(!MID) return;
+  try{ const {m, db} = await conLimite(nube(), 8000); const d = await conLimite(m.getDoc(m.doc(db, 'accesos', MID)), 8000);
+    if(d.exists()){ const x = d.data(); ACC = {tok:x.tok, n:x.n, rol:x.rol, activo:x.activo !== false}; ls.set('mkcat_acc_' + MID, ACC); }
+    else ACC = {...(ACC||{}), activo:false};
+  }catch(_){}
+  if(ACC && ACC.tok && ACC.tok !== tok){ tok = ACC.tok; K = 'mkcat_' + tok; carrito = ls.get(K + '_carrito', {}); }
+}
 async function cargar(){
   const t = Date.now();
+  await resolverAcceso();
   try{ /* primero la nube (al instante); si falla, el archivo publicado */
     const {m, db} = await conLimite(nube(), 8000);
     const [g, c] = await conLimite(Promise.all([m.getDoc(m.doc(db, 'catalogo', 'general')), tok ? m.getDoc(m.doc(db, 'clientesCat', tok)) : null]), 8000);
@@ -639,10 +666,13 @@ async function cargar(){
     catch(_){ CLI = ls.get(K + '_cli', null); }
   }
   if(!D){ $('main').innerHTML = '<div class="cargando">No se pudo cargar el catálogo. Revisa tu conexión e inténtalo de nuevo.</div>'; return; }
+  if(MID && (!ACC || ACC.activo === false)){ $('hola').innerHTML = ''; $('barra').innerHTML = ''; $('secnav').innerHTML = '';
+    $('main').innerHTML = `<div class="cargando"><div class="ok" style="background:#fdecea;color:#c0392b">✕</div><h3>${ACC ? 'Tu acceso a este catálogo fue retirado' : 'Este enlace no es válido'}</h3><p class="sub" style="margin-top:8px">Pide a la tienda que te comparta un nuevo enlace.</p></div>`; return; }
   /* quita del carrito lo que ya no está */
   Object.keys(carrito).forEach(id=>{ if(!prodPorId(id)) delete carrito[id]; }); guardarCarrito();
   $('sub').textContent = 'Merkalimentos · actualizado ' + new Date(D.publicado).toLocaleDateString('es-MX',{day:'numeric', month:'long', year:'numeric'});
-  $('hola').innerHTML = CLI ? `<span class="hola">Hola, ${esc(CLI.n)}, aquí podrás encontrar nuestros productos con tus precios</span>` : '';
+  $('hola').innerHTML = (CLI ? (MID && ACC ? `<span class="hola">Hola, ${esc(ACC.n)} · pedidos para ${esc(CLI.t || CLI.n)}</span>` : `<span class="hola">Hola, ${esc(CLI.n)}, aquí podrás encontrar nuestros productos con tus precios</span>`) : '') + avisoVisita();
+  asegurarUrlInstalable();
   pintar();
 }
 function pintar(){
@@ -710,6 +740,7 @@ function verGrande(id){
     <h3 style="margin-top:10px">${esc(nombre(p))}</h3><p class="sub">${esc(p.pr || '')}</p>
     <div class="tot"><span>${pe !== p.p ? 'Tu precio' : 'Precio'}</span><span>${fmt(pe)}${p.kg ? ' /kg' : ''}</span></div>
     ${pe !== p.p ? '' : p.promo ? `<p class="sub">Promo ${esc(p.promo)}</p>` : p.may ? `<p class="sub">${esc(p.may)}</p>` : ''}
+    ${sugeridoHTML(p)}
     <div class="acts"><button class="btn sec" id="vgCerrar">Cerrar</button></div>`, true);
   h.querySelector('#vgX').onclick = h.querySelector('#vgCerrar').onclick = ()=> h.remove();
 }
@@ -737,13 +768,14 @@ function verTicket(){
   const env = h.querySelector('#tEnviar'); if(env) env.onclick = ()=>{
     const nom = CLI ? (CLI.t || CLI.n) : h.querySelector('#tNom').value.trim(), tel = CLI ? CLI.tel : h.querySelector('#tTel').value.replace(/\D/g,'');
     if(!CLI){ if(!nom) return toast('Escribe tu nombre o el de tu tienda'); if(tel.length !== 10) return toast('El teléfono debe tener 10 dígitos'); ls.set('mkcat_nombre', nom); ls.set('mkcat_tel', tel); }
-    h.remove(); enviar({n: CLI ? CLI.n : nom, t: CLI ? (CLI.t || '') : '', tel}, nota ? nota.value.trim() : '');
+    h.remove(); revisarDuplicado({n: CLI ? CLI.n : nom, t: CLI ? (CLI.t || '') : '', tel}, nota ? nota.value.trim() : '');
   };
 }
 function confirmarSimple(t){ try{ return window.confirm(t); }catch(_){ return true; } }
 const b64url = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-async function enviar(cli, nota){
+async function enviar(cli, nota, agregaA){
   const lineas = Object.entries(carrito).map(([id,q])=>{ const p = prodPorId(id); return [id, q, precio(p), nombre(p)]; });
+  const quien = yo();
   const pedido = {v:1, id:'W' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), f:new Date().toISOString(), c:tok || null, cli, l:lineas, nota};
   const total = totalCarrito();
   /* 1) directo a la nube: llega solo a la app de Merkalimentos */
@@ -751,9 +783,10 @@ async function enviar(cli, nota){
   let enNube = false;
   try{
     const {m, db} = await conLimite(nube(), 8000);
-    await conLimite(m.setDoc(m.doc(db, 'pedidos', pedido.id), {v:1, id:pedido.id, f:pedido.f, c:pedido.c, cli:{n:cli.n || '', t:cli.t || '', tel:cli.tel || ''},
+    await conLimite(m.setDoc(m.doc(db, 'pedidos', pedido.id), {v:1, id:pedido.id, f:pedido.f, c:pedido.c, cli:{n:cli.n || '', t:cli.t || '', tel:cli.tel || '', ...(quien ? {por:quien} : {}), ...(agregaA ? {agregaA} : {})},
       l: lineas.map(([id, q, p, n])=> ({id, q, p, n})), nota: nota || '', total, estado:'Nuevo', creado: m.serverTimestamp()}), 10000);
     enNube = true;
+    if(tok) m.setDoc(m.doc(db, 'clientesCat', tok), {ult:{id: agregaA || pedido.id, f:pedido.f, total, por: quien ? {n:quien.n, rol:quien.rol} : null}}, {merge:true}).catch(()=>{});
   }catch(e){ console.warn('pedido por nube falló', e); }
   espera.remove();
   let pdf = null; try{ pdf = pdfPedido(pedido, total); }catch(e){}
@@ -761,9 +794,12 @@ async function enviar(cli, nota){
   const texto = `*Pedido ${cli.t || cli.n}*\n` + lineas.map(([id,q,pr,nm])=> `• ${prodPorId(id).kg ? r3(q) + ' kg' : q} × ${nm} = ${fmt(r2(pr*q))}`).join('\n') + `\n*Total: ${fmt(total)}*` + (nota ? `\nNota: ${nota}` : '') + `\n\nAbrir en la app: ${link}`;
   const wa = `https://wa.me/${D.negocio?.wa || '529611080808'}?text=${encodeURIComponent(texto)}`;
   const nombreArch = `Pedido ${(cli.t || cli.n).replace(/[\\/:*?"<>|]+/g,' ')} ${new Date().toLocaleDateString('es-MX').replace(/\//g,'-')}.pdf`;
-  if(enNube){ ls.set(K + '_ultimo', {id:pedido.id, f:pedido.f, total}); guardarEnHistorial({id:pedido.id, f:pedido.f, total, l: lineas.map(([id, q, p, n])=> ({q, p, n}))}); carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); modo = 'ver'; pintar(); pintarBotonMis(); setTimeout(pintarUltimo, 300); }
+  if(enNube && agregaA){ const l0 = misPedidos().find(x=> x.id===agregaA) || {id:agregaA, f:pedido.f, total:0, l:[]};
+    const o = {...l0, total: r2((l0.total||0) + total), l:[...(l0.l||[]), ...lineas.map(([id, q, p, n])=> ({q, p, n}))]}; delete o.sg;
+    ls.set(K + '_ultimo', {id:agregaA, f:o.f, total:o.total}); guardarEnHistorial(o); carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); modo = 'ver'; pintar(); pintarBotonMis(); setTimeout(pintarUltimo, 300); }
+  else if(enNube){ ls.set(K + '_ultimo', {id:pedido.id, f:pedido.f, total}); guardarEnHistorial({id:pedido.id, f:pedido.f, total, l: lineas.map(([id, q, p, n])=> ({q, p, n}))}); carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); modo = 'ver'; pintar(); pintarBotonMis(); setTimeout(pintarUltimo, 300); }
   const waTexto = enNube ? `https://wa.me/${D.negocio?.wa || '529611080808'}?text=${encodeURIComponent(`Hola, acabo de enviar mi pedido desde el catálogo (${cli.t || cli.n}) por ${fmt(total)}.`)}` : wa;
-  const h = hoja(enNube ? `<div class="ok">✓</div><h3 style="text-align:center">¡Pedido enviado!</h3>
+  const h = hoja(enNube ? `<div class="ok">✓</div><h3 style="text-align:center">${agregaA ? '¡Productos agregados a tu pedido!' : '¡Pedido enviado!'}</h3>
     <p class="sub" style="text-align:center">${lineas.length} ${lineas.length===1 ? 'producto' : 'productos'} · <b>${fmt(total)}</b></p>
     <div id="pSeg">${barraSeg(null)}</div>
     <div class="acts">
@@ -820,6 +856,100 @@ function pdfPedido(p, total){
   if(p.nota){ doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(40,45,43); doc.text(doc.splitTextToSize('Nota: ' + p.nota, W-2*M), M, y+22); }
   doc.setFontSize(8.5); doc.setTextColor(...gris); doc.text(`${D.negocio?.nombre || ''} · ${D.negocio?.sub || ''}${D.negocio?.tel ? ' · WhatsApp ' + D.negocio.tel : ''}`, M, H-12);
   return doc;
+}
+
+/* ===== Aviso del día de visita ===== */
+const DIAS_K = ['dom','lun','mar','mie','jue','vie','sab'], DIAS_N = {lun:'lunes', mar:'martes', mie:'miércoles', jue:'jueves', vie:'viernes', sab:'sábado', dom:'domingo'};
+function avisoVisita(){
+  const dv = (CLI && CLI.dv) || []; if(!dv.length || CLI.fs) return '';
+  const hoy = new Date().getDay(), kHoy = DIAS_K[hoy], kMan = DIAS_K[(hoy + 1) % 7];
+  if(dv.includes(kHoy)) return `<div class="visita hoy">📅 <b>Hoy es tu día de visita.</b> Si aún no haces tu pedido, ¡estás a tiempo!</div>`;
+  if(dv.includes(kMan)) return `<div class="visita">📅 <b>Mañana te visitamos</b> (${DIAS_N[kMan]}). Arma tu pedido desde hoy.</div>`;
+  for(let i = 2; i < 8; i++){ const k = DIAS_K[(hoy + i) % 7]; if(dv.includes(k)) return `<div class="visita prox">📅 Tu próxima visita es el <b>${DIAS_N[k]}</b>.</div>`; }
+  return '';
+}
+/* ===== Precio sugerido (solo en la vista grande): tu precio normal × (1 + %), al entero o .50; por pieza en paquetes ===== */
+function sugeridoHTML(p){
+  if(!p.sg || (CLI && CLI.ns)) return '';
+  const [pct, pz] = p.sg, u = p.p / (pz || 1), sug = Math.round(u * (1 + pct/100) * 2) / 2, gana = r2(sug - u);
+  return `<div class="sug"><span>💡 Precio sugerido de venta</span><b>${fmt(sug)}${p.kg ? ' /kg' : pz > 1 ? ' c/pza' : ''}</b><small>${pz > 1 ? `Por pieza (1 de ${pz}) · ` : ''}ganas ${fmt(gana)} por ${p.kg ? 'kg' : 'pieza'} · ${pct}%</small></div>`;
+}
+/* ===== Pedido de hoy hecho por otra persona: agregar a ese o hacer uno aparte ===== */
+async function revisarDuplicado(cli, nota){
+  if(!tok) return enviar(cli, nota);
+  await refrescarCliNube();
+  const lim = Date.now() - 20*3600e3, vivos = o => !o.sg || !['Cancelado','Entregado'].includes(o.sg.estado);
+  const cands = misPedidos().filter(o=> new Date(o.f).getTime() > lim && vivos(o));
+  const u = CLI && CLI.ult; if(u && u.id && new Date(u.f).getTime() > lim && !cands.some(o=> o.id===u.id)){ const e = CLI.ped && CLI.ped[u.id]; if(!e || vivos({sg:e})) cands.unshift({id:u.id, f:u.f, total:u.total, por:u.por}); }
+  if(!cands.length) return enviar(cli, nota);
+  const o = cands[0], porN = (o.por || (CLI.ult && CLI.ult.id===o.id ? CLI.ult.por : null));
+  const h = hoja(`<h3>Ya hay un pedido de hoy</h3><p class="sub">${porN ? `<b>${esc(porN.n)}</b>${porN.rol ? ' (' + esc(String(porN.rol).toLowerCase()) + ')' : ''} hizo` : 'Se hizo'} un pedido a las ${new Date(o.f).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})} por <b>${fmt(o.total)}</b>.</p>
+    <div class="acts"><button class="btn" id="dAgr">Agregar mis productos a ese pedido</button><button class="btn sec" id="dApa">Hacer un pedido aparte</button><button class="btn sec" id="dNo">Cancelar</button></div>`, true);
+  h.querySelector('#dAgr').onclick = ()=>{ h.remove(); enviar(cli, nota, o.id); };
+  h.querySelector('#dApa').onclick = ()=>{ h.remove(); enviar(cli, nota); };
+  h.querySelector('#dNo').onclick = ()=> h.remove();
+}
+/* ===== Personas con acceso: el dueño comparte un enlace propio para su encargado o familiar (máximo 2) ===== */
+const MAX_INV = 2;
+const rid = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b=> 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
+function verAccesos(){
+  const m = (CLI && CLI.miembros) || {}, act = Object.entries(m).filter(([,x])=> x && x.activo !== false);
+  const h = hoja(`<h3>Compartir tu catálogo</h3><p class="sub">Cada persona recibe su propio enlace. Sus pedidos llegan con su nombre y puedes quitarle el acceso cuando quieras.</p>
+    <div class="acc-l"><div class="acc-r"><span><b>${esc(CLI.n)}</b><small>Dueño · tú</small></span></div>
+      ${act.map(([mid, x])=> `<div class="acc-r"><span><b>${esc(x.n)}</b><small>${esc(x.rol)}</small></span><button class="acc-q" data-q="${mid}">Quitar acceso</button></div>`).join('')}</div>
+    ${act.length < MAX_INV ? `<label>¿Quién enviará pedidos con este enlace?</label><input class="field" id="aNom" maxlength="40" placeholder="Nombre" autocomplete="off">
+      <div class="kgs" id="aRol"><button data-r="Encargado" class="on">Encargado</button><button data-r="Familiar">Familiar</button></div>
+      <div class="acts"><button class="btn" id="aCrear">Crear enlace y compartir</button></div>`
+      : `<p class="aviso">Ya tienes ${MAX_INV + 1} personas con acceso. Quita a una para agregar a otra.</p>`}`);
+  h.querySelectorAll('#aRol button').forEach(b=> b.onclick = ()=> h.querySelectorAll('#aRol button').forEach(x=> x.classList.toggle('on', x===b)));
+  h.querySelectorAll('[data-q]').forEach(b=> b.onclick = ()=> quitarAcceso(b.dataset.q, h));
+  const cr = h.querySelector('#aCrear'); if(cr) cr.onclick = async ()=>{
+    const n = h.querySelector('#aNom').value.trim(), rol = h.querySelector('#aRol .on').dataset.r;
+    if(!n) return toast('Escribe el nombre');
+    cr.disabled = true; cr.textContent = 'Creando enlace…';
+    const mid = rid(12), ahora = new Date().toISOString();
+    try{ const {m: f, db} = await conLimite(nube(), 8000);
+      await conLimite(f.setDoc(f.doc(db, 'accesos', mid), {tok, n, rol, creado:f.serverTimestamp(), activo:true}), 10000);
+      await conLimite(f.setDoc(f.doc(db, 'clientesCat', tok), {miembros:{[mid]:{n, rol, creado:ahora, activo:true}}}, {merge:true}), 10000);
+      CLI.miembros = {...(CLI.miembros||{}), [mid]:{n, rol, creado:ahora, activo:true}}; ls.set(K + '_cli', CLI);
+    }catch(e){ cr.disabled = false; cr.textContent = 'Crear enlace y compartir'; return toast(/permission/i.test(String(e && (e.code || e.message))) ? 'Esta función aún no está activa. Avisa a Merkalimentos.' : 'Sin conexión: inténtalo de nuevo'); }
+    h.remove();
+    const link = location.origin + location.pathname + '?m=' + mid;
+    const txt = `Hola ${n}, te comparto el catálogo de Merkalimentos de ${CLI.t || CLI.n} para que puedas hacer pedidos: ${link}`;
+    try{ if(navigator.share){ await navigator.share({text:txt}); toast('Enlace compartido'); return; } }catch(e){ if(e && e.name==='AbortError'){ toast('Enlace creado: puedes compartirlo después'); return; } }
+    location.href = 'https://wa.me/?text=' + encodeURIComponent(txt);
+  };
+}
+async function quitarAcceso(mid, h){
+  const x = CLI.miembros[mid]; if(!confirmarSimple(`¿Quitar el acceso a ${x.n}? Ya no podrá hacer pedidos con su enlace.`)) return;
+  const ahora = new Date().toISOString();
+  try{ const {m: f, db} = await conLimite(nube(), 8000);
+    await conLimite(f.setDoc(f.doc(db, 'accesos', mid), {activo:false, quitado:ahora}, {merge:true}), 10000);
+    await conLimite(f.setDoc(f.doc(db, 'clientesCat', tok), {miembros:{[mid]:{activo:false, quitado:ahora}}}, {merge:true}), 10000);
+    CLI.miembros[mid] = {...x, activo:false}; ls.set(K + '_cli', CLI); toast(`${x.n} ya no tiene acceso`); h.remove(); verAccesos();
+  }catch(e){ toast('No se pudo quitar el acceso: revisa tu conexión'); }
+}
+/* ===== Instalar como app ===== */
+let promptInst = null;
+const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints > 1);
+const instalada = ()=> window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const puedeInstalar = ()=> !instalada() && (!!promptInst || esIOS);
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); promptInst = e; pintarBotonMis(); });
+window.addEventListener('appinstalled', ()=>{ promptInst = null; pintarBotonMis(); toast('¡Listo! Ya tienes la app en tu inicio'); });
+async function instalar(){
+  if(promptInst){ promptInst.prompt(); try{ await promptInst.userChoice; }catch(_){} promptInst = null; pintarBotonMis(); return; }
+  hoja(`<h3>Instalar en tu iPhone</h3><p class="sub">Así tendrás tu catálogo como una app en la pantalla de inicio:</p>
+    <ol class="pasos-i"><li>Toca el botón <b>Compartir</b> <span class="ico">⬆︎</span> abajo en Safari.</li><li>Elige <b>Agregar a inicio</b>.</li><li>Toca <b>Agregar</b>.</li></ol>
+    <p class="sub">Si no ves la opción, abre este enlace en <b>Safari</b>.</p>`, true);
+}
+/* La app instalada abre con el enlace de esta persona (en iPhone no comparte memoria con el navegador) */
+function asegurarUrlInstalable(){
+  const id = MID ? 'm=' + MID : tok ? 'c=' + tok : ''; if(!id) return;
+  try{ if(!location.search.includes(id)) history.replaceState(history.state, '', location.pathname + '?' + id); }catch(_){}
+  if(!esIOS) return;
+  try{ const man = {name:'Cliente consentido Merkalimentos', short_name:'Cliente consentido', start_url: location.origin + location.pathname + '?' + id, scope: location.origin + location.pathname,
+      display:'standalone', background_color:'#1f6f4a', theme_color:'#1f6f4a', icons:[{src: new URL('../icon-192.png', location.href).href, sizes:'192x192', type:'image/png'}, {src: new URL('../icon-512.png', location.href).href, sizes:'512x512', type:'image/png'}]};
+    document.querySelector('link[rel="manifest"]').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man)); }catch(_){}
 }
 cargar().then(()=>{ pintarBotonMis(); setTimeout(pintarUltimo, 300); }).catch(()=>{});
 /* Botón Atrás del teléfono: cierra ventanas abiertas, luego regresa al catálogo y en la pantalla principal pregunta si desea salir */
