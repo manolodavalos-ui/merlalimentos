@@ -900,6 +900,21 @@ dd.pos{color:var(--brand)}
 .rt-k.neg b{color:var(--danger,#c0392b)}
 .rt-leg{display:flex;flex-wrap:wrap;gap:4px 12px;padding:0 16px 10px;font-size:.78rem;color:var(--muted)}
 .rt-leg span{display:flex;align-items:center;gap:5px}.rt-leg i{width:10px;height:10px;border-radius:50%;display:inline-block}.rt-leg i.sq{border-radius:3px}
+.gc-sec{margin:12px 12px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+.gc-sec h4{margin:0;padding:10px 12px;font-size:.84rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line)}
+.gc-sec>p{padding:10px 12px;margin:0}
+.gc-ev,.gc-al{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;background:#fff}
+.gc-ev:last-child,.gc-al:last-child{border-bottom:0}
+.gc-h{font-size:.8rem;color:var(--muted);width:62px;flex-shrink:0}
+.gc-ev>i{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.gc-t{flex:1;min-width:0}.gc-t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gc-t small{color:var(--muted);font-size:.8rem}
+.gc-d{font-weight:700;font-size:.82rem;white-space:nowrap}
+.gc-hueco{padding:6px 12px;background:#fff4e5;color:#b35900;font-size:.8rem;font-weight:600;border-bottom:1px solid var(--line)}
+.gc-al{align-items:flex-start;font-size:.88rem}.gc-al>span:first-child{font-size:.8rem;color:var(--muted);width:62px;flex-shrink:0}
+.gc-al.dud .ub-b{margin-top:6px}
+.gc-nv{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line)}.gc-nv small{display:block;color:var(--muted);font-size:.8rem}
+.gc-disp{border-bottom:0;padding-top:0}
+#gcMapa{position:absolute;inset:0;background:#e8ecea}
 .af-wrap{padding:12px 16px 30px;display:flex;flex-direction:column;gap:12px}
 .af-top{display:flex;gap:14px;align-items:center}
 .af-img{width:92px;height:92px;border-radius:14px;background:#fff center/contain no-repeat;border:1px solid var(--line);display:grid;place-items:center;flex-shrink:0}
@@ -2143,7 +2158,7 @@ if(!store.get('config')) store.set('config', {tienda:'Merkalimentos', dispositiv
   if(!c.numDispositivo) c.numDispositivo = parseInt((c.dispositivo.match(/(\d+)\s*$/)||[])[1] || '1', 10);
   store.set('config', c);
 })();
-const APP_VERSION = '0.63.2';
+const APP_VERSION = '0.64.0';
 
 /* ================= Íconos ================= */
 const I = {
@@ -3339,7 +3354,8 @@ function registrarVenta(metodo, recibido, credito, opts = {}){
     devoluciones: t.devoluciones || [],
     sincronizado:false
   };
-  recibo.ub = ubVenta();
+  recibo.ub = ubVenta(); if(t.entregaPedido) recibo.entregaDe = t.entregaFolio || '';
+  gpsEvento(recibo, r=> DB.guardarRecibo(r));
   if(opts.abonarCredito && total < 0 && recibo.cliente?.id){
     const ab = abonarDevolucion(recibo, -total);
     if(ab){ recibo.devAbonada = ab.monto; recibo.abonoDevId = ab.id; recibo.cambio = r2(-total - ab.monto); }
@@ -3464,6 +3480,7 @@ function registrarVisita(cli, alTerminar){
   };
 }
 function asignarCliente(c){
+  if(c) obtenerPos(null);   /* calienta el GPS para registrar la ubicación de la venta o pedido */
   const t = ticket(); t.cliente = c ? clienteRef(c) : null; t.preguntado = true; if(!esCot()) repreciarTicket(t); guardarTicket(t);
 }
 function necesitaPreguntarCliente(){
@@ -4410,6 +4427,7 @@ function bindProgramar(){
       turno:turno?.folio || null, dispositivo:turno?.dispositivo || store.get('config').dispositivo || '', usuario:session.usuario, vendedor:session.nombre,
       ticketNombre:t.nombre || null, sincronizado:false, ...(t.origenRec ? {origenRec:t.origenRec} : {})
     };
+    if(!t.origenRec) gpsEvento(pedido, p=> DB.guardarPedido(p));
     DB.guardarPedido(pedido);
     if(pedido.origenRec) pedido.origenFecha = (pedidosRecibidos().find(x=> x.id===pedido.origenRec)||{}).fecha;
     pushPedidoNube(pedido); if(fechaEntrega===hoyClave()) setTimeout(marcarEnReparto, 800);
@@ -5126,7 +5144,7 @@ function renderHeader(){
       : current==='recibos' && reciboSel ? (reciboVista==='descuento' ? 'Descuento por pedido incompleto' : 'Recibo')
       : enCli ? ({crear:'Crear cliente', lista:'Clientes guardados', editar:'Editar cliente', ficha:'Cliente'})[cliVista]
       : (m ? m.label : '');
-    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(current));
+    pill.classList.toggle('hidden', ['recibos','clientes','config','articulos','catalogo','mapa','geocerca','creditos','inventario','informes','compras'].includes(current));
     acts.innerHTML = current==='clientes' && (cliVista==='crear'||cliVista==='editar') ? '<button class="head-txt" id="hCliGuardar">GUARDAR</button>'
                    : current==='clientes' && cliVista==='lista' ? `<button class="icon-btn" id="hCliNuevo" aria-label="Crear cliente">${svg('userAdd')}</button>` : '';
     const hg = document.getElementById('hCliGuardar'); if(hg) hg.onclick = guardarClienteForm;
@@ -5172,7 +5190,7 @@ function abrirMas(){
 /* ================= Recibos ================= */
 let reciboSel = null, reciboQ = '';
 /* Control de cambios: una entrada por versión publicada (más reciente al final) */
-const NOVEDADES = [{"v": "0.17", "f": "2026-10-31", "t": "Primera versión publicada: app web instalable que funciona sin internet"}, {"v": "0.18", "f": "2026-10-31", "t": "Cotizar con PDF para compartir y mejoras al permiso de ubicación"}, {"v": "0.19", "f": "2026-10-31", "t": "Cajón de dinero, gestión de tesorería y descuento por pedido incompleto con versión 2 imprimible"}, {"v": "0.20", "f": "2026-10-31", "t": "Configuración de impresoras (TicketPrinter, RawBT, navegador) e impresión al cobrar"}, {"v": "0.21", "f": "2026-10-31", "t": "Sección Artículos con alta y edición de productos, imagen, identificador, código de barras y precios con descuento"}, {"v": "0.21.1", "f": "2026-10-31", "t": "Precio visible en las fotos de Venta, Preventa y Cotizar"}, {"v": "0.22", "f": "2026-10-31", "t": "Catálogo para mostrar productos con foto ampliada al doble toque"}, {"v": "0.23", "f": "2026-10-31", "t": "Promociones por volumen y por paquete, aplicadas en el ticket y en el resumen del turno"}, {"v": "0.24", "f": "2026-10-31", "t": "Ahorro por promociones en el ticket y venta a crédito con cliente obligatorio, fecha de pago y deuda acumulada"}, {"v": "0.25", "f": "2026-10-31", "t": "Cotizar con inicio e historial de cotizaciones realizadas (referencias, reenviar, usar como base, eliminar)"}, {"v": "0.26", "f": "2026-10-31", "t": "Descuentos generan una nueva versión del recibo (la anterior queda cancelada) y opción de cancelar ticket completo"}, {"v": "0.27", "f": "2026-10-31", "t": "Mapa de clientes del día con pines azules (por atender) y verdes (atendidos)"}, {"v": "0.27.1", "f": "2026-10-31", "t": "El mapa queda debajo del menú lateral"}, {"v": "0.28", "f": "2026-10-31", "t": "Créditos y cobranza"}, {"v": "0.28.1", "f": "2026-10-31", "t": "Elegir dispositivo (TPV1/TPV2) y corregir folios del turno"}, {"v": "0.29", "f": "2026-11-01", "t": "Inventario (almacén y camioneta), compras, conteos y liquidación"}, {"v": "0.30", "f": "2026-11-01", "t": "Informes con calendario, comparación, productos, proveedores, clientes y año"}, {"v": "0.30.1", "f": "2026-11-01", "t": "Proveedores asignados y productos en revisión"}, {"v": "0.30.2", "f": "2026-11-01", "t": "Costos de compra (solo donde no había)"}, {"v": "0.31", "f": "2026-11-01", "t": "Devoluciones de clientes en el ticket y entrega al proveedor"}, {"v": "0.32", "f": "2026-11-01", "t": "Cliente consentido (catálogo en línea), precios especiales y pedidos recibidos"}, {"v": "0.32.1", "f": "2026-11-01", "t": "Ajustes de Cliente consentido, pedidos recibidos en Preventa y pegar pedido"}, {"v": "0.33", "f": "2026-11-01", "t": "Varias impresoras, Bluetooth directo (Web Serial), modo gráfico, tablas de caracteres y cajón"}, {"v": "0.34", "f": "2026-11-01", "t": "Compras y gastos (productos, insumos, operación, personales) y cuentas por pagar"}, {"v": "0.34.1", "f": "2026-11-02", "t": "Respaldo, restauración y borrar datos de prueba"}, {"v": "0.34.2", "f": "2026-11-02", "t": "Agregar existencia y fijar lo contado desde cada producto"}, {"v": "0.34.3", "f": "2026-11-02", "t": "Ajuste de inventario por producto y deshacer movimientos"}, {"v": "0.34.4", "f": "2026-11-02", "t": "Nombre de la tienda en el ticket"}, {"v": "0.34.5", "f": "2026-11-02", "t": "Efectivo teórico de ventas en el turno"}, {"v": "0.34.6", "f": "2026-11-02", "t": "Canal foodservice (FS) en clientes"}, {"v": "0.34.7", "f": "2026-11-02", "t": "Total de productos, devoluciones y total a pagar en el ticket"}, {"v": "0.35", "f": "2026-11-03", "t": "Turno abierto y consultar turnos anteriores con calendario"}, {"v": "0.35.1", "f": "2026-11-03", "t": "Promoción por volumen en productos por kilo"}, {"v": "0.35.2", "f": "2026-11-03", "t": "El teclado de peso ignora el toque con el que se abre"}, {"v": "0.35.3", "f": "2026-11-03", "t": "Sin recarga al jalar la pantalla; botón Actualizar en el menú"}, {"v": "0.36", "f": "2026-11-03", "t": "Nuevo diseño del ticket y nombre corto por producto"}, {"v": "0.37", "f": "2026-11-04", "t": "Compras por proveedor, regalos, costo promedio, bonificación y orden de compra"}, {"v": "0.37.1", "f": "2026-11-04", "t": "Regalos de la promoción en su propia sección"}, {"v": "0.37.2", "f": "2026-11-04", "t": "Pie de compras más legible"}, {"v": "0.38", "f": "2026-11-04", "t": "Compras tipo ticket Sigma (lista, volumen negociado, regalos, devolución)"}, {"v": "0.38.1", "f": "2026-11-05", "t": "Tickets del cliente y búsqueda de recibos por cliente"}, {"v": "0.38.2", "f": "2026-11-06", "t": "Nombres cortos en tickets del sistema y compartir ticket"}, {"v": "0.38.3", "f": "2026-11-07", "t": "Corrige altura de los días en Mapa de clientes"}, {"v": "0.39", "f": "2026-11-07", "t": "Nube Firebase - catálogo en vivo y pedidos automáticos"}, {"v": "0.39.1", "f": "2026-11-07", "t": "Actualizar ahora reintenta la conexión de pedidos"}, {"v": "0.39.2", "f": "2026-11-07", "t": "Reintento automático de pedidos en línea"}, {"v": "0.40", "f": "2026-11-07", "t": "Editar/cancelar ventas programadas y productos a entregar por día"}, {"v": "0.41", "f": "2026-11-07", "t": "Carga de camioneta por día con pedidos y extra de venta en ruta"}, {"v": "", "f": "2026-11-07", "t": "Cliente consentido: 3 productos por renglón en celular"}, {"v": "0.41.1", "f": "2026-11-07", "t": "Abrir mensajes con WhatsApp Business"}, {"v": "0.41.2", "f": "2026-11-07", "t": "Filtro por día al elegir cliente para enviar catálogo"}, {"v": "0.42", "f": "2026-11-07", "t": "Enviar catálogo en serie a los clientes de un día"}, {"v": "", "f": "2026-11-08", "t": "Cliente consentido: vista previa con imagen para WhatsApp"}, {"v": "0.42.1", "f": "2026-11-09", "t": "Actualizar GPS en selector de cliente y aviso de venta programada"}, {"v": "0.42.2", "f": "2026-11-09", "t": "Aviso de sin existencia indica camioneta/almacén"}, {"v": "0.43", "f": "2026-11-09", "t": "Entregar y cobrar ventas programadas"}, {"v": "0.44", "f": "2026-11-09", "t": "Visitas sin compra con motivo e informe de visitas"}, {"v": "0.44.1", "f": "2026-11-09", "t": "El mapa cuenta visitas sin compra como atendidas"}, {"v": "0.44.2", "f": "2026-11-09", "t": "Mapa reconoce ventas a clientes duplicados"}, {"v": "0.45", "f": "2026-11-09", "t": "Seguimiento del pedido para el cliente y confirmación por WhatsApp"}, {"v": "0.45.1", "f": "2026-11-09", "t": "Barra de estado del pedido y En reparto al abrir turno"}, {"v": "0.45.2", "f": "2026-11-09", "t": "Aviso al cliente con detalle del pedido e imagen del ticket"}, {"v": "", "f": "2026-11-09", "t": "Cliente consentido: Mis pedidos con barra de estado"}, {"v": "", "f": "2026-11-10", "t": "Cliente consentido: botón Mis pedidos siempre visible"}, {"v": "0.46", "f": "2026-11-10", "t": "Historial de pedidos del cliente en la nube (visible desde cualquier equipo)"}, {"v": "0.46.1", "f": "2026-11-10", "t": "Desglose por entrega en productos por kilo"}, {"v": "0.46.2", "f": "2026-11-10", "t": "Programar ventas sin turno abierto"}, {"v": "0.47", "f": "2026-11-10", "t": "Por entregar en inventario con faltantes por proveedor y orden de compra"}, {"v": "", "f": "2026-11-12", "t": "Cliente consentido: cerrar ventanas, salir, volver al catálogo, botón atrás y sin recarga al jalar"}, {"v": "", "f": "2026-11-12", "t": "Cliente consentido: botón Cancelar pedido en curso"}, {"v": "", "f": "2026-11-12", "t": "Cliente consentido: correcciones de navegación (salir tras recargar, barra al enviar, confirmación propia al vaciar)"}, {"v": "", "f": "2026-11-12", "t": "Cliente consentido: Salir abre WhatsApp y deja pantalla de despedida"}, {"v": "0.47.1", "f": "2026-11-14", "t": "Mostrar u ocultar productos en el catálogo de clientes; lácteos regionales con 5 productos"}, {"v": "0.47.2", "f": "2026-11-14", "t": "Corrige casilla Venta en ruta en editar cliente"}, {"v": "0.48.0", "f": "2026-11-14", "t": "Al cerrar turno, reprogramar entregas pendientes y avisar al cliente"}, {"v": "0.48.1", "f": "2026-11-16", "t": "Productos a entregar cuenta todos los pedidos del día, con entregado y pendiente"}, {"v": "0.48.2", "f": "2026-11-16", "t": "Atrás desde la venta programada abierta en el selector regresa al selector"}, {"v": "0.49.0", "f": "2026-11-16", "t": "Botón Atrás del teléfono y filtro por día en Seleccionar cliente"}, {"v": "0.49.1", "f": "2026-11-16", "t": "Filtro estándar por día (Todos, Lun…Dom, FS) en todas las pantallas para elegir clientes"}, {"v": "0.49.2", "f": "2026-11-16", "t": "Seleccionar cliente abre siempre en Todos por cercanía GPS"}, {"v": "0.49.3", "f": "2026-11-16", "t": "Seleccionar cliente marca 'Visitado hoy · compró', resumen de visitas del día y clientes de otros días con pedido"}, {"v": "0.49.4", "f": "2026-11-16", "t": "Entregar y cobrar al editar una venta programada"}, {"v": "0.50.0", "f": "2026-11-16", "t": "Informes · Compra ≥ (clientes por semana con promedio de compra mínimo)"}, {"v": "0.50.1", "f": "2026-11-16", "t": "Una etiqueta por venta programada en el selector; aviso de reprogramación al cambiar la fecha manualmente"}, {"v": "0.50.2", "f": "2026-11-17", "t": "Informes · tarjeta de cobranza del periodo"}, {"v": "0.50.3", "f": "2026-11-17", "t": "Agregar productos del catálogo al editar o entregar una venta programada"}, {"v": "0.51.0", "f": "2026-11-23", "t": "Cambiar forma de pago de un recibo (incluye crédito y saldo del cliente)"}, {"v": "0.51.1", "f": "2026-11-23", "t": "Estado de cuenta en formato de ticket (imagen e impresión)"}, {"v": "0.52.0", "f": "2026-11-23", "t": "Ficha informativa del cliente (desde Clientes y desde Venta) y días de visita en la barra del cliente"}, {"v": "0.52.1", "f": "2026-11-23", "t": "Botones − / + en el ticket y cantidad en kg editable"}, {"v": "0.52.2", "f": "2026-11-23", "t": "Ahorro por precio especial en tickets"}, {"v": "0.53.0", "f": "2026-11-23", "t": "Ventas programadas por día (filtros, estados, calendario) y tarjetas nuevas"}, {"v": "0.54.0", "f": "2026-11-25", "t": "Productos a entregar · semana pendiente, vista por cliente, lista para cargar, barras de avance y compartir como ticket"}, {"v": "0.54.1", "f": "2026-11-25", "t": "Reprogramar ventas atrasadas en grupo e ícono de cliente agregado"}, {"v": "0.55.0", "f": "2026-11-25", "t": "Seleccionar varios recibos e imprimir su suma"}, {"v": "0.55.1", "f": "2026-11-25", "t": "Productos a entregar · marcar con presión larga, día de entrega y mapa por cliente, sin barra"}, {"v": "0.55.2", "f": "2026-11-25", "t": "Días de visita del cliente en Productos a entregar"}, {"v": "0.55.3", "f": "2026-11-25", "t": "Al editar venta programada, Programar entrega a la izquierda y Entregar y cobrar a la derecha"}, {"v": "0.55.4", "f": "2026-11-25", "t": "Días de visita con el mismo formato que Clientes"}, {"v": "0.56.0", "f": "2026-11-25", "t": "Pedidos recibidos rediseñado (pestañas, tarjetas con acciones, seguimiento, aviso con Ver)"}, {"v": "0.56.1", "f": "2026-11-25", "t": "Pedidos recibidos · filtro por fecha de llegada y por día de visita"}, {"v": "0.57.0", "f": "2026-11-25", "t": "Modificar ticket desde Recibos (cancela y reemplaza el original)"}, {"v": "0.57.1", "f": "2026-11-25", "t": "Enviar recibo por WhatsApp directo al cliente"}, {"v": "0.57.2", "f": "2026-11-25", "t": "Recibo por WhatsApp con imagen del ticket y estado de cuenta si es crédito"}, {"v": "0.58.0", "f": "2026-11-25", "t": "Catálogo solo productos; Enviar catálogo en Clientes; Publicar en Artículos ⋮ y Configuración → Nube"}, {"v": "0.59.0", "f": "2026-11-25", "t": "Método de pago Transferencia con solicitud de comprobante y datos bancarios locales"}, {"v": "0.59.1", "f": "2026-11-25", "t": "Número de tarjeta fácil de copiar en el mensaje de transferencia"}, {"v": "0.59.2", "f": "2026-11-25", "t": "Historial de envíos del catálogo por cliente (incluido en el respaldo)"}, {"v": "0.60.0", "f": "2026-11-25", "t": "Novedades dentro de la app (Configuración → Novedades) y aviso de lo nuevo después de cada actualización"}, {"v": "0.61.0", "f": "2026-11-26", "t": "Mapa de clientes ahora es Control de ruta: pines más pequeños, botón Pendientes, entregas programadas en el mapa (aunque el cliente sea de otro día), colores por estado, avance del día, botón Siguiente y registrar No compró desde el mapa"}, {"v": "0.62.0", "f": "2026-11-26", "t": "Control de ruta: visitas hechas al día siguiente cuentan para el día original, pendientes de ayer pasan a hoy, ruta sugerida con Google Maps, marca de saldo, clientes fuera de ruta y no visitados al cerrar turno"}, {"v": "0.63.0", "f": "2026-11-26", "t": "Artículos ahora es Productos con ficha del producto (Editar desde la ficha), utilidad sugerida por producto (15, 18, 20, 25 %) y sección Precios sugeridos al final del ticket, por pieza en paquetes"}, {"v": "0.63.1", "f": "2026-11-26", "t": "Precios sugeridos del ticket se calculan con el precio de venta normal (sin precio especial ni promoción)"}, {"v": "0.63.2", "f": "2026-11-26", "t": "Precio sugerido automático: 20 % en productos de menos de $30 y 18 % de $30 en adelante (se puede elegir otro por producto)"}];
+const NOVEDADES = [{"v": "0.17", "f": "2026-10-31", "t": "Primera versión publicada: app web instalable que funciona sin internet"}, {"v": "0.18", "f": "2026-10-31", "t": "Cotizar con PDF para compartir y mejoras al permiso de ubicación"}, {"v": "0.19", "f": "2026-10-31", "t": "Cajón de dinero, gestión de tesorería y descuento por pedido incompleto con versión 2 imprimible"}, {"v": "0.20", "f": "2026-10-31", "t": "Configuración de impresoras (TicketPrinter, RawBT, navegador) e impresión al cobrar"}, {"v": "0.21", "f": "2026-10-31", "t": "Sección Artículos con alta y edición de productos, imagen, identificador, código de barras y precios con descuento"}, {"v": "0.21.1", "f": "2026-10-31", "t": "Precio visible en las fotos de Venta, Preventa y Cotizar"}, {"v": "0.22", "f": "2026-10-31", "t": "Catálogo para mostrar productos con foto ampliada al doble toque"}, {"v": "0.23", "f": "2026-10-31", "t": "Promociones por volumen y por paquete, aplicadas en el ticket y en el resumen del turno"}, {"v": "0.24", "f": "2026-10-31", "t": "Ahorro por promociones en el ticket y venta a crédito con cliente obligatorio, fecha de pago y deuda acumulada"}, {"v": "0.25", "f": "2026-10-31", "t": "Cotizar con inicio e historial de cotizaciones realizadas (referencias, reenviar, usar como base, eliminar)"}, {"v": "0.26", "f": "2026-10-31", "t": "Descuentos generan una nueva versión del recibo (la anterior queda cancelada) y opción de cancelar ticket completo"}, {"v": "0.27", "f": "2026-10-31", "t": "Mapa de clientes del día con pines azules (por atender) y verdes (atendidos)"}, {"v": "0.27.1", "f": "2026-10-31", "t": "El mapa queda debajo del menú lateral"}, {"v": "0.28", "f": "2026-10-31", "t": "Créditos y cobranza"}, {"v": "0.28.1", "f": "2026-10-31", "t": "Elegir dispositivo (TPV1/TPV2) y corregir folios del turno"}, {"v": "0.29", "f": "2026-11-01", "t": "Inventario (almacén y camioneta), compras, conteos y liquidación"}, {"v": "0.30", "f": "2026-11-01", "t": "Informes con calendario, comparación, productos, proveedores, clientes y año"}, {"v": "0.30.1", "f": "2026-11-01", "t": "Proveedores asignados y productos en revisión"}, {"v": "0.30.2", "f": "2026-11-01", "t": "Costos de compra (solo donde no había)"}, {"v": "0.31", "f": "2026-11-01", "t": "Devoluciones de clientes en el ticket y entrega al proveedor"}, {"v": "0.32", "f": "2026-11-01", "t": "Cliente consentido (catálogo en línea), precios especiales y pedidos recibidos"}, {"v": "0.32.1", "f": "2026-11-01", "t": "Ajustes de Cliente consentido, pedidos recibidos en Preventa y pegar pedido"}, {"v": "0.33", "f": "2026-11-01", "t": "Varias impresoras, Bluetooth directo (Web Serial), modo gráfico, tablas de caracteres y cajón"}, {"v": "0.34", "f": "2026-11-01", "t": "Compras y gastos (productos, insumos, operación, personales) y cuentas por pagar"}, {"v": "0.34.1", "f": "2026-11-02", "t": "Respaldo, restauración y borrar datos de prueba"}, {"v": "0.34.2", "f": "2026-11-02", "t": "Agregar existencia y fijar lo contado desde cada producto"}, {"v": "0.34.3", "f": "2026-11-02", "t": "Ajuste de inventario por producto y deshacer movimientos"}, {"v": "0.34.4", "f": "2026-11-02", "t": "Nombre de la tienda en el ticket"}, {"v": "0.34.5", "f": "2026-11-02", "t": "Efectivo teórico de ventas en el turno"}, {"v": "0.34.6", "f": "2026-11-02", "t": "Canal foodservice (FS) en clientes"}, {"v": "0.34.7", "f": "2026-11-02", "t": "Total de productos, devoluciones y total a pagar en el ticket"}, {"v": "0.35", "f": "2026-11-03", "t": "Turno abierto y consultar turnos anteriores con calendario"}, {"v": "0.35.1", "f": "2026-11-03", "t": "Promoción por volumen en productos por kilo"}, {"v": "0.35.2", "f": "2026-11-03", "t": "El teclado de peso ignora el toque con el que se abre"}, {"v": "0.35.3", "f": "2026-11-03", "t": "Sin recarga al jalar la pantalla; botón Actualizar en el menú"}, {"v": "0.36", "f": "2026-11-03", "t": "Nuevo diseño del ticket y nombre corto por producto"}, {"v": "0.37", "f": "2026-11-04", "t": "Compras por proveedor, regalos, costo promedio, bonificación y orden de compra"}, {"v": "0.37.1", "f": "2026-11-04", "t": "Regalos de la promoción en su propia sección"}, {"v": "0.37.2", "f": "2026-11-04", "t": "Pie de compras más legible"}, {"v": "0.38", "f": "2026-11-04", "t": "Compras tipo ticket Sigma (lista, volumen negociado, regalos, devolución)"}, {"v": "0.38.1", "f": "2026-11-05", "t": "Tickets del cliente y búsqueda de recibos por cliente"}, {"v": "0.38.2", "f": "2026-11-06", "t": "Nombres cortos en tickets del sistema y compartir ticket"}, {"v": "0.38.3", "f": "2026-11-07", "t": "Corrige altura de los días en Mapa de clientes"}, {"v": "0.39", "f": "2026-11-07", "t": "Nube Firebase - catálogo en vivo y pedidos automáticos"}, {"v": "0.39.1", "f": "2026-11-07", "t": "Actualizar ahora reintenta la conexión de pedidos"}, {"v": "0.39.2", "f": "2026-11-07", "t": "Reintento automático de pedidos en línea"}, {"v": "0.40", "f": "2026-11-07", "t": "Editar/cancelar ventas programadas y productos a entregar por día"}, {"v": "0.41", "f": "2026-11-07", "t": "Carga de camioneta por día con pedidos y extra de venta en ruta"}, {"v": "", "f": "2026-11-07", "t": "Cliente consentido: 3 productos por renglón en celular"}, {"v": "0.41.1", "f": "2026-11-07", "t": "Abrir mensajes con WhatsApp Business"}, {"v": "0.41.2", "f": "2026-11-07", "t": "Filtro por día al elegir cliente para enviar catálogo"}, {"v": "0.42", "f": "2026-11-07", "t": "Enviar catálogo en serie a los clientes de un día"}, {"v": "", "f": "2026-11-08", "t": "Cliente consentido: vista previa con imagen para WhatsApp"}, {"v": "0.42.1", "f": "2026-11-09", "t": "Actualizar GPS en selector de cliente y aviso de venta programada"}, {"v": "0.42.2", "f": "2026-11-09", "t": "Aviso de sin existencia indica camioneta/almacén"}, {"v": "0.43", "f": "2026-11-09", "t": "Entregar y cobrar ventas programadas"}, {"v": "0.44", "f": "2026-11-09", "t": "Visitas sin compra con motivo e informe de visitas"}, {"v": "0.44.1", "f": "2026-11-09", "t": "El mapa cuenta visitas sin compra como atendidas"}, {"v": "0.44.2", "f": "2026-11-09", "t": "Mapa reconoce ventas a clientes duplicados"}, {"v": "0.45", "f": "2026-11-09", "t": "Seguimiento del pedido para el cliente y confirmación por WhatsApp"}, {"v": "0.45.1", "f": "2026-11-09", "t": "Barra de estado del pedido y En reparto al abrir turno"}, {"v": "0.45.2", "f": "2026-11-09", "t": "Aviso al cliente con detalle del pedido e imagen del ticket"}, {"v": "", "f": "2026-11-09", "t": "Cliente consentido: Mis pedidos con barra de estado"}, {"v": "", "f": "2026-11-10", "t": "Cliente consentido: botón Mis pedidos siempre visible"}, {"v": "0.46", "f": "2026-11-10", "t": "Historial de pedidos del cliente en la nube (visible desde cualquier equipo)"}, {"v": "0.46.1", "f": "2026-11-10", "t": "Desglose por entrega en productos por kilo"}, {"v": "0.46.2", "f": "2026-11-10", "t": "Programar ventas sin turno abierto"}, {"v": "0.47", "f": "2026-11-10", "t": "Por entregar en inventario con faltantes por proveedor y orden de compra"}, {"v": "", "f": "2026-11-12", "t": "Cliente consentido: cerrar ventanas, salir, volver al catálogo, botón atrás y sin recarga al jalar"}, {"v": "", "f": "2026-11-12", "t": "Cliente consentido: botón Cancelar pedido en curso"}, {"v": "", "f": "2026-11-12", "t": "Cliente consentido: correcciones de navegación (salir tras recargar, barra al enviar, confirmación propia al vaciar)"}, {"v": "", "f": "2026-11-12", "t": "Cliente consentido: Salir abre WhatsApp y deja pantalla de despedida"}, {"v": "0.47.1", "f": "2026-11-14", "t": "Mostrar u ocultar productos en el catálogo de clientes; lácteos regionales con 5 productos"}, {"v": "0.47.2", "f": "2026-11-14", "t": "Corrige casilla Venta en ruta en editar cliente"}, {"v": "0.48.0", "f": "2026-11-14", "t": "Al cerrar turno, reprogramar entregas pendientes y avisar al cliente"}, {"v": "0.48.1", "f": "2026-11-16", "t": "Productos a entregar cuenta todos los pedidos del día, con entregado y pendiente"}, {"v": "0.48.2", "f": "2026-11-16", "t": "Atrás desde la venta programada abierta en el selector regresa al selector"}, {"v": "0.49.0", "f": "2026-11-16", "t": "Botón Atrás del teléfono y filtro por día en Seleccionar cliente"}, {"v": "0.49.1", "f": "2026-11-16", "t": "Filtro estándar por día (Todos, Lun…Dom, FS) en todas las pantallas para elegir clientes"}, {"v": "0.49.2", "f": "2026-11-16", "t": "Seleccionar cliente abre siempre en Todos por cercanía GPS"}, {"v": "0.49.3", "f": "2026-11-16", "t": "Seleccionar cliente marca 'Visitado hoy · compró', resumen de visitas del día y clientes de otros días con pedido"}, {"v": "0.49.4", "f": "2026-11-16", "t": "Entregar y cobrar al editar una venta programada"}, {"v": "0.50.0", "f": "2026-11-16", "t": "Informes · Compra ≥ (clientes por semana con promedio de compra mínimo)"}, {"v": "0.50.1", "f": "2026-11-16", "t": "Una etiqueta por venta programada en el selector; aviso de reprogramación al cambiar la fecha manualmente"}, {"v": "0.50.2", "f": "2026-11-17", "t": "Informes · tarjeta de cobranza del periodo"}, {"v": "0.50.3", "f": "2026-11-17", "t": "Agregar productos del catálogo al editar o entregar una venta programada"}, {"v": "0.51.0", "f": "2026-11-23", "t": "Cambiar forma de pago de un recibo (incluye crédito y saldo del cliente)"}, {"v": "0.51.1", "f": "2026-11-23", "t": "Estado de cuenta en formato de ticket (imagen e impresión)"}, {"v": "0.52.0", "f": "2026-11-23", "t": "Ficha informativa del cliente (desde Clientes y desde Venta) y días de visita en la barra del cliente"}, {"v": "0.52.1", "f": "2026-11-23", "t": "Botones − / + en el ticket y cantidad en kg editable"}, {"v": "0.52.2", "f": "2026-11-23", "t": "Ahorro por precio especial en tickets"}, {"v": "0.53.0", "f": "2026-11-23", "t": "Ventas programadas por día (filtros, estados, calendario) y tarjetas nuevas"}, {"v": "0.54.0", "f": "2026-11-25", "t": "Productos a entregar · semana pendiente, vista por cliente, lista para cargar, barras de avance y compartir como ticket"}, {"v": "0.54.1", "f": "2026-11-25", "t": "Reprogramar ventas atrasadas en grupo e ícono de cliente agregado"}, {"v": "0.55.0", "f": "2026-11-25", "t": "Seleccionar varios recibos e imprimir su suma"}, {"v": "0.55.1", "f": "2026-11-25", "t": "Productos a entregar · marcar con presión larga, día de entrega y mapa por cliente, sin barra"}, {"v": "0.55.2", "f": "2026-11-25", "t": "Días de visita del cliente en Productos a entregar"}, {"v": "0.55.3", "f": "2026-11-25", "t": "Al editar venta programada, Programar entrega a la izquierda y Entregar y cobrar a la derecha"}, {"v": "0.55.4", "f": "2026-11-25", "t": "Días de visita con el mismo formato que Clientes"}, {"v": "0.56.0", "f": "2026-11-25", "t": "Pedidos recibidos rediseñado (pestañas, tarjetas con acciones, seguimiento, aviso con Ver)"}, {"v": "0.56.1", "f": "2026-11-25", "t": "Pedidos recibidos · filtro por fecha de llegada y por día de visita"}, {"v": "0.57.0", "f": "2026-11-25", "t": "Modificar ticket desde Recibos (cancela y reemplaza el original)"}, {"v": "0.57.1", "f": "2026-11-25", "t": "Enviar recibo por WhatsApp directo al cliente"}, {"v": "0.57.2", "f": "2026-11-25", "t": "Recibo por WhatsApp con imagen del ticket y estado de cuenta si es crédito"}, {"v": "0.58.0", "f": "2026-11-25", "t": "Catálogo solo productos; Enviar catálogo en Clientes; Publicar en Artículos ⋮ y Configuración → Nube"}, {"v": "0.59.0", "f": "2026-11-25", "t": "Método de pago Transferencia con solicitud de comprobante y datos bancarios locales"}, {"v": "0.59.1", "f": "2026-11-25", "t": "Número de tarjeta fácil de copiar en el mensaje de transferencia"}, {"v": "0.59.2", "f": "2026-11-25", "t": "Historial de envíos del catálogo por cliente (incluido en el respaldo)"}, {"v": "0.60.0", "f": "2026-11-25", "t": "Novedades dentro de la app (Configuración → Novedades) y aviso de lo nuevo después de cada actualización"}, {"v": "0.61.0", "f": "2026-11-26", "t": "Mapa de clientes ahora es Control de ruta: pines más pequeños, botón Pendientes, entregas programadas en el mapa (aunque el cliente sea de otro día), colores por estado, avance del día, botón Siguiente y registrar No compró desde el mapa"}, {"v": "0.62.0", "f": "2026-11-26", "t": "Control de ruta: visitas hechas al día siguiente cuentan para el día original, pendientes de ayer pasan a hoy, ruta sugerida con Google Maps, marca de saldo, clientes fuera de ruta y no visitados al cerrar turno"}, {"v": "0.63.0", "f": "2026-11-26", "t": "Artículos ahora es Productos con ficha del producto (Editar desde la ficha), utilidad sugerida por producto (15, 18, 20, 25 %) y sección Precios sugeridos al final del ticket, por pieza en paquetes"}, {"v": "0.63.1", "f": "2026-11-26", "t": "Precios sugeridos del ticket se calculan con el precio de venta normal (sin precio especial ni promoción)"}, {"v": "0.63.2", "f": "2026-11-26", "t": "Precio sugerido automático: 20 % en productos de menos de $30 y 18 % de $30 en adelante (se puede elegir otro por producto)"}, {"v": "0.64.0", "f": "2026-11-26", "t": "Geocerca (solo administrador): ubicación GPS en cada venta, pedido, entrega, abono y visita; radio por cliente, cumplimiento de ruta, % en sitio, línea de tiempo con huecos, alertas y corrección de ubicación"}];
 const ICON_PAGO = {'Efectivo':'cash','Tarjeta':'card','Transferencia':'bank','Crédito':'creditos'};
 const METODOS = ['Efectivo','Tarjeta','Transferencia','Crédito'];
 const fechaLarga = d => d.toLocaleDateString('es-MX',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
@@ -6620,8 +6638,14 @@ let mapaSoloPend = false;
 const cliCompleto = ref => clientes().find(c=> esMismoCliente(ref, c)) || ref;
 function itemsMapa(){
   if(mapaDia==='cobro') return cartera().map((x,i)=> ({c:x.c, n:i+1, cobro:x, color:COLOR_EST[x.estado]}));
-  const clave = hoyClave(fechaDeDia(mapaDia)), hoy = hoyClave(), esHoy = clave===hoy;
-  const ls = clientesDelDia(mapaDia).map(x=> ({...x, at: atendidoRuta(x.c, clave), peds:[]}));
+  return planDia(hoyClave(fechaDeDia(mapaDia)));
+}
+/* Plan de un día: clientes de ese día de visita + entregas + pendientes pasados a ese día + fuera de ruta */
+function planDia(clave){
+  const dk = DIA_IDX[kDate(clave).getDay()];
+  const delDia = clientes().filter(c=> (c.diasVisita||[]).includes(dk)).sort((a,b)=> ((a.orden||999)-(b.orden||999)) || a.nombre.localeCompare(b.nombre,'es')).map((c,i)=> ({c, n: c.orden || i+1}));
+  const hoy = hoyClave(), esHoy = clave===hoy;
+  const ls = delDia.map(x=> ({...x, at: atendidoRuta(x.c, clave), peds:[]}));
   const buscar = ref => ls.find(x=> esMismoCliente(ref, x.c));
   /* Entregas del día (y atrasadas si es hoy), también de clientes que no son de este día */
   DB.pedidos.filter(p=> (p.estado==='Programado' || p.estado==='Entregado') && (p.fechaEntrega===clave || (esHoy && p.estado==='Programado' && (p.fechaEntrega||'') < hoy)))
@@ -6629,10 +6653,10 @@ function itemsMapa(){
       if(!it){ const c = cliCompleto(p.cliente); it = {c, n:0, at:atendidoEn(c, clave), peds:[], extra:true}; ls.push(it); }
       it.peds.push(p); });
   /* Pendientes de días anteriores que se pasaron a hoy */
-  const arr = esHoy ? rutaArr()[hoy] : null;
+  const arr = rutaArr()[clave];
   if(arr && arr.ids) arr.ids.forEach(id=>{ const c = clientes().find(z=> z.id===id); if(!c) return;
     const it = buscar(c); if(it){ it.arr = arr.desde?.[id]; return; }
-    ls.push({c, n:0, at:atendidoEn(c, clave), peds:[], extra:true, arr: arr.desde?.[id] || sumaDias(hoy, -1)}); });
+    ls.push({c, n:0, at:atendidoEn(c, clave), peds:[], extra:true, arr: arr.desde?.[id] || sumaDias(clave, -1)}); });
   /* Fuera de ruta: compraron o hicieron pedido ese día sin ser de ese día */
   const dia = f => hoyClave(new Date(f))===clave;
   [...DB.recibos.filter(r=> r.cliente && !r.cancelado && !r.reemplazadoPor && dia(r.fecha)), ...DB.pedidos.filter(p=> p.cliente && p.estado!=='Cancelado' && dia(p.fecha))]
@@ -6867,6 +6891,133 @@ function renderMapa(){
     if(m){ mapaInst.setView(m.getLatLng(), 17, {animate:false}); setTimeout(()=> m.openPopup(), 30); document.getElementById('mpMapa').scrollIntoView({behavior:'smooth', block:'center'}); }
     else toast('Este cliente no tiene ubicación; márcala en Clientes');
   });
+}
+
+/* ================= Geocerca (solo administrador) ================= */
+/* Ubicación de cada evento: si el GPS es reciente se guarda al momento; si no, se pide y se completa en cuanto llega */
+const gpsDe = p => p ? {lat:r6(p.lat), lng:r6(p.lng), prec:Math.round(p.prec||0), t:p.t} : null;
+const r6 = x => Math.round(x*1e6)/1e6;
+function gpsEvento(obj, guardar){
+  if(ultimaPos && Date.now() - ultimaPos.t < 300000){ obj.gps = gpsDe(ultimaPos); return; }
+  obtenerPos(pos=>{ if(!pos || obj.gps) return; obj.gps = {...gpsDe(pos), tarde:true}; try{ guardar(obj); }catch(_){} });
+}
+let geoInst = null, geoDia = null, geoDisp = '', geoMarcas = {};
+const geoRadio = ()=> Number(store.get('geoRadio', 100)) || 100;
+function cerrarGeo(){ try{ geoInst && geoInst.remove(); }catch(_){} geoInst = null; geoMarcas = {}; }
+const posEv = x => { const p = x.gps || x.ubicacion; return p && p.lat != null ? {lat:Number(p.lat), lng:Number(p.lng), prec:p.prec} : null; };
+function eventosDia(clave){
+  const dia = f => f && hoyClave(new Date(f))===clave, out = [];
+  const add = (x, tipo, monto, extra='') => { if(!x.cliente) return; const c = cliCompleto(x.cliente);
+    out.push({id:x.id, f:x.fecha, tipo, monto, extra, c, pos:posEv(x), disp:x.dispositivo || '', vend:x.vendedor || ''}); };
+  DB.recibos.filter(r=> dia(r.fecha) && !r.cancelado && !r.reemplazadoPor && !r.tipo).forEach(r=> add(r, r.entregaDe ? 'Entrega' : 'Venta', r.total, r.entregaDe ? '#' + r.entregaDe : ''));
+  DB.pedidos.filter(p=> dia(p.fecha) && p.estado!=='Cancelado' && !p.origenRec).forEach(p=> add(p, 'Pedido', p.total));
+  DB.visitas.filter(v=> dia(v.fecha)).forEach(v=> add(v, 'No compró', null, v.motivo || ''));
+  DB.abonos.filter(a=> dia(a.fecha) && a.tipo==='abono' && !a.cancelado).forEach(a=> add(a, 'Abono', a.monto));
+  const R = geoRadio();
+  out.forEach(e=>{ e.dist = e.pos && tieneUbicacion(e.c) ? Math.round(distanciaKm(e.pos, {lat:Number(e.c.lat), lng:Number(e.c.lng)}) * 1000) : null;
+    e.geo = !e.pos ? 'nogps' : e.dist == null ? 'nocli' : e.dist <= R ? 'in' : 'out'; });
+  return out.sort((a,b)=> a.f.localeCompare(b.f));
+}
+const GEO = {in:{c:'#1e8e3e', t:'En sitio'}, out:{c:'#d93025', t:'Fuera'}, nogps:{c:'#e37400', t:'Sin GPS'}, nocli:{c:'#e37400', t:'Cliente sin ubicación'},
+  novis:{c:'#8a9490', t:'No visitado'}, tarde:{c:'#7cb342', t:'Atendido otro día'}};
+const fmtM = m => m == null ? '' : m >= 1000 ? (m/1000).toFixed(1) + ' km' : m + ' m';
+const horaDe = f => new Date(f).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit', hour12:false});
+function datosGeo(){
+  const clave = geoDia, evs = eventosDia(clave).filter(e=> !geoDisp || e.disp===geoDisp);
+  const plan = planDia(clave).map(x=> ({...x, evs:[]}));
+  evs.forEach(e=>{ let it = plan.find(x=> esMismoCliente(e.c, x.c));
+    if(!it){ it = {c:e.c, n:0, evs:[], extra:true, fuera:true, peds:[]}; plan.push(it); } it.evs.push(e); });
+  let n = Math.max(0, ...plan.filter(x=> x.n).map(x=> Number(x.n)||0)); plan.forEach(x=>{ if(!x.n) x.n = ++n; });
+  plan.forEach(x=>{ const g = x.evs.map(e=> e.geo);
+    x.geo = !x.evs.length ? (x.at?.tarde ? 'tarde' : 'novis') : g.includes('in') ? 'in' : g.includes('out') ? 'out' : g.includes('nocli') ? 'nocli' : 'nogps'; });
+  /* recorrido y huecos */
+  const conPos = evs.filter(e=> e.pos); let km = 0; for(let i = 1; i < conPos.length; i++) km += distanciaKm(conPos[i-1].pos, conPos[i].pos);
+  const huecos = []; for(let i = 1; i < evs.length; i++){ const min = (new Date(evs[i].f) - new Date(evs[i-1].f)) / 60000; if(min >= 45) huecos.push({i, min}); }
+  return {clave, evs, plan, km, huecos};
+}
+/* Clientes que salen fuera siempre en el mismo punto: probablemente su ubicación está mal marcada */
+function ubicacionesDudosas(){
+  const desde = sumaDias(hoyClave(), -30), R = geoRadio(), g = {};
+  const todos = [...DB.recibos.filter(r=> !r.cancelado && !r.tipo), ...DB.pedidos.filter(p=> !p.origenRec), ...DB.visitas, ...DB.abonos.filter(a=> a.tipo==='abono')];
+  todos.forEach(x=>{ if(!x.cliente || !x.fecha || hoyClave(new Date(x.fecha)) < desde) return; const p = posEv(x); if(!p) return;
+    const c = cliCompleto(x.cliente); if(!c.id || !tieneUbicacion(c)) return; (g[c.id] = g[c.id] || {c, ps:[]}).ps.push(p); });
+  return Object.values(g).map(({c, ps})=>{
+    const fuera = ps.filter(p=> distanciaKm(p, {lat:Number(c.lat), lng:Number(c.lng)})*1000 > R); if(fuera.length < 2 || fuera.length < ps.length * 2/3) return null;
+    const cen = {lat: fuera.reduce((s,p)=> s+p.lat, 0)/fuera.length, lng: fuera.reduce((s,p)=> s+p.lng, 0)/fuera.length};
+    if(fuera.some(p=> distanciaKm(p, cen)*1000 > 80)) return null;
+    return {c, cen, n:fuera.length, dist: Math.round(distanciaKm(cen, {lat:Number(c.lat), lng:Number(c.lng)})*1000)};
+  }).filter(Boolean);
+}
+function viewGeocerca(){
+  if(!geoDia) geoDia = hoyClave();
+  const D = datosGeo(), R = geoRadio(), hoy = hoyClave(), ev = D.evs;
+  const medibles = ev.filter(e=> e.geo==='in' || e.geo==='out'), enSitio = medibles.filter(e=> e.geo==='in').length;
+  const planBase = D.plan.filter(x=> !x.fuera), atend = planBase.filter(x=> x.evs.length || x.at?.tarde).length;
+  const dias = Array.from({length:7}, (_,i)=> sumaDias(hoy, -i)), fueraRango = !dias.includes(geoDia);
+  const disps = [...new Set(eventosDia(geoDia).map(e=> e.disp).filter(Boolean))];
+  const k = (v, t, cls='') => `<div class="rt-k ${cls}"><b>${v}</b><span>${t}</span></div>`;
+  const alertas = [];
+  ev.filter(e=> e.geo==='out' && e.tipo==='No compró').forEach(e=> alertas.push({e, t:`"No compró" registrado a <b>${fmtM(e.dist)}</b> de ${esc(e.c.tienda || e.c.nombre)}`}));
+  ev.filter(e=> e.geo==='out' && e.tipo!=='No compró' && e.dist > 300).forEach(e=> alertas.push({e, t:`${e.tipo} ${e.monto != null ? fmt(e.monto) + ' ' : ''}a <b>${fmtM(e.dist)}</b> de ${esc(e.c.tienda || e.c.nombre)}`}));
+  const dudosas = geoDia===hoy ? ubicacionesDudosas() : [];
+  let tl = ''; ev.forEach((e,i)=>{ const h = D.huecos.find(x=> x.i===i); if(h) tl += `<div class="gc-hueco">⏱ ${Math.floor(h.min/60) ? Math.floor(h.min/60) + ' h ' : ''}${Math.round(h.min%60)} min sin registros</div>`;
+    tl += `<button class="gc-ev" data-ev="${e.id}"><span class="gc-h">${horaDe(e.f)}</span><i style="background:${GEO[e.geo].c}"></i>
+      <span class="gc-t"><b>${esc(e.c.tienda || e.c.nombre || '')}</b><small>${e.tipo}${e.monto != null ? ' ' + fmt(e.monto) : ''}${e.extra ? ' · ' + esc(e.extra) : ''}${disps.length > 1 && !geoDisp ? ' · ' + esc(e.disp) : ''}</small></span>
+      <span class="gc-d" style="color:${GEO[e.geo].c}">${e.geo==='in' || e.geo==='out' ? fmtM(e.dist) : GEO[e.geo].t}</span></button>`; });
+  const noVis = planBase.filter(x=> x.geo==='novis');
+  return `<div class="mp-wrap">
+    <div class="dias filtro mp-dias">${dias.map((d,i)=> `<button class="dia${d===geoDia?' on':''}" data-gd="${d}">${i===0 ? 'Hoy' : i===1 ? 'Ayer' : diaCorto(d)}</button>`).join('')}${fueraRango ? `<button class="dia on" data-gd="${geoDia}">${diaCorto(geoDia)}</button>` : ''}<button class="dia" id="gcCal" aria-label="Calendario">📅</button></div>
+    <div class="mp-res"><b>${esc(relNombre(geoDia))}</b> · ${D.plan.length} clientes
+      <button class="rt-pend" id="gcRadio">Radio ${R} m</button></div>
+    ${disps.length > 1 ? `<div class="dias filtro gc-disp"><button class="dia${!geoDisp?' on':''}" data-gv="">Todos</button>${disps.map(d=> `<button class="dia${geoDisp===d?' on':''}" data-gv="${esc(d)}">${esc(d)}</button>`).join('')}</div>` : ''}
+    <div class="rt-ks">${k(`${atend}/${planBase.length}`, 'cumplimiento', atend < planBase.length ? '' : 'pos')}${k(medibles.length ? Math.round(enSitio/medibles.length*100) + '%' : '—', 'en sitio')}${k(medibles.length - enSitio, 'fuera', medibles.length - enSitio ? 'neg' : '')}${k(ev.filter(e=> e.geo==='nogps').length, 'sin GPS')}</div>
+    <div class="rt-ks">${k(ev.length ? horaDe(ev[0].f) : '—', 'inicio')}${k(ev.length ? horaDe(ev[ev.length-1].f) : '—', 'último')}${k(D.km ? D.km.toFixed(1) + ' km' : '—', 'recorrido')}${k(D.huecos.length, 'huecos 45+ min', D.huecos.length ? 'neg' : '')}</div>
+    <div class="rt-leg">${['in','out','nogps','novis','tarde'].filter(g=> D.plan.some(x=> x.geo===g) || (g==='nogps' && D.plan.some(x=> x.geo==='nocli'))).map(g=> `<span><i style="background:${GEO[g].c}"></i>${GEO[g].t} ${D.plan.filter(x=> x.geo===g || (g==='nogps' && x.geo==='nocli')).length}</span>`).join('')}</div>
+    <div class="mp-box"><div id="gcMapa"></div>
+      ${!D.plan.some(x=> tieneUbicacion(x.c)) ? `<div class="mp-vacio">No hay clientes con ubicación este día.</div>` : ''}
+      <div class="map-aviso hidden" id="gcAviso">No se pudo cargar el mapa (¿sin internet?).</div></div>
+    ${alertas.length || dudosas.length ? `<div class="gc-sec"><h4>⚠ Alertas (${alertas.length + dudosas.length})</h4>
+      ${alertas.map(a=> `<button class="gc-al" data-ev="${a.e.id}"><span>${horaDe(a.e.f)}</span><span>${a.t}</span></button>`).join('')}
+      ${dudosas.map(d=> `<div class="gc-al dud"><span>📍</span><span><b>${esc(d.c.tienda || d.c.nombre)}</b>: ${d.n} registros a ${fmtM(d.dist)} de su ubicación, siempre en el mismo punto. Puede estar mal marcada.
+        <button class="ub-b" data-fix="${d.c.id}" data-lat="${d.cen.lat}" data-lng="${d.cen.lng}">Corregir ubicación</button></span></div>`).join('')}</div>` : ''}
+    <div class="gc-sec"><h4>Línea de tiempo (${ev.length})</h4>${tl || '<p class="muted">Sin registros este día.</p>'}</div>
+    ${noVis.length ? `<div class="gc-sec"><h4>No visitados (${noVis.length})</h4>${noVis.map(x=> `<div class="gc-nv"><span class="mp-n" style="background:${GEO.novis.c}">${x.n}</span><span><b>${esc(x.c.tienda || x.c.nombre)}</b><small>${x.arr ? 'pendiente de ' + diaCorto(x.arr) + ' · ' : ''}${(x.peds||[]).some(p=> p.estado==='Programado') ? 'entrega pendiente · ' : ''}${esc(x.c.colonia || '')}</small></span></div>`).join('')}</div>` : ''}
+    <p class="note-sm">La ubicación se guarda en cada venta, pedido, entrega, abono y visita sin compra. Los registros anteriores a esta versión no tienen GPS.</p>
+  </div>`;
+}
+function renderGeocerca(){
+  cerrarGeo();
+  const view = document.getElementById('view'); view.innerHTML = viewGeocerca(); renderHeader();
+  document.querySelectorAll('[data-gd]').forEach(b=> b.onclick = ()=>{ geoDia = b.dataset.gd; renderGeocerca(); });
+  document.querySelectorAll('[data-gv]').forEach(b=> b.onclick = ()=>{ geoDisp = b.dataset.gv; renderGeocerca(); });
+  document.getElementById('gcCal').onclick = ()=> calendarioDias({sel:geoDia, contar:k=> eventosDia(k).length, nota:'El número indica los registros de cada día.', alElegir:k=>{ geoDia = k; renderGeocerca(); }});
+  document.getElementById('gcRadio').onclick = ()=>{ const ops = [50, 100, 150, 200], i = ops.indexOf(geoRadio()); store.set('geoRadio', ops[(i+1) % ops.length]); renderGeocerca(); toast(`Radio de la geocerca: ${geoRadio()} m`); };
+  document.querySelectorAll('[data-fix]').forEach(b=> b.onclick = e=>{ e.stopPropagation(); const c = clientes().find(x=> x.id===b.dataset.fix); if(!c) return;
+    confirmar({titulo:'Corregir ubicación', ok:'Corregir', texto:`¿Mover la ubicación de <b>${esc(c.tienda || c.nombre)}</b> al punto donde se registran sus visitas? Puedes revisarla después en Clientes.`,
+      alAceptar:()=>{ const ls = clientes(), x = ls.find(z=> z.id===c.id); x.lat = r6(Number(b.dataset.lat)); x.lng = r6(Number(b.dataset.lng)); x.ubCorregida = new Date().toISOString(); store.set('clientes', ls); toast('Ubicación corregida'); renderGeocerca(); }}); });
+  const D = datosGeo(), R = geoRadio();
+  try{
+    if(typeof L === 'undefined') throw 0;
+    geoInst = L.map('gcMapa', {zoomControl:true}).setView(CENTRO_DEFAULT, 13);
+    let fallas = 0;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OpenStreetMap'})
+      .on('tileerror', ()=>{ if(++fallas===4) document.getElementById('gcAviso')?.classList.remove('hidden'); })
+      .on('tileload', ()=>{ fallas = 0; document.getElementById('gcAviso')?.classList.add('hidden'); }).addTo(geoInst);
+    const pts = [];
+    D.plan.filter(x=> tieneUbicacion(x.c)).forEach(x=>{ const ll = [Number(x.c.lat), Number(x.c.lng)], col = GEO[x.geo].c; pts.push(ll);
+      L.circle(ll, {radius:R, color:col, weight:1.5, fillColor:col, fillOpacity:.12}).addTo(geoInst);
+      L.marker(ll, {icon:pinIcon(col, x.n, (x.peds||[]).length ? 'ent' : 'vis'), zIndexOffset: x.geo==='out' ? 800 : 0}).addTo(geoInst)
+        .bindPopup(`<div class="mp-pop"><span class="mp-est" style="background:${col}">${GEO[x.geo].t}</span><b>${x.n}. ${esc(x.c.tienda || x.c.nombre)}</b>${x.evs.map(e=> `<small>${horaDe(e.f)} · ${e.tipo}${e.monto != null ? ' ' + fmt(e.monto) : ''} · ${e.geo==='in'||e.geo==='out' ? 'a ' + fmtM(e.dist) : GEO[e.geo].t}</small>`).join('') || '<small>Sin registros</small>'}</div>`); });
+    D.evs.filter(e=> e.pos).forEach(e=>{ const ll = [e.pos.lat, e.pos.lng], col = GEO[e.geo].c; pts.push(ll);
+      if(e.geo==='out') L.polyline([ll, [Number(e.c.lat), Number(e.c.lng)]], {color:col, weight:2, dashArray:'5 5'}).addTo(geoInst);
+      geoMarcas[e.id] = L.circleMarker(ll, {radius:6, color:'#fff', weight:2, fillColor:col, fillOpacity:1}).addTo(geoInst)
+        .bindPopup(`<div class="mp-pop"><b>${horaDe(e.f)} · ${e.tipo}${e.monto != null ? ' ' + fmt(e.monto) : ''}</b><small>${esc(e.c.tienda || e.c.nombre)}</small><small>${e.geo==='in'||e.geo==='out' ? `A ${fmtM(e.dist)} del cliente (${GEO[e.geo].t.toLowerCase()})` : GEO[e.geo].t}${e.pos.prec ? ` · precisión ±${e.pos.prec} m` : ''}</small>${e.vend ? `<small>${esc(e.vend)}${e.disp ? ' · ' + esc(e.disp) : ''}</small>` : ''}</div>`); });
+    if(pts.length) geoInst.fitBounds(L.latLngBounds(pts), {padding:[30,30], maxZoom:16});
+    setTimeout(()=> geoInst && geoInst.invalidateSize(), 80);
+  }catch(e){ document.getElementById('gcAviso')?.classList.remove('hidden'); }
+  document.querySelectorAll('[data-ev]').forEach(b=> b.onclick = ()=>{ const m = geoMarcas[b.dataset.ev];
+    if(m && geoInst){ geoInst.setView(m.getLatLng(), 17, {animate:false}); setTimeout(()=> m.openPopup(), 30); document.getElementById('gcMapa').scrollIntoView({behavior:'smooth', block:'center'}); }
+    else toast('Este registro no tiene ubicación GPS'); });
 }
 
 /* Búsqueda por palabras, sin importar acentos ni el orden */
@@ -9379,7 +9530,7 @@ function registrarAbono(){
   const seq = (t.abonos||0) + 1; t.abonos = seq; store.set('turno', t);
   const ab = {id:'A'+Date.now(), tipo:'abono', folio:`A${t.folio}-${String(seq).padStart(3,'0')}`, fecha:new Date().toISOString(),
     turno:t.folio, dispositivo:t.dispositivo, usuario:session.usuario, vendedor:session.nombre,
-    cliente:{id:c.id, nombre:c.nombre, tienda:c.tienda||'', telefono:c.telefono||''}, monto:m, metodo:credMetodo,
+    cliente:{id:c.id, nombre:c.nombre, tienda:c.tienda||'', telefono:c.telefono||''}, monto:m, metodo:credMetodo, gps: ultimaPos && Date.now() - ultimaPos.t < 300000 ? gpsDe(ultimaPos) : null,
     referencia: credMetodo==='Efectivo' ? '' : (document.getElementById('abRef').value.trim()), nota:document.getElementById('abNota').value.trim(),
     aplicaciones:dist, saldoAntes:antes, saldoDespues:r2(antes - m), sincronizado:false};
   aplicarAbono(ab);
@@ -9802,6 +9953,7 @@ function go(id){
   if(current !== id){ seccionPrevia = current; pedDesdeSel = null; recSel.clear(); document.body.classList.remove('rc-con-sel'); }
   current = id;
   if(id!=='mapa') cerrarMapa();
+  if(id!=='geocerca') cerrarGeo();
   document.querySelector('.cl-sheet')?.remove();
   document.querySelector('.cat-modal')?.remove();
   document.querySelectorAll('.sheet-bg.center').forEach(x=> x.remove());
@@ -9812,8 +9964,8 @@ function go(id){
   document.querySelector('main').classList.toggle('flush', esVenta);
   view.classList.toggle('wide', esVenta);
   document.querySelector('.popover')?.remove();
-  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
-  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','creditos','inventario','informes','compras'].includes(id));
+  document.querySelector('main').classList.toggle('flush', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','geocerca','creditos','inventario','informes','compras'].includes(id));
+  view.classList.toggle('wide', esVenta || ['recibos','clientes','config','articulos','catalogo','mapa','geocerca','creditos','inventario','informes','compras'].includes(id));
   if(id==='turno'){ if(!turnoActual() && turnoVista==='tesoreria') turnoVista = 'resumen'; view.innerHTML = viewTurno(); bindTurno(); renderHeader(); }
   else if(id==='recibos'){ reciboSel = null; reciboCli = null; renderRecibos(); }
   else if(id==='clientes'){ cliVista = 'inicio'; cliSel = null; cliDesde = null; renderClientes(); }
@@ -9821,6 +9973,7 @@ function go(id){
   else if(id==='articulos'){ artVista = 'lista'; artSel = null; renderArticulos(); }
   else if(id==='catalogo'){ catVista = 'ver'; renderCatalogo(); }
   else if(id==='mapa'){ mapaDia = null; renderMapa(); }
+  else if(id==='geocerca'){ geoDia = hoyClave(); geoDisp = ''; renderGeocerca(); }
   else if(id==='compras'){ compDia = compDia || hoyClave(); renderCompras(); }
   else if(id==='informes'){ infTab = 'resumen'; infAbierto = null; renderInformes(); }
   else if(id==='inventario'){ invVista = 'inicio'; invBorr = null; invQ = ''; invFiltro = 'todos'; cargaDia = null; cargaFuentes = {ped:false, ruta:false}; renderInventario(); }
