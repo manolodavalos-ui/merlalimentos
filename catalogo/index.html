@@ -134,6 +134,25 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 .toast.on{opacity:1}
 .pie{text-align:center;color:var(--muted);font-size:.78rem;padding:10px 0 30px}
 .cargando{text-align:center;color:var(--muted);padding:60px 20px}
+.menu-b{position:fixed;top:calc(10px + env(safe-area-inset-top));left:10px;z-index:25;width:42px;height:42px;border-radius:12px;background:rgba(0,0,0,.35);color:#fff;font-size:1.3rem;font-weight:700}
+.menu-b i{display:none;position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid #1f6f4a}
+.modo-pedido-on .menu-b{background:rgba(31,111,74,.92)}
+.hoja.lat{align-items:stretch;justify-content:flex-start;background:rgba(10,20,15,0);transition:background .2s}.hoja.lat.on{background:rgba(10,20,15,.45)}
+.lat-pan{width:82%;max-width:320px;height:100%;background:#fff;overflow:auto;padding:0 0 calc(16px + env(safe-area-inset-bottom));transform:translateX(-100%);transition:transform .22s}.hoja.lat.on .lat-pan{transform:none}
+.lat-cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;padding:calc(22px + env(safe-area-inset-top)) 18px 18px}.lat-cab b{display:block;font-size:1.05rem}.lat-cab small{opacity:.85}
+.lat-i{display:flex;align-items:center;gap:14px;width:100%;padding:14px 18px;text-align:left;font-size:.98rem}.lat-i:active{background:var(--bg)}
+.lat-i span{width:26px;text-align:center;font-size:1.15rem}.lat-i b{flex:1;font-weight:600}
+.lat-i i{font-style:normal;background:var(--brand);color:#fff;border-radius:999px;padding:1px 8px;font-size:.76rem;font-weight:700}.lat-i i.v{background:#e0a800;color:#3a2a00}.lat-i i.a{background:var(--gold);color:#3a2a00}
+.lat-sep{height:1px;background:var(--line);margin:6px 0}
+.vale-ban{display:block;margin:10px auto 0;max-width:420px;width:100%;background:linear-gradient(135deg,#fff8e1,#ffe9a8);color:#5a3e00;border-radius:12px;padding:10px 12px;font-size:.88rem;text-align:left;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.vale-ln{background:#fff8e1;border-radius:10px;padding:10px;margin-top:6px;border-bottom:0}.vale-ln .im{color:#7a5600}
+.vale-it{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}.vale-it>b{font-size:1.2rem;min-width:70px;color:#7a5600}
+.vale-it span{font-weight:700;font-size:.9rem}.vale-it small{display:block;color:var(--muted);font-weight:400;font-size:.78rem}
+.vale-it.activo{border-color:#e0a800;background:#fffaf0}.vale-it.usado,.vale-it.vencido{opacity:.55}
+.qr-box{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:1;max-height:52vh;margin:0 auto}
+.qr-box video{width:100%;height:100%;object-fit:cover}.qr-marco{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.9);border-radius:16px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.cfg-c{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}.cfg-c h4{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.cfg-c>div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px solid var(--line);font-size:.9rem}.cfg-c>div span{color:var(--muted)}.cfg-c>div b{text-align:right;font-weight:600}
 .visita{margin:10px auto 0;max-width:420px;background:#fff;color:#1d3b2c;border-radius:12px;padding:9px 12px;font-size:.86rem;text-align:left;border-left:5px solid #2f6fd6;box-shadow:0 4px 14px rgba(0,0,0,.15)}
 .visita.hoy{border-left-color:#1f9d55}.visita.prox{border-left-color:#c9d3ce;color:#4b5a53}
 .sug{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:linear-gradient(135deg,#fff8e1,#fff3cd);border:1px solid #f2d27a;display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
@@ -150,7 +169,7 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 <nav class="secnav" id="secnav"></nav>
 <main class="wrap" id="main"><div class="cargando">Cargando catálogo…</div></main>
 <div class="barra" id="barra"></div>
-<button class="salir" id="bSalir" aria-label="Salir">✕ Salir</button>
+<button class="menu-b" id="bMenu" aria-label="Menú">☰<i id="menuDot"></i></button>
 <div class="toast" id="toast"></div>
 <script>/* jsPDF 2.5.2 — MIT */
 /** @license
@@ -592,10 +611,10 @@ const misPedidos = ()=>{
 async function refrescarCliNube(){ if(!tok) return; try{ const {m, db} = await conLimite(nube(), 8000); const c = await conLimite(m.getDoc(m.doc(db, 'clientesCat', tok)), 8000); if(c.exists()){ CLI = c.data(); ls.set(K + '_cli', CLI); } }catch(_){} }
 function guardarEnHistorial(o){ const l = misPedidos().filter(x=> x.id!==o.id); l.unshift(o); ls.set(K + '_pedidos', l.slice(0, 30)); pintarBotonMis(); }
 function pintarBotonMis(){ const el = document.getElementById('misPed'); if(!el) return; const n = misPedidos().length;
-  el.innerHTML = `<button class="mis-btn" id="btnMis">📋 Mis pedidos${n ? ` <i>${n}</i>` : ''}</button>${esDueno() && CLI ? ` <button class="mis-btn" id="btnAcc">👥 Compartir</button>` : ''}${puedeInstalar() ? ` <button class="mis-btn" id="btnInst">📲 Instalar app</button>` : ''}`;
-  const b = el.querySelector('#btnMis'); if(b) b.onclick = verMisPedidos;
-  const a = el.querySelector('#btnAcc'); if(a) a.onclick = verAccesos;
-  const i = el.querySelector('#btnInst'); if(i) i.onclick = instalar; }
+  const va = valeActivo();
+  el.innerHTML = va ? `<button class="vale-ban" id="btnVale">🎟️ Tienes un vale de <b>${fmt(va.m)}</b> para tu próximo pedido${va.v ? ` · vence ${new Date(va.v + 'T12:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'})}` : ''}</button>` : '';
+  const bv = el.querySelector('#btnVale'); if(bv) bv.onclick = verVales;
+  const dot = document.getElementById('menuDot'); if(dot) dot.style.display = (puedeInstalar() || valesPorActivar().length) ? 'block' : 'none'; }
 async function verMisPedidos(){
   await refrescarCliNube(); pintarBotonMis();
   const l = misPedidos();
@@ -751,7 +770,7 @@ function verTicket(){
     ${ids.length ? ids.map(id=>{ const p = prodPorId(id), q = carrito[id];
       return `<div class="ln" data-id="${id}"><span class="nm">${esc(nombre(p))}<small>${fmt(precio(p))}${p.kg ? ' por kg' : ' c/u'}</small></span>
         ${p.kg ? `<button class="stp" data-kg="${id}"><span>${r3(q)} kg</span></button>` : `<span class="stp"><button data-m="-1">−</button><span>${q}</span><button data-m="1">+</button></span>`}
-        <span class="im">${fmt(r2(precio(p)*q))}</span></div>`; }).join('') + `<div class="tot"><span>Total</span><span>${fmt(totalCarrito())}</span></div>`
+        <span class="im">${fmt(r2(precio(p)*q))}</span></div>`; }).join('') + filaValePedido() + `<div class="tot"><span>Total</span><span>${fmt(r2(totalCarrito() - descVale()))}</span></div>`
       : '<div class="vacio">Tu pedido está vacío.<br>Toca los productos del catálogo para agregarlos.</div>'}
     ${ids.length ? `${CLI ? '' : `<label>Tu nombre o tienda *</label><input class="field" id="tNom" value="${esc(ls.get('mkcat_nombre',''))}" autocomplete="name">
       <label>Tu teléfono *</label><input class="field" id="tTel" type="tel" inputmode="tel" maxlength="14" value="${esc(ls.get('mkcat_tel',''))}">`}
@@ -775,7 +794,7 @@ function confirmarSimple(t){ try{ return window.confirm(t); }catch(_){ return tr
 const b64url = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 async function enviar(cli, nota, agregaA){
   const lineas = Object.entries(carrito).map(([id,q])=>{ const p = prodPorId(id); return [id, q, precio(p), nombre(p)]; });
-  const quien = yo();
+  const quien = yo(), valeUsado = descVale(lineas.reduce((t,[,q,p])=> t + q*p, 0)) ? valeActivo() : null;
   const pedido = {v:1, id:'W' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), f:new Date().toISOString(), c:tok || null, cli, l:lineas, nota};
   const total = totalCarrito();
   /* 1) directo a la nube: llega solo a la app de Merkalimentos */
@@ -783,7 +802,7 @@ async function enviar(cli, nota, agregaA){
   let enNube = false;
   try{
     const {m, db} = await conLimite(nube(), 8000);
-    await conLimite(m.setDoc(m.doc(db, 'pedidos', pedido.id), {v:1, id:pedido.id, f:pedido.f, c:pedido.c, cli:{n:cli.n || '', t:cli.t || '', tel:cli.tel || '', ...(quien ? {por:quien} : {}), ...(agregaA ? {agregaA} : {})},
+    await conLimite(m.setDoc(m.doc(db, 'pedidos', pedido.id), {v:1, id:pedido.id, f:pedido.f, c:pedido.c, cli:{n:cli.n || '', t:cli.t || '', tel:cli.tel || '', ...(quien ? {por:quien} : {}), ...(agregaA ? {agregaA} : {}), ...(valeUsado ? {vale:valeUsado.cod} : {})},
       l: lineas.map(([id, q, p, n])=> ({id, q, p, n})), nota: nota || '', total, estado:'Nuevo', creado: m.serverTimestamp()}), 10000);
     enNube = true;
     if(tok) m.setDoc(m.doc(db, 'clientesCat', tok), {ult:{id: agregaA || pedido.id, f:pedido.f, total, por: quien ? {n:quien.n, rol:quien.rol} : null}}, {merge:true}).catch(()=>{});
@@ -800,7 +819,7 @@ async function enviar(cli, nota, agregaA){
   else if(enNube){ ls.set(K + '_ultimo', {id:pedido.id, f:pedido.f, total}); guardarEnHistorial({id:pedido.id, f:pedido.f, total, l: lineas.map(([id, q, p, n])=> ({q, p, n}))}); carrito = {}; guardarCarrito(); ls.set(K + '_nota', ''); modo = 'ver'; pintar(); pintarBotonMis(); setTimeout(pintarUltimo, 300); }
   const waTexto = enNube ? `https://wa.me/${D.negocio?.wa || '529611080808'}?text=${encodeURIComponent(`Hola, acabo de enviar mi pedido desde el catálogo (${cli.t || cli.n}) por ${fmt(total)}.`)}` : wa;
   const h = hoja(enNube ? `<div class="ok">✓</div><h3 style="text-align:center">${agregaA ? '¡Productos agregados a tu pedido!' : '¡Pedido enviado!'}</h3>
-    <p class="sub" style="text-align:center">${lineas.length} ${lineas.length===1 ? 'producto' : 'productos'} · <b>${fmt(total)}</b></p>
+    <p class="sub" style="text-align:center">${lineas.length} ${lineas.length===1 ? 'producto' : 'productos'} · <b>${fmt(total)}</b>${valeUsado ? `<br>🎟️ Tu vale de ${fmt(valeUsado.m)} se descuenta al entregarte` : ''}</p>
     <div id="pSeg">${barraSeg(null)}</div>
     <div class="acts">
       ${pdf ? '<button class="btn sec" id="pPdf">Compartir o guardar PDF del pedido</button>' : ''}
@@ -858,6 +877,121 @@ function pdfPedido(p, total){
   return doc;
 }
 
+
+/* ===== Vales de descuento ===== */
+let VALES = ls.get('mkcat_vales_' + (tok || ''), {});   /* {cod: {m, v, e}} estado vivo de cada vale de esta tienda */
+const MIN_VALE = 200, hoyK = ()=> { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const valeActivo = ()=> Object.entries(VALES).map(([cod, x])=> ({cod, ...x})).filter(x=> x.e==='activo' && (!x.v || x.v >= hoyK())).sort((a,b)=> String(a.v).localeCompare(String(b.v)))[0] || null;
+const valesPorActivar = ()=> Object.entries(VALES).filter(([,x])=> x.e==='impreso' && (!x.v || x.v >= hoyK()));
+const descVale = (base = totalCarrito()) => { const v = valeActivo(); return v && base >= MIN_VALE ? Number(v.m) || 0 : 0; };
+function filaValePedido(){
+  const v = valeActivo(); if(!v) return '';
+  const d = descVale();
+  return `<div class="ln vale-ln"><span class="nm">🎟️ Vale de descuento<small>${d ? 'Se descuenta al entregarte tu pedido' : `Se aplica en pedidos desde ${fmt(MIN_VALE)} · te faltan ${fmt(r2(MIN_VALE - totalCarrito()))}`}</small></span><span class="im">${d ? '−' + fmt(d) : fmt(v.m)}</span></div>`;
+}
+async function refrescarVales(){
+  if(!tok) return; const base = {...((CLI && CLI.vales) || {})};
+  Object.keys(VALES).forEach(k=>{ if(!base[k]) base[k] = VALES[k]; });
+  try{ const {m, db} = await conLimite(nube(), 8000);
+    await conLimite(Promise.all(Object.keys(base).filter(k=> !['usado','vencido'].includes(base[k].e)).map(async k=>{ const d = await m.getDoc(m.doc(db, 'vales', k)); if(d.exists()){ const x = d.data(); if(x.tok===tok) base[k] = {m:x.monto, v:x.vence || '', e:x.estado}; } })), 10000);
+  }catch(_){}
+  Object.keys(base).forEach(k=>{ if(base[k].v && base[k].v < hoyK() && base[k].e!=='usado') base[k].e = 'vencido'; });
+  VALES = base; ls.set('mkcat_vales_' + tok, VALES); pintarBotonMis();
+}
+async function activarVale(cod){
+  cod = String(cod || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if(!cod) return;
+  if(!tok) return toast('Abre tu catálogo desde tu enlace para activar el vale');
+  const espera = hoja(`<div class="ok" style="background:#eef3f1;color:#1f6f4a">…</div><h3 style="text-align:center">Revisando tu vale…</h3>`, true);
+  let msg = null, ok = false, monto = 0, vence = '';
+  try{ const {m, db} = await conLimite(nube(), 8000); const d = await conLimite(m.getDoc(m.doc(db, 'vales', cod)), 8000);
+    if(!d.exists()) msg = 'Ese código no es válido. Revisa que esté bien escrito.';
+    else { const x = d.data(); monto = x.monto; vence = x.vence || '';
+      if(x.tok !== tok) msg = 'Este vale pertenece a otra tienda.';
+      else if(x.estado==='usado') msg = 'Este vale ya se usó.';
+      else if(x.estado==='vencido' || (vence && vence < hoyK())) msg = 'Este vale ya venció.';
+      else if(x.estado==='activo') ok = true;
+      else if(x.estado!=='impreso') msg = 'Este vale todavía no se puede activar.';
+      else { const q = yo(); await conLimite(m.setDoc(m.doc(db, 'vales', cod), {estado:'activo', activado:new Date().toISOString(), activadoPor: q ? q.n : ''}, {merge:true}), 10000); ok = true; }
+      if(ok){ VALES[cod] = {m:monto, v:vence, e:'activo'}; ls.set('mkcat_vales_' + tok, VALES); pintarBotonMis(); }
+    }
+  }catch(e){ msg = /permission/i.test(String(e && (e.code || e.message))) ? 'Esta función aún no está activa. Avisa a Merkalimentos.' : 'Sin conexión. Inténtalo de nuevo cuando tengas señal.'; }
+  espera.remove();
+  if(ok){ const h = hoja(`<div class="ok">🎉</div><h3 style="text-align:center">¡Vale de ${fmt(monto)} activado!</h3><p class="sub" style="text-align:center">Se descuenta solo en tu siguiente pedido de ${fmt(MIN_VALE)} o más${vence ? `.<br>Vigente hasta el ${new Date(vence + 'T12:00').toLocaleDateString('es-MX',{day:'numeric', month:'long'})}` : ''}.</p><div class="acts"><button class="btn" id="vaOk">¡Perfecto!</button></div>`, true); h.querySelector('#vaOk').onclick = ()=> h.remove(); }
+  else { const h = hoja(`<div class="ok" style="background:#fdecea;color:#c0392b">!</div><h3 style="text-align:center">No se pudo activar</h3><p class="sub" style="text-align:center">${msg}</p><div class="acts"><button class="btn" id="vaOk">Entendido</button></div>`, true); h.querySelector('#vaOk').onclick = ()=> h.remove(); }
+}
+async function verVales(){
+  await refrescarVales();
+  const ls2 = Object.entries(VALES).map(([cod, x])=> ({cod, ...x})).sort((a,b)=> ({activo:0, impreso:1, usado:2, vencido:3}[a.e] ?? 4) - ({activo:0, impreso:1, usado:2, vencido:3}[b.e] ?? 4));
+  const txt = {activo:'Listo para usarse', impreso:'Escanéalo para activarlo', usado:'Usado', vencido:'Vencido'};
+  const h = hoja(`<h3>Mis vales de descuento</h3><p class="sub">Los vales vienen impresos en tu ticket. Escanéalos para activarlos y se descuentan solos en tu siguiente pedido de ${fmt(MIN_VALE)} o más.</p>
+    ${ls2.length ? ls2.map(v=> `<div class="vale-it ${v.e}"><b>${fmt(v.m)}</b><span>${txt[v.e] || v.e}<small>${esc(v.cod)}${v.v ? ' · vence ' + new Date(v.v + 'T12:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'}) : ''}</small></span></div>`).join('') : '<div class="vacio">Aún no tienes vales. ¡Pueden venir en tu próximo ticket!</div>'}
+    <div class="acts"><button class="btn" id="vEsc">📷 Escanear QR</button></div>`);
+  h.querySelector('#vEsc').onclick = ()=>{ h.remove(); escanearQR(); };
+}
+/* ===== Escanear QR: lector del navegador o jsQR si no existe ===== */
+async function cargarJsQR(){ if(window.jsQR) return window.jsQR; await new Promise((ok, mal)=>{ const s = document.createElement('script'); s.src = 'jsqr.js'; s.onload = ok; s.onerror = mal; document.head.appendChild(s); }); return window.jsQR; }
+function escanearQR(){
+  let vivo = true, stream = null;
+  const h = hoja(`<h3>Escanear QR</h3><p class="sub">Apunta la cámara al código QR de tu vale.</p>
+    <div class="qr-box"><video id="qrV" playsinline muted></video><i class="qr-marco"></i></div>
+    <p class="sub" id="qrMsg" style="text-align:center;margin-top:8px">Abriendo la cámara…</p>
+    <label>¿No lo lee? Escribe el código del vale</label><div style="display:flex;gap:8px"><input class="field" id="qrCod" placeholder="Ej. MK7F3K9Q" autocapitalize="characters" autocomplete="off"><button class="btn" id="qrOk" style="flex:0 0 auto;padding:12px 16px">Activar</button></div>`, true);
+  const cerrar = ()=>{ vivo = false; try{ stream && stream.getTracks().forEach(t=> t.stop()); }catch(_){} };
+  const obs = new MutationObserver(()=>{ if(!document.body.contains(h)){ cerrar(); obs.disconnect(); } }); obs.observe(document.body, {childList:true});
+  const listo = txt => { if(!vivo) return; cerrar(); h.remove(); const m = String(txt).match(/vale=([A-Za-z0-9]+)/); activarVale(m ? m[1] : txt); };
+  h.querySelector('#qrOk').onclick = ()=>{ const v = h.querySelector('#qrCod').value.trim(); if(!v) return toast('Escribe el código'); listo(v); };
+  (async ()=>{
+    const msg = h.querySelector('#qrMsg'), vid = h.querySelector('#qrV');
+    try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); }catch(_){ msg.textContent = 'No se pudo abrir la cámara: permite el acceso o escribe el código.'; return; }
+    if(!vivo){ cerrar(); return; }
+    vid.srcObject = stream; try{ await vid.play(); }catch(_){}
+    msg.textContent = 'Buscando el código…';
+    let det = null; try{ if('BarcodeDetector' in window && (await BarcodeDetector.getSupportedFormats()).includes('qr_code')) det = new BarcodeDetector({formats:['qr_code']}); }catch(_){}
+    let jq = null; if(!det){ try{ jq = await cargarJsQR(); }catch(_){ msg.textContent = 'Tu celular no puede leer QR aquí: escribe el código.'; return; } }
+    const cv = document.createElement('canvas'), g = cv.getContext('2d', {willReadFrequently:true});
+    const ciclo = async ()=>{ if(!vivo) return;
+      try{ if(vid.readyState >= 2){
+        if(det){ const r = await det.detect(vid); if(r && r.length) return listo(r[0].rawValue); }
+        else { const w = 480, k = w / (vid.videoWidth || w); cv.width = w; cv.height = Math.round((vid.videoHeight || w) * k); g.drawImage(vid, 0, 0, cv.width, cv.height);
+          const im = g.getImageData(0, 0, cv.width, cv.height), r = jq(im.data, cv.width, cv.height, {inversionAttempts:'dontInvert'}); if(r && r.data) return listo(r.data); } } }catch(_){}
+      setTimeout(ciclo, 220); };
+    ciclo();
+  })();
+}
+/* ===== Menú lateral ===== */
+function abrirMenu(){
+  if(document.querySelector('.lat')) return;
+  const n = misPedidos().length, va = valeActivo(), pa = valesPorActivar().length, wa = String(D?.negocio?.wa || '529611080808').replace(/\D/g,'');
+  const it = (id, ico, t, extra = '') => `<button class="lat-i" data-l="${id}"><span>${ico}</span><b>${t}</b>${extra}</button>`;
+  const h = document.createElement('div'); h.className = 'hoja lat';
+  h.innerHTML = `<div class="lat-pan"><div class="lat-cab"><b>${esc(CLI ? (CLI.t || CLI.n) : 'Cliente consentido')}</b><small>${MID && ACC ? esc(ACC.n) + ' · ' + esc(String(ACC.rol).toLowerCase()) : CLI ? esc(CLI.n) : 'Merkalimentos'}</small></div>
+    ${it('cat', '🛒', 'Catálogo')}${it('mis', '📋', 'Mis pedidos', n ? `<i>${n}</i>` : '')}${tok ? it('vales', '🎟️', 'Mis vales', va ? `<i class="v">${fmt(va.m)}</i>` : pa ? `<i class="a">${pa}</i>` : '') : ''}
+    ${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
+    ${it('wa', '💬', 'Escribir a Merkalimentos')}<div class="lat-sep"></div>${it('cfg', '⚙️', 'Configuración')}${it('salir', '✕', 'Salir')}</div>`;
+  h.onclick = e=>{ if(e.target===h) h.remove(); };
+  document.body.appendChild(h); requestAnimationFrame(()=> h.classList.add('on'));
+  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, mis:verMisPedidos, vales:verVales, qr:escanearQR, acc:verAccesos, inst:instalar,
+    wa:()=>{ location.href = `https://wa.me/${wa}?text=${encodeURIComponent('Hola, les escribo desde mi catálogo' + (CLI ? ' (' + (CLI.t || CLI.n) + ')' : ''))}`; }, cfg:verConfig, salir:preguntarSalir})[b.dataset.l](); });
+}
+function verConfig(){
+  const h = hoja(`<h3>Configuración</h3>
+    ${CLI ? `<div class="cfg-c"><h4>Mis datos</h4><div><span>Tienda</span><b>${esc(CLI.t || '—')}</b></div><div><span>Nombre</span><b>${esc(CLI.n)}</b></div><div><span>Teléfono</span><b>${esc(CLI.tel || '—')}</b></div><div><span>Dirección</span><b>${esc(CLI.dir || '—')}</b></div>
+      ${(CLI.dv||[]).length ? `<div><span>Días de visita</span><b>${CLI.dv.map(k=> DIAS_N[k]).join(', ')}</b></div>` : ''}<p class="sub" style="margin:8px 0 0">¿Algo está mal? Escríbenos por WhatsApp y lo corregimos.</p></div>` : ''}
+    ${MID && ACC ? `<div class="cfg-c"><h4>Mi acceso</h4><div><span>Entras como</span><b>${esc(ACC.n)} (${esc(String(ACC.rol).toLowerCase())})</b></div><p class="sub" style="margin:8px 0 0">Tus pedidos llegan con tu nombre a nombre de ${esc(CLI?.t || CLI?.n || 'la tienda')}.</p></div>` : ''}
+    <div class="cfg-c"><h4>Aplicación</h4><div><span>Instalada</span><b>${instalada() ? 'Sí ✓' : 'No'}</b></div><div><span>Avisos en el celular</span><b>Próximamente</b></div></div>
+    <div class="acts">${esDueno() && CLI ? '<button class="btn sec" id="cfAcc">👥 Personas con acceso</button>' : ''}${puedeInstalar() ? '<button class="btn sec" id="cfInst">📲 Instalar app</button>' : ''}
+      <button class="btn sec" id="cfAct">Buscar actualización</button><button class="btn sec" id="cfBorrar">Borrar historial de este celular</button></div>`);
+  const a = h.querySelector('#cfAcc'); if(a) a.onclick = ()=>{ h.remove(); verAccesos(); };
+  const i = h.querySelector('#cfInst'); if(i) i.onclick = ()=>{ h.remove(); instalar(); };
+  h.querySelector('#cfAct').onclick = async ()=>{ try{ const r = await navigator.serviceWorker?.getRegistration(); await r?.update(); }catch(_){} location.reload(); };
+  h.querySelector('#cfBorrar').onclick = ()=>{ if(!confirmarSimple('¿Borrar el historial de pedidos y el pedido en curso de este celular? Tus pedidos enviados no se borran.')) return; ls.set(K + '_pedidos', []); ls.set(K + '_ultimo', null); carrito = {}; guardarCarrito(); h.remove(); pintar(); toast('Historial borrado'); };
+}
+/* App instalada: se registra una vez para dar prioridad en los vales a quien aún no la tiene */
+async function marcarInstalada(){
+  if(!instalada() || !tok) return; const k = 'mkcat_inst_' + tok; if(ls.get(k)) return;
+  try{ const {m, db} = await conLimite(nube(), 8000); const q = yo();
+    await conLimite(m.setDoc(m.doc(db, 'clientesCat', tok), {app:{inst:new Date().toISOString(), plat: esIOS ? 'ios' : 'android', por: q ? q.n : ''}}, {merge:true}), 10000); ls.set(k, 1); }catch(_){}
+}
 /* ===== Aviso del día de visita ===== */
 const DIAS_K = ['dom','lun','mar','mie','jue','vie','sab'], DIAS_N = {lun:'lunes', mar:'martes', mie:'miércoles', jue:'jueves', vie:'viernes', sab:'sábado', dom:'domingo'};
 function avisoVisita(){
@@ -945,13 +1079,15 @@ async function instalar(){
 /* La app instalada abre con el enlace de esta persona (en iPhone no comparte memoria con el navegador) */
 function asegurarUrlInstalable(){
   const id = MID ? 'm=' + MID : tok ? 'c=' + tok : ''; if(!id) return;
-  try{ if(!location.search.includes(id)) history.replaceState(history.state, '', location.pathname + '?' + id); }catch(_){}
+  try{ if(location.search !== '?' + id) history.replaceState(history.state, '', location.pathname + '?' + id); }catch(_){}
   if(!esIOS) return;
   try{ const man = {name:'Cliente consentido Merkalimentos', short_name:'Cliente consentido', start_url: location.origin + location.pathname + '?' + id, scope: location.origin + location.pathname,
       display:'standalone', background_color:'#1f6f4a', theme_color:'#1f6f4a', icons:[{src: new URL('../icon-192.png', location.href).href, sizes:'192x192', type:'image/png'}, {src: new URL('../icon-512.png', location.href).href, sizes:'512x512', type:'image/png'}]};
     document.querySelector('link[rel="manifest"]').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man)); }catch(_){}
 }
-cargar().then(()=>{ pintarBotonMis(); setTimeout(pintarUltimo, 300); }).catch(()=>{});
+const VALE_URL = new URLSearchParams(location.search).get('vale');
+cargar().then(async ()=>{ VALES = ls.get('mkcat_vales_' + (tok || ''), {}); pintarBotonMis(); setTimeout(pintarUltimo, 300); marcarInstalada();
+  await refrescarVales(); if(VALE_URL) activarVale(VALE_URL); }).catch(()=>{});
 /* Botón Atrás del teléfono: cierra ventanas abiertas, luego regresa al catálogo y en la pantalla principal pregunta si desea salir */
 let saliendo = false;
 const armarAtras = ()=>{ try{ history.pushState({mk:1}, ''); }catch(_){} };
@@ -990,7 +1126,7 @@ function despedida(){
   document.body.appendChild(a);
   a.querySelector('#aVolver').onclick = ()=>{ a.remove(); saliendo = false; };
 }
-document.getElementById('bSalir').onclick = preguntarSalir;
+document.getElementById('bMenu').onclick = abrirMenu;
 try{ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js'); }catch(_){}
 </script>
 </body>
