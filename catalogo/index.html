@@ -144,6 +144,17 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 .lat-i span{width:26px;text-align:center;font-size:1.15rem}.lat-i b{flex:1;font-weight:600}
 .lat-i i{font-style:normal;background:var(--brand);color:#fff;border-radius:999px;padding:1px 8px;font-size:.76rem;font-weight:700}.lat-i i.v{background:#e0a800;color:#3a2a00}.lat-i i.a{background:var(--gold);color:#3a2a00}
 .lat-sep{height:1px;background:var(--line);margin:6px 0}
+.modo-dev .prod.sin-dev{filter:grayscale(1);opacity:.45}.modo-dev .prod.sin-dev .add{display:none}
+.nodev{position:absolute;top:8px;left:8px;z-index:2;background:#6b7570;color:#fff;font-size:.66rem;font-weight:700;padding:2px 7px;border-radius:999px}
+.qty.dev{background:#b35900}
+.modo-dev .prod .add{background:#b35900}
+.dev-b{background:#b35900}
+.pol{background:#fff8ef;border:1px solid #f0d3ad;border-radius:12px;padding:12px 14px;font-size:.88rem;color:#4a3a28;margin:8px 0}
+.pol ul{margin:6px 0 4px 18px;line-height:1.5}.pol small{color:#7a6a58}
+.dev-h{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;font-size:.86rem}.dev-h>b{display:block;margin-bottom:4px}
+.dev-h>div{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--line)}.dev-h .e{font-weight:700}.dev-h .e.Aplicada{color:#1f9d55}.dev-h .e.Descartada{color:#c0392b}
+.qsel{display:flex;gap:8px;align-items:center}.qsel button{width:46px;height:46px;border-radius:12px;background:var(--bg);font-size:1.3rem;font-weight:800}.qsel .field{text-align:center;margin:0}
+.lnk-s{color:var(--brand);font-weight:700;text-decoration:underline;font-size:.78rem}
 .inst-ban{display:flex;align-items:stretch;margin:10px auto 0;max-width:420px;background:#fff;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.15);overflow:hidden;text-align:left}
 .inst-ban #btnInst{flex:1;display:flex;align-items:center;gap:10px;padding:10px 12px;color:#1d3b2c;text-align:left}.inst-ban #btnInst>span:first-child{font-size:1.5rem}
 .inst-ban b{display:block;font-size:.95rem}.inst-ban small{display:block;font-size:.78rem;color:#5b6b63}
@@ -704,6 +715,7 @@ async function cargar(){
   pintar();
 }
 function pintar(){
+  if(modo==='dev') return pintarDev();
   const secs = D.secciones.filter(s=> D.productos.some(p=> p.s===s));
   $('secnav').innerHTML = secs.map((s,i)=> `<button data-i="${i}">${esc(s)}</button>`).join('');
   $('secnav').querySelectorAll('button').forEach(b=> b.onclick = ()=> document.getElementById('sec' + b.dataset.i).scrollIntoView({behavior:'smooth', block:'start'}));
@@ -887,6 +899,112 @@ function pdfPedido(p, total){
 }
 
 
+
+/* ===== Devoluciones ===== */
+let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
+const guardarDev = ()=> ls.set(K + '_dev', devC);
+const devDias = ()=> Number(D?.devPol?.dias) || 8;
+const nDev = ()=> Object.keys(devC).length;
+const totalDev = ()=> r2(Object.entries(devC).reduce((s,[id,x])=>{ const p = prodPorId(id); return s + (p ? p.p * x.q : 0); }, 0));
+const MOT_DEV = [['Caducado','Caducado'], ['Defecto','Defecto del producto'], ['Dañado','Dañado']];
+const fCorta = k => k ? new Date(k + 'T12:00').toLocaleDateString('es-MX', {day:'numeric', month:'short'}) : '';
+function politicaDevHTML(corta){
+  return `<div class="pol">
+    <b>↩️ Política de devolución</b>
+    <ul><li><b>Productos con devolución:</b> los que ves en color. Los que están en gris no tienen devolución.</li>
+      <li><b>Caducados:</b> se aceptan con no más de <b>${devDias()} días</b> de caducados.</li>
+      <li><b>Defecto del producto o dañado:</b> se acepta sin importar la fecha.</li>
+      <li>Se descuentan al <b>precio actual</b> en tu <b>siguiente compra</b>.</li>
+      <li>El repartidor revisa fechas y producto al visitarte; si la devolución es mayor que tu compra, el resto queda a tu favor para la siguiente.</li></ul>
+</div>`;
+}
+function pintarDev(){
+  const secs = D.secciones.filter(s=> D.productos.some(p=> p.s===s));
+  $('secnav').innerHTML = secs.map((s,i)=> `<button data-i="${i}">${esc(s)}</button>`).join('');
+  $('secnav').querySelectorAll('button').forEach(b=> b.onclick = ()=> document.getElementById('sec' + b.dataset.i).scrollIntoView({behavior:'smooth', block:'start'}));
+  $('main').className = 'wrap modo-dev'; document.body.classList.add('modo-pedido-on');
+  $('main').innerHTML = `<section class="pagina dev-int"><h2>Agregar devolución</h2>${politicaDevHTML()}${devHistHTML()}</section>`
+    + secs.map((s,i)=> `<section class="pagina" id="sec${i}"><h2>${esc(s)}</h2><div class="grid">${D.productos.filter(p=> p.s===s).map(tarjetaDev).join('')}</div></section>`).join('');
+  $('main').querySelectorAll('.prod').forEach(b=> b.onclick = ()=>{ const p = prodPorId(b.dataset.id); if(!p.ad) return toast('Este producto no tiene devolución'); pedirDev(p); });
+  barraDev(); refrescarDevs();
+}
+function tarjetaDev(p){
+  const f = foto(p), x = devC[p.id];
+  return `<button class="prod${p.ad ? '' : ' sin-dev'}" data-id="${p.id}">
+    ${x ? `<span class="qty dev">${p.kg ? r3(x.q) + ' kg' : x.q}</span>` : ''}${p.ad ? '' : '<span class="nodev">Sin devolución</span>'}
+    <span class="ft" ${f ? `style="background-image:url('${f}')"` : ''}>${f ? '' : esc(nombre(p))}${p.ad ? '<span class="add">↩</span>' : ''}</span>
+    <span class="tx">${p.m ? `<span class="mc">${esc(p.m)}</span>` : ''}<span class="nm">${esc(p.n)}</span>${p.pr ? `<span class="ps">${esc(p.pr)}</span>` : ''}
+      <span class="pr">${fmt(p.p)}${p.kg ? ' <small>por kg</small>' : ''}</span></span></button>`;
+}
+function barraDev(){
+  $('barra').innerHTML = `<div class="in"><button class="btn sec" id="dvSalir" style="flex:0 0 auto;padding:14px 16px">‹ Catálogo</button><button class="btn dev-b" id="dvTk">↩️ Devolución <b>${nDev()}</b> ${fmt(totalDev())}</button></div>`;
+  $('dvSalir').onclick = ()=>{ modo = 'ver'; document.body.classList.remove('modo-pedido-on'); pintar(); window.scrollTo(0,0); };
+  $('dvTk').onclick = verTicketDev;
+}
+function pedirDev(p){
+  const x = devC[p.id] || {q: p.kg ? 0.5 : 1, mot:'Caducado', cad:''}, lim = (()=>{ const d = new Date(); d.setDate(d.getDate() - devDias()); return d.toISOString().slice(0,10); })();
+  let mot = x.mot;
+  const h = hoja(`<h3>${esc(nombre(p))}</h3><p class="sub">${fmt(p.p)}${p.kg ? ' por kg' : ' c/u'} · precio actual</p>
+    <label>Cantidad${p.kg ? ' (kg)' : ''}</label>
+    ${p.kg ? `<input class="field" id="dvQ" type="number" inputmode="decimal" min="0" step="0.05" value="${x.q}">`
+      : `<div class="qsel"><button id="dvMenos">−</button><input class="field" id="dvQ" type="number" inputmode="numeric" min="1" step="1" value="${x.q}"><button id="dvMas">+</button></div>`}
+    <label>Motivo</label><div class="kgs" id="dvMot">${MOT_DEV.map(([k,t])=> `<button data-m="${k}" class="${k===mot?'on':''}">${t}</button>`).join('')}</div>
+    <div id="dvCadBox"><label>Fecha de caducidad</label><input class="field" id="dvCad" type="date" value="${x.cad || ''}"><small class="sub">Se aceptan con no más de ${devDias()} días de caducados.</small></div>
+    <p class="aviso" id="dvErr" style="display:none"></p>
+    <div class="acts"><button class="btn" id="dvOk">${devC[p.id] ? 'Guardar' : 'Agregar a la devolución'}</button>${devC[p.id] ? '<button class="btn sec" id="dvDel">Quitar de la devolución</button>' : ''}</div>`, true);
+  const q = h.querySelector('#dvQ'), cb = h.querySelector('#dvCadBox'), err = m => { const e = h.querySelector('#dvErr'); e.textContent = m; e.style.display = 'block'; };
+  const pm = ()=> cb.style.display = mot==='Caducado' ? 'block' : 'none'; pm();
+  h.querySelectorAll('#dvMot button').forEach(b=> b.onclick = ()=>{ mot = b.dataset.m; h.querySelectorAll('#dvMot button').forEach(y=> y.classList.toggle('on', y===b)); pm(); });
+  const mn = h.querySelector('#dvMenos'), ms = h.querySelector('#dvMas');
+  if(mn) mn.onclick = ()=> q.value = Math.max(1, (parseInt(q.value)||1) - 1); if(ms) ms.onclick = ()=> q.value = (parseInt(q.value)||0) + 1;
+  h.querySelector('#dvOk').onclick = ()=>{
+    const v = r3(Number(q.value)||0), cad = h.querySelector('#dvCad').value;
+    if(!(v > 0)) return err('Escribe la cantidad.');
+    if(!p.kg && !Number.isInteger(v)) return err('La cantidad debe ser en piezas enteras.');
+    if(mot==='Caducado'){ if(!cad) return err('Escribe la fecha de caducidad del producto.');
+      if(cad < lim) return err(`Caducó el ${fCorta(cad)}: tiene más de ${devDias()} días de caducado y no se acepta la devolución.`); }
+    devC[p.id] = {q:v, mot, cad: mot==='Caducado' ? cad : ''}; guardarDev(); h.remove(); pintarDev(); toast('Agregado a tu devolución');
+  };
+  const d = h.querySelector('#dvDel'); if(d) d.onclick = ()=>{ delete devC[p.id]; guardarDev(); h.remove(); pintarDev(); };
+}
+function verTicketDev(){
+  const ids = Object.keys(devC); if(!ids.length) return toast('Toca los productos en color para agregarlos a tu devolución');
+  const h = hoja(`<h3>Tu devolución</h3>
+    <div class="tk">${ids.map(id=>{ const p = prodPorId(id), x = devC[id]; if(!p) return '';
+      return `<div class="ln"><span class="nm">${esc(nombre(p))}<small>${esc(MOT_DEV.find(m=> m[0]===x.mot)?.[1] || x.mot)}${x.cad ? ' · caduca ' + fCorta(x.cad) : ''} · <button class="lnk-s" data-ed="${id}">cambiar</button></small></span><span class="q">${p.kg ? r3(x.q) + ' kg' : '× ' + x.q}</span><span class="im">${fmt(r2(p.p * x.q))}</span></div>`; }).join('')}
+      <div class="tot"><span>Valor estimado</span><span>${fmt(totalDev())}</span></div></div>
+    <p class="sub">Se descuenta en tu siguiente compra después de que el repartidor revise fechas y producto.</p>
+    <div class="acts"><button class="btn" id="dvEnv">Asignar a mi próxima compra</button><button class="btn sec" id="dvSeg">Agregar más productos</button></div>`);
+  h.querySelectorAll('[data-ed]').forEach(b=> b.onclick = ()=>{ h.remove(); pedirDev(prodPorId(b.dataset.ed)); });
+  h.querySelector('#dvSeg').onclick = ()=> h.remove();
+  h.querySelector('#dvEnv').onclick = async ()=>{
+    if(!tok) return toast('Abre tu catálogo desde tu enlace para enviar devoluciones');
+    const b = h.querySelector('#dvEnv'); b.disabled = true; b.textContent = 'Enviando…';
+    const id = 'DV' + Date.now().toString(36).toUpperCase() + rid(4), quien = yo(), total = totalDev();
+    const l = ids.map(i=>{ const p = prodPorId(i), x = devC[i]; return {id:i, q:x.q, p:p.p, n:nombre(p), mot:x.mot, cad:x.cad || '', kg:!!p.kg}; });
+    try{ const {m, db} = await conLimite(nube(), 8000);
+      await conLimite(m.setDoc(m.doc(db, 'devoluciones', id), {v:1, id, f:new Date().toISOString(), c:tok, cli:{n:CLI?.n || '', t:CLI?.t || '', tel:CLI?.tel || '', ...(quien ? {por:quien} : {})}, l, total, estado:'Nueva', creado:m.serverTimestamp()}), 10000);
+    }catch(e){ b.disabled = false; b.textContent = 'Asignar a mi próxima compra';
+      return toast(/permission/i.test(String(e && (e.code || e.message))) ? 'Esta función aún no está activa. Avisa a Merkalimentos.' : 'Sin conexión: inténtalo de nuevo'); }
+    const hs = ls.get(K + '_devs', []); hs.unshift({id, f:new Date().toISOString(), total, n:l.length, e:'Nueva'}); ls.set(K + '_devs', hs.slice(0, 20));
+    devC = {}; guardarDev(); h.remove();
+    const ok = hoja(`<div class="ok">✓</div><h3 style="text-align:center">¡Devolución registrada!</h3><p class="sub" style="text-align:center">${l.length} ${l.length===1?'producto':'productos'} · ${fmt(total)}<br>En tu próxima visita el repartidor la revisa y se descuenta de tu compra.</p><div class="acts"><button class="btn" id="okC">Volver al catálogo</button></div>`, true);
+    ok.querySelector('#okC').onclick = ()=>{ ok.remove(); modo = 'ver'; document.body.classList.remove('modo-pedido-on'); pintar(); window.scrollTo(0,0); };
+  };
+}
+const TXT_DEV = {Nueva:'Por revisar en tu visita', Aplicada:'Aplicada en tu compra', Parcial:'Aplicada en parte', Descartada:'No aceptada'};
+function devHistHTML(){
+  const hs = ls.get(K + '_devs', []).filter(x=> Date.now() - new Date(x.f) < 45*864e5); if(!hs.length) return '';
+  return `<div class="dev-h"><b>Tus devoluciones</b>${hs.slice(0,5).map(x=> `<div><span>${fCorta(x.f.slice(0,10))} · ${x.n} ${x.n===1?'producto':'productos'}</span><span class="e ${x.e}">${TXT_DEV[x.e] || x.e} · ${fmt(x.total)}</span></div>`).join('')}</div>`;
+}
+async function refrescarDevs(){
+  const hs = ls.get(K + '_devs', []), vivas = hs.filter(x=> x.e==='Nueva' || x.e==='Parcial'); if(!vivas.length) return;
+  try{ const {m, db} = await conLimite(nube(), 8000); let cambio = false;
+    await conLimite(Promise.all(vivas.map(async x=>{ const d = await m.getDoc(m.doc(db, 'devoluciones', x.id)); if(d.exists() && d.data().estado !== x.e){ x.e = d.data().estado; cambio = true; } })), 8000);
+    if(cambio){ ls.set(K + '_devs', hs); if(modo==='dev'){ const el = document.querySelector('.dev-h'); if(el) el.outerHTML = devHistHTML(); } }
+  }catch(_){}
+}
+function abrirDevolucion(){ modo = 'dev'; pintar(); window.scrollTo(0,0); }
 /* ===== Vales de descuento ===== */
 let VALES = ls.get('mkcat_vales_' + (tok || ''), {});   /* {cod: {m, v, e}} estado vivo de cada vale de esta tienda */
 const MIN_VALE = 200, hoyK = ()=> { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
@@ -975,11 +1093,11 @@ function abrirMenu(){
   const h = document.createElement('div'); h.className = 'hoja lat';
   h.innerHTML = `<div class="lat-pan"><div class="lat-cab"><b>${esc(CLI ? (CLI.t || CLI.n) : 'Cliente consentido')}</b><small>${MID && ACC ? esc(ACC.n) + ' · ' + esc(String(ACC.rol).toLowerCase()) : CLI ? esc(CLI.n) : 'Merkalimentos'}</small></div>
     ${it('cat', '🛒', 'Catálogo')}${it('mis', '📋', 'Mis pedidos', n ? `<i>${n}</i>` : '')}${tok ? it('vales', '🎟️', 'Mis vales', va ? `<i class="v">${fmt(va.m)}</i>` : pa ? `<i class="a">${pa}</i>` : '') : ''}
-    ${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
+    ${tok ? it('dev', '↩️', 'Agregar devolución', nDev() ? `<i>${nDev()}</i>` : '') : ''}${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
     ${it('wa', '💬', 'Escribir a Merkalimentos')}<div class="lat-sep"></div>${it('cfg', '⚙️', 'Configuración')}${it('salir', '✕', 'Salir')}</div>`;
   h.onclick = e=>{ if(e.target===h) h.remove(); };
   document.body.appendChild(h); requestAnimationFrame(()=> h.classList.add('on'));
-  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, mis:verMisPedidos, vales:verVales, qr:escanearQR, acc:verAccesos, inst:instalar,
+  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar,
     wa:()=>{ location.href = `https://wa.me/${wa}?text=${encodeURIComponent('Hola, les escribo desde mi catálogo' + (CLI ? ' (' + (CLI.t || CLI.n) + ')' : ''))}`; }, cfg:verConfig, salir:preguntarSalir})[b.dataset.l](); });
 }
 function verConfig(){
@@ -987,6 +1105,7 @@ function verConfig(){
     ${CLI ? `<div class="cfg-c"><h4>Mis datos</h4><div><span>Tienda</span><b>${esc(CLI.t || '—')}</b></div><div><span>Nombre</span><b>${esc(CLI.n)}</b></div><div><span>Teléfono</span><b>${esc(CLI.tel || '—')}</b></div><div><span>Dirección</span><b>${esc(CLI.dir || '—')}</b></div>
       ${(CLI.dv||[]).length ? `<div><span>Días de visita</span><b>${CLI.dv.map(k=> DIAS_N[k]).join(', ')}</b></div>` : ''}<p class="sub" style="margin:8px 0 0">¿Algo está mal? Escríbenos por WhatsApp y lo corregimos.</p></div>` : ''}
     ${MID && ACC ? `<div class="cfg-c"><h4>Mi acceso</h4><div><span>Entras como</span><b>${esc(ACC.n)} (${esc(String(ACC.rol).toLowerCase())})</b></div><p class="sub" style="margin:8px 0 0">Tus pedidos llegan con tu nombre a nombre de ${esc(CLI?.t || CLI?.n || 'la tienda')}.</p></div>` : ''}
+    <div class="cfg-c"><h4>Devoluciones</h4>${politicaDevHTML(true)}</div>
     <div class="cfg-c"><h4>Aplicación</h4><div><span>Instalada</span><b>${instalada() ? 'Sí ✓' : 'No'}</b></div><div><span>Avisos en el celular</span><b>Próximamente</b></div></div>
     <div class="acts">${esDueno() && CLI ? '<button class="btn sec" id="cfAcc">👥 Personas con acceso</button>' : ''}${puedeInstalar() ? '<button class="btn sec" id="cfInst">📲 Instalar app</button>' : ''}
       <button class="btn sec" id="cfAct">Buscar actualización</button><button class="btn sec" id="cfBorrar">Borrar historial de este celular</button></div>`);
@@ -1111,7 +1230,8 @@ window.addEventListener('popstate', ()=>{
   if(saliendo) return;
   const hs = document.querySelectorAll('.hoja');
   if(hs.length){ hs[hs.length-1].remove(); armarAtras(); return; }
-  if(modo==='pedido'){ modo = 'ver'; pintar(); armarAtras(); return; }
+  if(modo==='pedido' || modo==='dev'){ modo = 'ver'; pintar(); armarAtras(); return; }
+  if(instalada()){ saliendo = true; history.back(); return; }   /* en la app instalada, Atrás en la pantalla principal la cierra */
   armarAtras(); preguntarSalir();
 });
 function preguntarSalir(){
@@ -1126,10 +1246,22 @@ function preguntarSalir(){
 /* Salir: el navegador no deja cerrar una pestaña abierta desde un link, así que regresamos a WhatsApp y dejamos una despedida */
 function salir(){
   saliendo = true;
+  if(instalada()){ cerrarApp(); return; }
   try{ window.close(); }catch(_){}
   const num = String(D?.negocio?.wa || '529611080808').replace(/\D/g,'');
   despedida();
   try{ location.href = `whatsapp://send?phone=${num}`; }catch(_){}
+}
+/* App instalada: se cierra sin cerrar sesión (la identidad queda guardada en el celular) */
+function cerrarApp(){
+  try{ window.close(); }catch(_){}
+  setTimeout(()=>{ if(document.visibilityState === 'hidden') return;
+    try{ const n = history.length; if(n > 1) history.go(-(n - 1)); }catch(_){}
+    setTimeout(()=>{ if(document.visibilityState === 'hidden') return; saliendo = false;
+      const a = document.createElement('div'); a.className = 'adios';
+      a.innerHTML = `<div class="in"><div class="ok">👋</div><h3>¡Hasta pronto!</h3><p class="sub">Ya puedes cerrar la app. Tu sesión queda guardada.</p><button class="btn" id="adVolver">Volver al catálogo</button></div>`;
+      document.body.appendChild(a); a.querySelector('#adVolver').onclick = ()=>{ a.remove(); armarAtras(); }; }, 400);
+  }, 250);
 }
 function despedida(){
   if(document.querySelector('.adios')) return;
