@@ -155,6 +155,8 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 .dev-h>div{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--line)}.dev-h .e{font-weight:700}.dev-h .e.Aplicada{color:#1f9d55}.dev-h .e.Descartada{color:#c0392b}
 .qsel{display:flex;gap:8px;align-items:center}.qsel button{width:46px;height:46px;border-radius:12px;background:var(--bg);font-size:1.3rem;font-weight:800}.qsel .field{text-align:center;margin:0}
 .lnk-s{color:var(--brand);font-weight:700;text-decoration:underline;font-size:.78rem}
+.qr-b{background:#fff7e6;border-radius:12px;padding:8px 12px;margin-top:8px;font-size:.86rem}
+.cfg-c .btn{margin:0}#cfVer{align-items:center}
 .inst-ban{display:flex;align-items:stretch;margin:10px auto 0;max-width:420px;background:#fff;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.15);overflow:hidden;text-align:left}
 .inst-ban #btnInst{flex:1;display:flex;align-items:center;gap:10px;padding:10px 12px;color:#1d3b2c;text-align:left}.inst-ban #btnInst>span:first-child{font-size:1.5rem}
 .inst-ban b{display:block;font-size:.95rem}.inst-ban small{display:block;font-size:.78rem;color:#5b6b63}
@@ -641,7 +643,7 @@ async function verMisPedidos(){
   if(!l.length){ const h0 = hoja(`<h3>Mis pedidos</h3><p class="sub">Aquí verás tus pedidos y en qué paso va cada uno: recibido, programado, en reparto y entregado.</p><p class="sub">Todavía no has hecho pedidos desde este celular. Toca <b>Realizar pedido</b> para empezar.</p><div class="acts"><button class="btn" id="mpX">Entendido</button></div>`); h0.querySelector('#mpX').onclick = ()=> h0.remove(); return; }
   const h = hoja(`<h3>Mis pedidos</h3><p class="sub">Pedidos hechos desde este celular. Toca un pedido para ver sus productos.</p><div id="mpL">${l.map(o=>`<div class="mp-item" data-id="${o.id}"><div class="sgbar" style="box-shadow:none;margin:0;padding:0"><h4>${new Date(o.f).toLocaleDateString('es-MX',{weekday:'short', day:'numeric',month:'short'})} · ${fmt(o.total)}</h4><p class="sub" style="margin:0">Consultando estado…</p></div></div>`).join('')}</div>
     <div class="acts"><button class="btn sec" id="mpX">Cerrar</button></div>`);
-  h.querySelector('#mpX').onclick = ()=> h.remove();
+  h.querySelector('#mpX').onclick = ()=>{ h.remove(); pintarUltimo(); };
   const sgs = await Promise.all(l.map(o=> o.sg ? o.sg : leerSeguimiento(o.id)));
   l.forEach((o,i)=>{ const el = h.querySelector(`.mp-item[data-id="${o.id}"]`); if(!el) return;
     const sg = sgs[i];
@@ -649,13 +651,22 @@ async function verMisPedidos(){
       + (o.l && o.l.length ? `<details class="mp-det"><summary>${o.l.length} ${o.l.length===1?'producto':'productos'}</summary>${o.l.map(x=>`<div><span>${esc(String(x.q))} x ${esc(x.n)}</span><b>${fmt(x.q * x.p)}</b></div>`).join('')}</details>` : '');
   });
 }
-async function pintarUltimo(){
-  const u = misPedidos()[0], el = document.getElementById('ultPed'); if(!el || !u || !u.id) return;
-  if(Date.now() - new Date(u.f).getTime() > 10*864e5) return;
-  const sg = u.sg || await leerSeguimiento(u.id); if(sg === undefined) return;
-  if(sg && sg.estado==='Entregado' && Date.now() - new Date(sg.entregado || sg.actualizado).getTime() > 3*864e5) return;
+async function pintarUltimo(refrescar){
+  const el = document.getElementById('ultPed'); if(!el) return;
+  if(refrescar) await refrescarCliNube();
+  const u = misPedidos()[0]; if(!u || !u.id){ el.innerHTML = ''; return; }
+  if(Date.now() - new Date(u.f).getTime() > 10*864e5){ el.innerHTML = ''; return; }
+  /* el estado más avanzado entre el historial de la nube y el seguimiento (la cancelación puede venir por cualquiera) */
+  const s1 = u.sg || null, s2 = await leerSeguimiento(u.id), peso = x => !x ? 0 : ({Cancelado:9, Entregado:8, 'En reparto':6, Programado:4, Recibido:2})[x.estado] || 1;
+  if(s2 === undefined && !s1) return;
+  const sg = peso(s2) > peso(s1) ? s2 : s1;
+  const cuando = x => new Date(x.cancelado || x.entregado || x.act || x.actualizado || u.f).getTime();
+  if(sg && sg.estado==='Entregado' && Date.now() - cuando(sg) > 3*864e5){ el.innerHTML = ''; return; }
+  if(sg && sg.estado==='Cancelado' && Date.now() - cuando(sg) > 864e5){ el.innerHTML = ''; return; }
   el.innerHTML = barraSeg(sg, u);
 }
+/* Al volver a la app (o al cerrar Mis pedidos) se actualiza el estado del último pedido */
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && D) pintarUltimo(true); });
 const conLimite = (p, ms) => Promise.race([p, new Promise((_, rej)=> setTimeout(()=> rej(new Error('tiempo')), ms))]);
 /* Quién abre: el dueño entra con ?c=token; una persona invitada (encargado o familiar) entra con ?m=id y su token se resuelve en la nube */
 const QS = new URLSearchParams(location.search);
@@ -900,6 +911,10 @@ function pdfPedido(p, total){
 
 
 
+/* ===== Versión del catálogo ===== */
+const CAT_V = '1.9';
+const CAT_NOV = [['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
+  ['1.7', 'Menú lateral, vales de descuento y escanear QR'], ['1.6', 'App instalable, compartir con encargado o familiar, aviso de visita y precio sugerido'], ['1.5', 'Mis pedidos con seguimiento de entrega']];
 /* ===== Devoluciones ===== */
 let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
 const guardarDev = ()=> ls.set(K + '_dev', devC);
@@ -1025,15 +1040,24 @@ async function refrescarVales(){
   Object.keys(base).forEach(k=>{ if(base[k].v && base[k].v < hoyK() && base[k].e!=='usado') base[k].e = 'vencido'; });
   VALES = base; ls.set('mkcat_vales_' + tok, VALES); pintarBotonMis();
 }
+/* Variantes de un código escrito a mano: S/5, B/8, Z/2, O/0/Q, I/1/L se confunden fácilmente */
+function variantesVale(cod){
+  const G = [['S','5'], ['B','8'], ['Z','2'], ['O','0','Q','D'], ['I','1','L','T']], out = new Set([cod]);
+  const grupo = ch => G.find(g=> g.includes(ch));
+  [...cod].forEach((ch, i)=>{ const g = grupo(ch); if(!g || i < 2) return; [...out].forEach(c=> g.forEach(x=>{ if(out.size < 40) out.add(c.slice(0, i) + x + c.slice(i + 1)); })); });
+  return [...out];
+}
 async function activarVale(cod){
   cod = String(cod || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if(!cod) return;
+  if(!cod.startsWith('MK') && cod.length <= 8) cod = 'MK' + cod;
   if(!tok) return toast('Abre tu catálogo desde tu enlace para activar el vale');
   const espera = hoja(`<div class="ok" style="background:#eef3f1;color:#1f6f4a">…</div><h3 style="text-align:center">Revisando tu vale…</h3>`, true);
   let msg = null, ok = false, monto = 0, vence = '';
-  try{ const {m, db} = await conLimite(nube(), 8000); const d = await conLimite(m.getDoc(m.doc(db, 'vales', cod)), 8000);
-    if(!d.exists()) msg = 'Ese código no es válido. Revisa que esté bien escrito.';
+  try{ const {m, db} = await conLimite(nube(), 8000); let d = await conLimite(m.getDoc(m.doc(db, 'vales', cod)), 8000);
+    if(!d.exists()){ for(const v of variantesVale(cod).slice(1)){ const x = await conLimite(m.getDoc(m.doc(db, 'vales', v)), 8000); if(x.exists() && x.data().tok === tok){ d = x; cod = v; break; } } }
+    if(!d.exists()) msg = `No encontramos el código <b>${esc(cod)}</b>. Revisa que esté igual que en tu ticket (empieza con MK).`;
     else { const x = d.data(); monto = x.monto; vence = x.vence || '';
-      if(x.tok !== tok) msg = 'Este vale pertenece a otra tienda.';
+      if(x.tok !== tok) msg = 'Este vale es de otra tienda: solo lo puede activar la tienda a la que se le entregó.';
       else if(x.estado==='usado') msg = 'Este vale ya se usó.';
       else if(x.estado==='vencido' || (vence && vence < hoyK())) msg = 'Este vale ya venció.';
       else if(x.estado==='activo') ok = true;
@@ -1041,7 +1065,7 @@ async function activarVale(cod){
       else { const q = yo(); await conLimite(m.setDoc(m.doc(db, 'vales', cod), {estado:'activo', activado:new Date().toISOString(), activadoPor: q ? q.n : ''}, {merge:true}), 10000); ok = true; }
       if(ok){ VALES[cod] = {m:monto, v:vence, e:'activo'}; ls.set('mkcat_vales_' + tok, VALES); pintarBotonMis(); }
     }
-  }catch(e){ msg = /permission/i.test(String(e && (e.code || e.message))) ? 'Esta función aún no está activa. Avisa a Merkalimentos.' : 'Sin conexión. Inténtalo de nuevo cuando tengas señal.'; }
+  }catch(e){ msg = /permission/i.test(String(e && (e.code || e.message))) ? 'No se pudo activar en este momento. Avisa a Merkalimentos.' : 'Sin conexión. Inténtalo de nuevo cuando tengas señal.'; }
   espera.remove();
   if(ok){ const h = hoja(`<div class="ok">🎉</div><h3 style="text-align:center">¡Vale de ${fmt(monto)} activado!</h3><p class="sub" style="text-align:center">Se descuenta solo en tu siguiente pedido de ${fmt(MIN_VALE)} o más${vence ? `.<br>Vigente hasta el ${new Date(vence + 'T12:00').toLocaleDateString('es-MX',{day:'numeric', month:'long'})}` : ''}.</p><div class="acts"><button class="btn" id="vaOk">¡Perfecto!</button></div>`, true); h.querySelector('#vaOk').onclick = ()=> h.remove(); }
   else { const h = hoja(`<div class="ok" style="background:#fdecea;color:#c0392b">!</div><h3 style="text-align:center">No se pudo activar</h3><p class="sub" style="text-align:center">${msg}</p><div class="acts"><button class="btn" id="vaOk">Entendido</button></div>`, true); h.querySelector('#vaOk').onclick = ()=> h.remove(); }
@@ -1057,19 +1081,44 @@ async function verVales(){
 }
 /* ===== Escanear QR: lector del navegador o jsQR si no existe ===== */
 async function cargarJsQR(){ if(window.jsQR) return window.jsQR; await new Promise((ok, mal)=>{ const s = document.createElement('script'); s.src = 'jsqr.js'; s.onload = ok; s.onerror = mal; document.head.appendChild(s); }); return window.jsQR; }
+async function estadoCamara(){ try{ const r = await navigator.permissions.query({name:'camera'}); return r.state; }catch(_){ return 'desconocido'; } }
+/* Lee un QR de una foto (plan B cuando la cámara en vivo no abre) */
+async function leerQRFoto(file){
+  const img = await new Promise((ok, mal)=>{ const i = new Image(); i.onload = ()=> ok(i); i.onerror = mal; i.src = URL.createObjectURL(file); });
+  try{ if('BarcodeDetector' in window){ const r = await new BarcodeDetector({formats:['qr_code']}).detect(img); if(r && r.length) return r[0].rawValue; } }catch(_){}
+  const jq = await cargarJsQR(), cv = document.createElement('canvas'), g = cv.getContext('2d', {willReadFrequently:true});
+  for(const w of [1000, 700, 1400, 500]){ const k = Math.min(1, w / img.naturalWidth); cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+    g.drawImage(img, 0, 0, cv.width, cv.height); const d = g.getImageData(0, 0, cv.width, cv.height), r = jq(d.data, cv.width, cv.height, {inversionAttempts:'attemptBoth'}); if(r && r.data) return r.data; }
+  return null;
+}
+function pasosPermisoCamara(){
+  return instalada() ? '<ol class="pasos-i"><li>Mantén presionado el ícono de <b>Cliente consentido</b> en tu inicio.</li><li>Toca <b>Información de la app</b> (ⓘ).</li><li><b>Permisos → Cámara → Permitir</b>.</li><li>Vuelve a abrir la app.</li></ol>'
+    : '<ol class="pasos-i"><li>Toca el <b>candado</b> o el ícono junto a la dirección, arriba.</li><li><b>Permisos → Cámara → Permitir</b>.</li><li>Recarga la página.</li></ol>';
+}
 function escanearQR(){
   let vivo = true, stream = null;
   const h = hoja(`<h3>Escanear QR</h3><p class="sub">Apunta la cámara al código QR de tu vale.</p>
     <div class="qr-box"><video id="qrV" playsinline muted></video><i class="qr-marco"></i></div>
     <p class="sub" id="qrMsg" style="text-align:center;margin-top:8px">Abriendo la cámara…</p>
+    <div id="qrPlanB" class="qr-b" style="display:none"></div>
+    <button class="btn sec" id="qrFoto" style="width:100%;margin-top:6px">📸 Tomar foto del QR</button><input type="file" id="qrFile" accept="image/*" capture="environment" hidden>
     <label>¿No lo lee? Escribe el código del vale</label><div style="display:flex;gap:8px"><input class="field" id="qrCod" placeholder="Ej. MK7F3K9Q" autocapitalize="characters" autocomplete="off"><button class="btn" id="qrOk" style="flex:0 0 auto;padding:12px 16px">Activar</button></div>`, true);
+  const fi = h.querySelector('#qrFile');
+  h.querySelector('#qrFoto').onclick = ()=> fi.click();
+  fi.onchange = async ()=>{ const f = fi.files && fi.files[0]; if(!f) return; const msg = h.querySelector('#qrMsg'); msg.textContent = 'Leyendo la foto…';
+    try{ const t = await leerQRFoto(f); if(t) return listo(t); msg.textContent = 'No se encontró el QR en la foto: acércate más y que se vea completo y enfocado.'; }catch(_){ msg.textContent = 'No se pudo leer la foto. Intenta de nuevo o escribe el código.'; }
+    fi.value = ''; };
   const cerrar = ()=>{ vivo = false; try{ stream && stream.getTracks().forEach(t=> t.stop()); }catch(_){} };
   const obs = new MutationObserver(()=>{ if(!document.body.contains(h)){ cerrar(); obs.disconnect(); } }); obs.observe(document.body, {childList:true});
   const listo = txt => { if(!vivo) return; cerrar(); h.remove(); const m = String(txt).match(/vale=([A-Za-z0-9]+)/); activarVale(m ? m[1] : txt); };
   h.querySelector('#qrOk').onclick = ()=>{ const v = h.querySelector('#qrCod').value.trim(); if(!v) return toast('Escribe el código'); listo(v); };
   (async ()=>{
     const msg = h.querySelector('#qrMsg'), vid = h.querySelector('#qrV');
-    try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); }catch(_){ msg.textContent = 'No se pudo abrir la cámara: permite el acceso o escribe el código.'; return; }
+    try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); }catch(_){
+      const st = await estadoCamara(); h.querySelector('.qr-box').style.display = 'none';
+      msg.innerHTML = '<b>La cámara no abrió dentro de la app.</b> Usa <b>📸 Tomar foto del QR</b> o escribe el código.';
+      if(st === 'denied'){ const b = h.querySelector('#qrPlanB'); b.style.display = 'block'; b.innerHTML = '<small>Para escanear en vivo, permite la cámara:</small>' + pasosPermisoCamara(); }
+      return; }
     if(!vivo){ cerrar(); return; }
     vid.srcObject = stream; try{ await vid.play(); }catch(_){}
     msg.textContent = 'Buscando el código…';
@@ -1106,12 +1155,25 @@ function verConfig(){
       ${(CLI.dv||[]).length ? `<div><span>Días de visita</span><b>${CLI.dv.map(k=> DIAS_N[k]).join(', ')}</b></div>` : ''}<p class="sub" style="margin:8px 0 0">¿Algo está mal? Escríbenos por WhatsApp y lo corregimos.</p></div>` : ''}
     ${MID && ACC ? `<div class="cfg-c"><h4>Mi acceso</h4><div><span>Entras como</span><b>${esc(ACC.n)} (${esc(String(ACC.rol).toLowerCase())})</b></div><p class="sub" style="margin:8px 0 0">Tus pedidos llegan con tu nombre a nombre de ${esc(CLI?.t || CLI?.n || 'la tienda')}.</p></div>` : ''}
     <div class="cfg-c"><h4>Devoluciones</h4>${politicaDevHTML(true)}</div>
-    <div class="cfg-c"><h4>Aplicación</h4><div><span>Instalada</span><b>${instalada() ? 'Sí ✓' : 'No'}</b></div><div><span>Avisos en el celular</span><b>Próximamente</b></div></div>
+    <div class="cfg-c"><h4>Permisos</h4><div><span>Cámara (escanear vales)</span><b id="cfCam">…</b></div><div><span>Avisos en el celular</span><b>Próximamente</b></div>
+      <div id="cfCamAyuda"></div><button class="btn sec" id="cfCamBtn" style="width:100%;margin-top:8px">📷 Activar cámara</button></div>
+    <div class="cfg-c"><h4>Aplicación</h4><div><span>Versión</span><b>${CAT_V}</b></div><div><span>Instalada</span><b>${instalada() ? 'Sí ✓' : 'No'}</b></div><div id="cfVer"><span>Actualización</span><b>Buscando…</b></div>
+      <details class="mp-det"><summary>Novedades</summary>${CAT_NOV.map(([v, t])=> `<div><span><b>${v}</b> · ${esc(t)}</span></div>`).join('')}</details></div>
     <div class="acts">${esDueno() && CLI ? '<button class="btn sec" id="cfAcc">👥 Personas con acceso</button>' : ''}${puedeInstalar() ? '<button class="btn sec" id="cfInst">📲 Instalar app</button>' : ''}
-      <button class="btn sec" id="cfAct">Buscar actualización</button><button class="btn sec" id="cfBorrar">Borrar historial de este celular</button></div>`);
+      <button class="btn sec" id="cfBorrar">Borrar historial de este celular</button></div>`);
   const a = h.querySelector('#cfAcc'); if(a) a.onclick = ()=>{ h.remove(); verAccesos(); };
   const i = h.querySelector('#cfInst'); if(i) i.onclick = ()=>{ h.remove(); instalar(); };
-  h.querySelector('#cfAct').onclick = async ()=>{ try{ const r = await navigator.serviceWorker?.getRegistration(); await r?.update(); }catch(_){} location.reload(); };
+  const camTxt = {granted:'Permitida ✓', denied:'Bloqueada', prompt:'Sin preguntar', desconocido:'—'};
+  const pintaCam = async ()=>{ const st = await estadoCamara(); const el = h.querySelector('#cfCam'); if(!el) return; el.textContent = camTxt[st] || st;
+    h.querySelector('#cfCamAyuda').innerHTML = st === 'denied' ? '<small class="sub">Está bloqueada. Para permitirla:</small>' + pasosPermisoCamara() : '';
+    h.querySelector('#cfCamBtn').style.display = st === 'granted' ? 'none' : 'block'; };
+  pintaCam();
+  h.querySelector('#cfCamBtn').onclick = async ()=>{ try{ const s2 = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); s2.getTracks().forEach(t=> t.stop()); toast('Cámara permitida ✓'); }catch(_){ toast('La cámara sigue bloqueada: sigue los pasos'); } pintaCam(); };
+  (async ()=>{ const el = h.querySelector('#cfVer'); try{ const r = await fetch('version.json?t=' + Date.now(), {cache:'no-store'}); const j = await r.json();
+      if(String(j.v) === CAT_V) el.innerHTML = '<span>Actualización</span><b>Al día ✓</b>';
+      else { el.innerHTML = `<span>Hay versión nueva <b>${esc(j.v)}</b></span><button class="btn" id="cfAct" style="flex:0 0 auto;padding:8px 14px">Actualizar</button>`;
+        el.querySelector('#cfAct').onclick = async ()=>{ try{ const g = await navigator.serviceWorker?.getRegistration(); await g?.update(); }catch(_){} location.reload(); }; }
+    }catch(_){ el.innerHTML = '<span>Actualización</span><b>Sin conexión</b>'; } })();
   h.querySelector('#cfBorrar').onclick = ()=>{ if(!confirmarSimple('¿Borrar el historial de pedidos y el pedido en curso de este celular? Tus pedidos enviados no se borran.')) return; ls.set(K + '_pedidos', []); ls.set(K + '_ultimo', null); carrito = {}; guardarCarrito(); h.remove(); pintar(); toast('Historial borrado'); };
 }
 /* App instalada: se registra una vez para dar prioridad en los vales a quien aún no la tiene */
