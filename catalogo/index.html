@@ -220,6 +220,12 @@ header.cab{box-shadow:0 1px 0 #D5DDE8}
 .vale-ban{background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
 .vale-it.activo{border-color:#F59E0B;background:#FFFBEB}
 .seg.ok{border-left:5px solid #45A02F}.seg.esp{border-left:5px solid #F59E0B}
+
+.sol-foto{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:120px;border:2px dashed #C9D6E8;border-radius:14px;background:#F4F7FB;color:var(--brand);font-weight:600;cursor:pointer;margin:8px 0 4px;padding:8px;text-align:center}
+.sol-foto img{max-width:100%;max-height:200px;border-radius:10px}.sol-foto small{color:var(--muted);font-weight:400}
+.sol-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sol-mot{display:flex;gap:8px;margin-top:4px}.sol-mot button{flex:1;padding:10px 8px;border-radius:12px;border:1px solid #C9D6E8;background:#EEF3F9;color:var(--brand);font-weight:600;font-size:.88rem}
+.sol-mot button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
 </style>
 </head>
 <body>
@@ -965,8 +971,8 @@ function pdfPedido(p, total){
 
 
 /* ===== Versión del catálogo ===== */
-const CAT_V = '3.5';
-const CAT_NOV = [['3.5', 'Catálogo Foodservice para restaurantes y cocinas, con opción de ver el catálogo de tiendita'], ['3.4', 'Promociones y vales en ámbar, tu día de visita en verde'], ['3.3', 'Más contraste: fondo azul grisáceo, categorías en azul claro y productos en tarjetas blancas'], ['3.2', 'El ícono de la app se actualiza solo'], ['3.1', 'Ícono de la app con el diseño nuevo'], ['3.0', 'Nuevo diseño: colores de Merkalimentos (azul, blanco y gris) y logo nuevo'], ['2.4', 'Ícono en alta calidad'], ['2.3', 'Nuevo ícono de la app: el tendero de Merkalimentos'], ['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
+const CAT_V = '3.6';
+const CAT_NOV = [['3.6', 'Pídenos un producto: mándanos foto y datos de lo que quieres que te surtamos'], ['3.5', 'Catálogo Foodservice para restaurantes y cocinas, con opción de ver el catálogo de tiendita'], ['3.4', 'Promociones y vales en ámbar, tu día de visita en verde'], ['3.3', 'Más contraste: fondo azul grisáceo, categorías en azul claro y productos en tarjetas blancas'], ['3.2', 'El ícono de la app se actualiza solo'], ['3.1', 'Ícono de la app con el diseño nuevo'], ['3.0', 'Nuevo diseño: colores de Merkalimentos (azul, blanco y gris) y logo nuevo'], ['2.4', 'Ícono en alta calidad'], ['2.3', 'Nuevo ícono de la app: el tendero de Merkalimentos'], ['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
   ['1.7', 'Menú lateral, vales de descuento y escanear QR'], ['1.6', 'App instalable, compartir con encargado o familiar, aviso de visita y precio sugerido'], ['1.5', 'Mis pedidos con seguimiento de entrega']];
 /* ===== Devoluciones ===== */
 let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
@@ -1195,11 +1201,11 @@ function abrirMenu(){
   const h = document.createElement('div'); h.className = 'hoja lat';
   h.innerHTML = `<div class="lat-pan"><div class="lat-cab"><b>${esc(CLI ? (CLI.t || CLI.n) : 'Cliente consentido')}<i class="lat-v">v${CAT_V}</i></b><small>${MID && ACC ? esc(ACC.n) + ' · ' + esc(String(ACC.rol).toLowerCase()) : CLI ? esc(CLI.n) : 'Merkalimentos'}</small></div>
     ${it('cat', '🛒', 'Catálogo')}${esFS() && D && (D.todos || D.productos).some(p=> p.cn === 'f' || p.cn === 'a') ? it('surt', SURT === 'fs' ? '🏪' : '🍳', SURT === 'fs' ? 'Ver catálogo de tiendita' : 'Ver mi catálogo Foodservice') : ''}${it('mis', '📋', 'Mis pedidos', n ? `<i>${n}</i>` : '')}${tok ? it('vales', '🎟️', 'Mis vales', va ? `<i class="v">${fmt(va.m)}</i>` : pa ? `<i class="a">${pa}</i>` : '') : ''}
-    ${tok ? it('dev', '↩️', 'Agregar devolución', nDev() ? `<i>${nDev()}</i>` : '') : ''}${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${tok && ['apagados','permitidos'].includes(estadoAvisos()) ? it('av', '🔔', 'Activar avisos', '<i class="a">!</i>') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
+    ${tok ? it('sol', '📸', 'Pídenos un producto') : ''}${tok ? it('dev', '↩️', 'Agregar devolución', nDev() ? `<i>${nDev()}</i>` : '') : ''}${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${tok && ['apagados','permitidos'].includes(estadoAvisos()) ? it('av', '🔔', 'Activar avisos', '<i class="a">!</i>') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
     ${it('wa', '💬', 'Escribir a Merkalimentos')}<div class="lat-sep"></div>${it('cfg', '⚙️', 'Configuración')}${it('salir', '✕', 'Salir')}</div>`;
   h.onclick = e=>{ if(e.target===h) h.remove(); };
   document.body.appendChild(h); requestAnimationFrame(()=> h.classList.add('on'));
-  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, surt:cambiarSurtido, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar, av:activarAvisos,
+  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, surt:cambiarSurtido, sol:pidenosProducto, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar, av:activarAvisos,
     wa:()=> escribirMerka(wa), cfg:verConfig, salir:preguntarSalir})[b.dataset.l](); });
 }
 function verConfig(){
@@ -1263,6 +1269,60 @@ async function activarAvisos(silencioso){
   if(Notification.permission !== 'granted'){ if(silencioso) return false; const r = await Notification.requestPermission(); if(r !== 'granted'){ toast('Avisos no permitidos'); return false; } }
   try{ const t = await conLimite(tokenAvisos(), 15000); if(!t) throw 0; if(t !== ls.get('mkcat_push_' + tok)) await guardarTokenAvisos(t); if(!silencioso) toast('Avisos activados ✓'); return true; }
   catch(_){ if(!silencioso) toast('No se pudieron activar los avisos, intenta de nuevo'); return false; }
+}
+/* ===== Pídenos un producto: el cliente propone un producto que quiere que le surtamos ===== */
+function fotoChica(file, lado = 720){
+  return new Promise((ok, mal)=>{ const rd = new FileReader(); rd.onerror = mal; rd.onload = ()=>{ const img = new Image(); img.onerror = mal; img.onload = ()=>{
+    const k = Math.min(1, lado / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+    let q = .72, u = c.toDataURL('image/jpeg', q); while(u.length > 250000 && q > .3){ q -= .1; u = c.toDataURL('image/jpeg', q); } ok(u); }; img.src = rd.result; }; rd.readAsDataURL(file); });
+}
+const EST_SOL = {Nuevo:['Enviada','#3D5A80','#E8EEF6'], Revisando:['Revisando','#92400E','#FEF3C7'], Conseguido:['¡Ya lo surtimos!','#2F7A22','#E8F5E3'], 'No disponible':['No disponible','#B91C1C','#FDECEC']};
+function pidenosProducto(){
+  let foto = '';
+  const h = hoja(`<h3>📸 Pídenos un producto</h3><p class="sub">¿Hay algo que vendes y no te surtimos, o quieres otra opción? Cuéntanos y lo buscamos.</p>
+    <div class="sol-foto" id="spFoto"><span>📷 Toma o elige una foto del producto</span></div>
+    <input type="file" id="spFile" accept="image/*" hidden>
+    <label>Nombre del producto *</label><input class="field" id="spNom" maxlength="80" placeholder="Ej. Queso Oaxaca">
+    <div class="sol-2"><div><label>Marca</label><input class="field" id="spMar" maxlength="40"></div><div><label>Presentación / gramaje</label><input class="field" id="spPre" maxlength="40" placeholder="Ej. 500 g"></div></div>
+    <label>¿Cuánto vendes a la semana?</label><input class="field" id="spCan" maxlength="40" placeholder="Ej. 2 cajas, 10 piezas">
+    <div class="sol-2"><div><label>Precio al que lo vendes</label><input class="field" id="spPv" type="number" inputmode="decimal" min="0" step="0.5" placeholder="Opcional"></div><div><label>Precio al que lo compras</label><input class="field" id="spPc" type="number" inputmode="decimal" min="0" step="0.5" placeholder="Opcional"></div></div>
+    <label>Motivo</label><div class="sol-mot" id="spMot"><button type="button" data-v="Sin proveedor" class="on">No tengo proveedor</button><button type="button" data-v="Otra opción">Quiero otra opción</button></div>
+    <div class="acts"><button class="btn" id="spEnv">Enviar</button></div>
+    <div id="spHist">${histSolHTML()}</div>`);
+  const fi = h.querySelector('#spFile'), fb = h.querySelector('#spFoto');
+  fb.onclick = ()=> fi.click();
+  fi.onchange = async ()=>{ const f = fi.files && fi.files[0]; if(!f) return; fb.innerHTML = '<span>Procesando foto…</span>';
+    try{ foto = await fotoChica(f); fb.innerHTML = `<img src="${foto}" alt="Foto del producto"><small>Toca para cambiarla</small>`; }catch(_){ foto = ''; fb.innerHTML = '<span>No se pudo leer la foto, intenta de nuevo</span>'; } };
+  h.querySelectorAll('#spMot button').forEach(b=> b.onclick = ()=> h.querySelectorAll('#spMot button').forEach(x=> x.classList.toggle('on', x===b)));
+  const env = h.querySelector('#spEnv');
+  env.onclick = async ()=>{
+    const v = id => h.querySelector(id).value.trim(), nom = v('#spNom');
+    if(!nom){ h.querySelector('#spNom').focus(); return toast('Escribe el nombre del producto'); }
+    const num = x => { const n = Number(x); return x !== '' && n > 0 ? Math.round(n*100)/100 : null; };
+    const id = 'SP' + Date.now().toString(36).toUpperCase() + rid(4), quien = yo();
+    const d = {id, c:tok, cli:{n:CLI?.n || '', t:CLI?.t || '', ...(quien ? {por:quien} : {})}, nombre:nom, marca:v('#spMar'), pres:v('#spPre'), cant:v('#spCan'),
+      pv:num(v('#spPv')), pc:num(v('#spPc')), motivo:h.querySelector('#spMot .on')?.dataset.v || '', foto, f:new Date().toISOString(), estado:'Nuevo'};
+    env.disabled = true; env.textContent = 'Enviando…';
+    try{ const {m, db} = await conLimite(nube(), 8000); await conLimite(m.setDoc(m.doc(db, 'solicitudes', id), {...d, creado:m.serverTimestamp()}), 15000); }
+    catch(e){ env.disabled = false; env.textContent = 'Enviar'; return toast(/permission/i.test(String(e && (e.code || e.message))) ? 'Esta función aún no está activa. Escríbenos por WhatsApp.' : 'Sin conexión: inténtalo de nuevo'); }
+    const ls2 = ls.get(K + '_sols', []); ls2.unshift({id, nombre:nom, marca:d.marca, pres:d.pres, f:d.f, estado:'Nuevo'}); ls.set(K + '_sols', ls2.slice(0, 30));
+    h.remove(); toast('¡Gracias! Lo revisamos y te avisamos ✓');
+  };
+  refrescarSols().then(c=>{ if(c && document.body.contains(h)) h.querySelector('#spHist').innerHTML = histSolHTML(); });
+}
+function histSolHTML(){
+  const ls2 = ls.get(K + '_sols', []); if(!ls2.length) return '';
+  return `<div class="cfg-c" style="margin-top:14px"><h4>Tus solicitudes</h4>${ls2.slice(0, 10).map(x=>{ const e = EST_SOL[x.estado] || EST_SOL.Nuevo;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)"><span><b>${esc(x.nombre)}</b><small class="sub" style="display:block">${esc([x.marca, x.pres].filter(Boolean).join(' · '))}${x.r ? ' · ' + esc(x.r) : ''}</small></span><span style="flex-shrink:0;font-size:.75rem;font-weight:700;padding:3px 9px;border-radius:99px;color:${e[1]};background:${e[2]}">${e[0]}</span></div>`; }).join('')}</div>`;
+}
+async function refrescarSols(){
+  const ls2 = ls.get(K + '_sols', []), pend = ls2.filter(x=> x.estado !== 'Conseguido' && x.estado !== 'No disponible').slice(0, 10); if(!pend.length) return false;
+  let cambio = false;
+  try{ const {m, db} = await conLimite(nube(), 8000);
+    await conLimite(Promise.all(pend.map(async x=>{ const d = await m.getDoc(m.doc(db, 'solicitudes', x.id)); if(d.exists()){ const o = d.data(); if(o.estado !== x.estado || (o.r || '') !== (x.r || '')){ x.estado = o.estado; x.r = o.r || ''; cambio = true; } } })), 10000);
+    if(cambio) ls.set(K + '_sols', ls2); }catch(_){}
+  return cambio;
 }
 /* ===== Escribir a Merkalimentos: WhatsApp o mensaje por la app (respuesta llega como aviso) ===== */
 function escribirMerka(wa){
