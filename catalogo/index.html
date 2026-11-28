@@ -20,6 +20,12 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="Cliente consentido">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>/* iPhone: sin manifiesto, "Agregar a inicio" guarda la liga actual (con el código del cliente) */
+(function(){ var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints > 1);
+  if(ios && /[?&](c|m)=/.test(location.search)){ var l = document.querySelector('link[rel="manifest"]'); if(l) l.parentNode.removeChild(l); } })();</script>
 <link rel="icon" href="cc-icon-192-v2.png">
 <link rel="apple-touch-icon" href="cc-apple-touch-icon-v2.png">
 <style>
@@ -772,6 +778,7 @@ async function cargar(){
     try{ const r = await fetch('c/' + tok + '.json?t=' + t, {cache:'no-store'}); if(r.ok){ CLI = await r.json(); ls.set(K + '_cli', CLI); } else CLI = ls.get(K + '_cli', null); }
     catch(_){ CLI = ls.get(K + '_cli', null); }
   }
+  if(!tok && !MID && instalada()) setTimeout(vincularCatalogo, 600);
   if(!D){ $('main').innerHTML = '<div class="cargando">No se pudo cargar el catálogo. Revisa tu conexión e inténtalo de nuevo.</div>'; return; }
   if(MID && (!ACC || ACC.activo === false)){ $('hola').innerHTML = ''; $('barra').innerHTML = ''; $('secnav').innerHTML = '';
     $('main').innerHTML = `<div class="cargando"><div class="ok" style="background:#fdecea;color:#DC2626">✕</div><h3>${ACC ? 'Tu acceso a este catálogo fue retirado' : 'Este enlace no es válido'}</h3><p class="sub" style="margin-top:8px">Pide a la tienda que te comparta un nuevo enlace.</p></div>`; return; }
@@ -971,8 +978,8 @@ function pdfPedido(p, total){
 
 
 /* ===== Versión del catálogo ===== */
-const CAT_V = '3.6';
-const CAT_NOV = [['3.6', 'Pídenos un producto: mándanos foto y datos de lo que quieres que te surtamos'], ['3.5', 'Catálogo Foodservice para restaurantes y cocinas, con opción de ver el catálogo de tiendita'], ['3.4', 'Promociones y vales en ámbar, tu día de visita en verde'], ['3.3', 'Más contraste: fondo azul grisáceo, categorías en azul claro y productos en tarjetas blancas'], ['3.2', 'El ícono de la app se actualiza solo'], ['3.1', 'Ícono de la app con el diseño nuevo'], ['3.0', 'Nuevo diseño: colores de Merkalimentos (azul, blanco y gris) y logo nuevo'], ['2.4', 'Ícono en alta calidad'], ['2.3', 'Nuevo ícono de la app: el tendero de Merkalimentos'], ['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
+const CAT_V = '3.7';
+const CAT_NOV = [['3.7', 'iPhone: al agregar a inicio se conserva tu catálogo; si ya la tenías, vincúlala pegando tu liga'], ['3.6', 'Pídenos un producto: mándanos foto y datos de lo que quieres que te surtamos'], ['3.5', 'Catálogo Foodservice para restaurantes y cocinas, con opción de ver el catálogo de tiendita'], ['3.4', 'Promociones y vales en ámbar, tu día de visita en verde'], ['3.3', 'Más contraste: fondo azul grisáceo, categorías en azul claro y productos en tarjetas blancas'], ['3.2', 'El ícono de la app se actualiza solo'], ['3.1', 'Ícono de la app con el diseño nuevo'], ['3.0', 'Nuevo diseño: colores de Merkalimentos (azul, blanco y gris) y logo nuevo'], ['2.4', 'Ícono en alta calidad'], ['2.3', 'Nuevo ícono de la app: el tendero de Merkalimentos'], ['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
   ['1.7', 'Menú lateral, vales de descuento y escanear QR'], ['1.6', 'App instalable, compartir con encargado o familiar, aviso de visita y precio sugerido'], ['1.5', 'Mis pedidos con seguimiento de entrega']];
 /* ===== Devoluciones ===== */
 let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
@@ -1202,10 +1209,10 @@ function abrirMenu(){
   h.innerHTML = `<div class="lat-pan"><div class="lat-cab"><b>${esc(CLI ? (CLI.t || CLI.n) : 'Cliente consentido')}<i class="lat-v">v${CAT_V}</i></b><small>${MID && ACC ? esc(ACC.n) + ' · ' + esc(String(ACC.rol).toLowerCase()) : CLI ? esc(CLI.n) : 'Merkalimentos'}</small></div>
     ${it('cat', '🛒', 'Catálogo')}${esFS() && D && (D.todos || D.productos).some(p=> p.cn === 'f' || p.cn === 'a') ? it('surt', SURT === 'fs' ? '🏪' : '🍳', SURT === 'fs' ? 'Ver catálogo de tiendita' : 'Ver mi catálogo Foodservice') : ''}${it('mis', '📋', 'Mis pedidos', n ? `<i>${n}</i>` : '')}${tok ? it('vales', '🎟️', 'Mis vales', va ? `<i class="v">${fmt(va.m)}</i>` : pa ? `<i class="a">${pa}</i>` : '') : ''}
     ${tok ? it('sol', '📸', 'Pídenos un producto') : ''}${tok ? it('dev', '↩️', 'Agregar devolución', nDev() ? `<i>${nDev()}</i>` : '') : ''}${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${tok && ['apagados','permitidos'].includes(estadoAvisos()) ? it('av', '🔔', 'Activar avisos', '<i class="a">!</i>') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
-    ${it('wa', '💬', 'Escribir a Merkalimentos')}<div class="lat-sep"></div>${it('cfg', '⚙️', 'Configuración')}${it('salir', '✕', 'Salir')}</div>`;
+    ${!tok && !MID ? it('vinc', '🔗', 'Vincular mi catálogo') : ''}${it('wa', '💬', 'Escribir a Merkalimentos')}<div class="lat-sep"></div>${it('cfg', '⚙️', 'Configuración')}${it('salir', '✕', 'Salir')}</div>`;
   h.onclick = e=>{ if(e.target===h) h.remove(); };
   document.body.appendChild(h); requestAnimationFrame(()=> h.classList.add('on'));
-  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, surt:cambiarSurtido, sol:pidenosProducto, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar, av:activarAvisos,
+  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, surt:cambiarSurtido, sol:pidenosProducto, vinc:vincularCatalogo, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar, av:activarAvisos,
     wa:()=> escribirMerka(wa), cfg:verConfig, salir:preguntarSalir})[b.dataset.l](); });
 }
 function verConfig(){
@@ -1269,6 +1276,23 @@ async function activarAvisos(silencioso){
   if(Notification.permission !== 'granted'){ if(silencioso) return false; const r = await Notification.requestPermission(); if(r !== 'granted'){ toast('Avisos no permitidos'); return false; } }
   try{ const t = await conLimite(tokenAvisos(), 15000); if(!t) throw 0; if(t !== ls.get('mkcat_push_' + tok)) await guardarTokenAvisos(t); if(!silencioso) toast('Avisos activados ✓'); return true; }
   catch(_){ if(!silencioso) toast('No se pudieron activar los avisos, intenta de nuevo'); return false; }
+}
+/* ===== App instalada sin cliente (iPhone guarda aparte): vincular con la liga del cliente ===== */
+function idDeLiga(t){ t = String(t || '').trim(); const m = t.match(/[?&](c|m)=([A-Za-z0-9_-]{4,40})/); if(m) return {k:m[1], v:m[2]}; if(/^[A-Za-z0-9_-]{6,40}$/.test(t)) return {k:'c', v:t}; return null; }
+function vincularCatalogo(){
+  if(document.querySelector('.hoja.vinc')) return;
+  const h = hoja(`<h3>Vincula tu catálogo</h3><p class="sub">Para ver tus precios y hacer pedidos, abre aquí la liga que te mandamos por WhatsApp.</p>
+    <ol style="margin:10px 0 0 18px;line-height:1.6"><li>En WhatsApp, mantén presionada tu liga del catálogo y toca <b>Copiar</b>.</li><li>Regresa aquí y toca <b>Pegar mi liga</b>.</li></ol>
+    <button class="btn" id="vcPeg" style="width:100%;margin-top:12px">📋 Pegar mi liga</button>
+    <label>O pégala / escribe tu código aquí</label><div style="display:flex;gap:8px"><input class="field" id="vcIn" placeholder="https://… ?c=…" autocomplete="off"><button class="btn" id="vcOk" style="flex:0 0 auto;padding:12px 16px">Abrir</button></div>
+    <button class="btn sec" id="vcCat" style="width:100%;margin-top:12px">Ver el catálogo general</button>`, true);
+  h.classList.add('vinc');
+  const ir = t=>{ const r = idDeLiga(t); if(!r) return toast('No reconozco esa liga, revisa que esté completa');
+    try{ if(r.k==='c'){ localStorage.setItem('mkcat_tok', r.v); localStorage.removeItem('mkcat_mid'); } else localStorage.setItem('mkcat_mid', r.v); }catch(_){}
+    location.replace(location.pathname + '?' + r.k + '=' + r.v); };
+  h.querySelector('#vcPeg').onclick = async ()=>{ try{ const t = await navigator.clipboard.readText(); if(t) return ir(t); }catch(_){} toast('No se pudo pegar: pégala en el cuadro de abajo'); h.querySelector('#vcIn').focus(); };
+  h.querySelector('#vcOk').onclick = ()=> ir(h.querySelector('#vcIn').value);
+  h.querySelector('#vcCat').onclick = ()=> h.remove();
 }
 /* ===== Pídenos un producto: el cliente propone un producto que quiere que le surtamos ===== */
 function fotoChica(file, lado = 720){
@@ -1457,6 +1481,8 @@ function asegurarUrlInstalable(){
   const id = MID ? 'm=' + MID : tok ? 'c=' + tok : ''; if(!id) return;
   try{ if(location.search !== '?' + id) history.replaceState(history.state, '', location.pathname + '?' + id); }catch(_){}
   if(!esIOS) return;
+  try{ const lm = document.querySelector('link[rel="manifest"]'); if(lm) lm.remove(); }catch(_){}
+  return;
   try{ const man = {name:'Cliente consentido Merkalimentos', short_name:'Cliente consentido', start_url: location.origin + location.pathname + '?' + id, scope: location.origin + location.pathname,
       display:'standalone', background_color:'#FFFFFF', theme_color:'#FFFFFF', icons:[{src: new URL('cc-icon-192-v2.png', location.href).href, sizes:'192x192', type:'image/png'}, {src: new URL('cc-icon-512-v2.png', location.href).href, sizes:'512x512', type:'image/png'}]};
     document.querySelector('link[rel="manifest"]').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man)); }catch(_){}
