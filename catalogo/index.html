@@ -62,8 +62,9 @@ header.cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;pa
 .volver{display:flex;align-items:center;gap:6px;margin:0 0 10px;border:0;background:none;color:var(--brand);font-weight:700;font-size:.95rem;padding:4px 0;cursor:pointer}
 .pseg{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#fff8e1;color:#7a5600;font-size:.88rem;text-align:center}.pseg.ok{background:#e6f5ec;color:#1f6f4a}
 .cab .hola{display:inline-block;margin-top:12px;background:rgba(255,255,255,.14);padding:6px 12px;border-radius:999px;font-size:.88rem}
-.secnav{position:sticky;top:0;z-index:10;display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:var(--bg);scrollbar-width:none;max-width:860px;margin:0 auto}
-.secnav button{flex-shrink:0;padding:7px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:.82rem;font-weight:600;color:var(--muted)}
+.secnav{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;justify-content:center;gap:4px;overflow-x:visible;padding:8px 6px;background:var(--bg);scrollbar-width:none;max-width:860px;margin:0 auto}
+.pagina{scroll-margin-top:var(--navh,64px)}
+.secnav button{flex-shrink:0;padding:5px 7px;font-size:.7rem!important;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:.82rem;font-weight:600;color:var(--muted)}
 .pagina{background:var(--card);border-radius:14px;box-shadow:0 4px 18px rgba(20,40,30,.08);margin:12px 0 18px;padding:16px 14px 18px}
 .pagina h2{display:flex;align-items:center;gap:10px;font-size:.86rem;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
 .pagina h2::after{content:"";flex:1;height:2px;background:var(--soft)}
@@ -139,7 +140,7 @@ label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
 .modo-pedido-on .menu-b{background:rgba(31,111,74,.92)}
 .hoja.lat{align-items:stretch;justify-content:flex-start;background:rgba(10,20,15,0);transition:background .2s}.hoja.lat.on{background:rgba(10,20,15,.45)}
 .lat-pan{width:82%;max-width:320px;height:100%;background:#fff;overflow:auto;padding:0 0 calc(16px + env(safe-area-inset-bottom));transform:translateX(-100%);transition:transform .22s}.hoja.lat.on .lat-pan{transform:none}
-.lat-cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;padding:calc(22px + env(safe-area-inset-top)) 18px 18px}.lat-cab b{display:block;font-size:1.05rem}.lat-cab small{opacity:.85}
+.lat-cab{background:linear-gradient(150deg,var(--brand),#14492f);color:#fff;padding:calc(22px + env(safe-area-inset-top)) 18px 18px}.lat-cab b{display:block;font-size:1.05rem}.lat-v{font-style:normal;font-weight:500;font-size:.72rem;opacity:.75;margin-left:8px;padding:1px 7px;border:1px solid rgba(255,255,255,.45);border-radius:20px;vertical-align:2px}.lat-cab small{opacity:.85}
 .lat-i{display:flex;align-items:center;gap:14px;width:100%;padding:14px 18px;text-align:left;font-size:.98rem}.lat-i:active{background:var(--bg)}
 .lat-i span{width:26px;text-align:center;font-size:1.15rem}.lat-i b{flex:1;font-weight:600}
 .lat-i i{font-style:normal;background:var(--brand);color:#fff;border-radius:999px;padding:1px 8px;font-size:.76rem;font-weight:700}.lat-i i.v{background:#e0a800;color:#3a2a00}.lat-i i.a{background:var(--gold);color:#3a2a00}
@@ -728,8 +729,9 @@ async function cargar(){
 function pintar(){
   if(modo==='dev') return pintarDev();
   const secs = D.secciones.filter(s=> D.productos.some(p=> p.s===s));
-  $('secnav').innerHTML = secs.map((s,i)=> `<button data-i="${i}">${esc(s)}</button>`).join('');
+  $('secnav').innerHTML = secs.map((s,i)=> `<button data-i="${i}" title="${esc(s)}">${esc(s.length <= 12 ? s : s.split(/[ ,]/)[0])}</button>`).join('');
   $('secnav').querySelectorAll('button').forEach(b=> b.onclick = ()=> document.getElementById('sec' + b.dataset.i).scrollIntoView({behavior:'smooth', block:'start'}));
+  requestAnimationFrame(()=> document.documentElement.style.setProperty('--navh', ($('secnav').offsetHeight + 6) + 'px'));
   $('main').className = 'wrap' + (modo==='pedido' ? ' modo-pedido' : '');
   document.body.classList.toggle('modo-pedido-on', modo==='pedido');
   $('main').innerHTML = secs.map((s,i)=> `<section class="pagina" id="sec${i}"><h2>${esc(s)}</h2><div class="grid">${D.productos.filter(p=> p.s===s).map(tarjeta).join('')}</div></section>`).join('')
@@ -912,8 +914,8 @@ function pdfPedido(p, total){
 
 
 /* ===== Versión del catálogo ===== */
-const CAT_V = '2.0';
-const CAT_NOV = [['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
+const CAT_V = '2.1';
+const CAT_NOV = [['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
   ['1.7', 'Menú lateral, vales de descuento y escanear QR'], ['1.6', 'App instalable, compartir con encargado o familiar, aviso de visita y precio sugerido'], ['1.5', 'Mis pedidos con seguimiento de entrega']];
 /* ===== Devoluciones ===== */
 let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
@@ -935,7 +937,7 @@ function politicaDevHTML(corta){
 }
 function pintarDev(){
   const secs = D.secciones.filter(s=> D.productos.some(p=> p.s===s));
-  $('secnav').innerHTML = secs.map((s,i)=> `<button data-i="${i}">${esc(s)}</button>`).join('');
+  $('secnav').innerHTML = secs.map((s,i)=> `<button data-i="${i}" title="${esc(s)}">${esc(s.length <= 12 ? s : s.split(/[ ,]/)[0])}</button>`).join('');
   $('secnav').querySelectorAll('button').forEach(b=> b.onclick = ()=> document.getElementById('sec' + b.dataset.i).scrollIntoView({behavior:'smooth', block:'start'}));
   $('main').className = 'wrap modo-dev'; document.body.classList.add('modo-pedido-on');
   $('main').innerHTML = `<section class="pagina dev-int"><h2>Agregar devolución</h2>${politicaDevHTML()}${devHistHTML()}</section>`
@@ -1140,14 +1142,14 @@ function abrirMenu(){
   const n = misPedidos().length, va = valeActivo(), pa = valesPorActivar().length, wa = String(D?.negocio?.wa || '529611080808').replace(/\D/g,'');
   const it = (id, ico, t, extra = '') => `<button class="lat-i" data-l="${id}"><span>${ico}</span><b>${t}</b>${extra}</button>`;
   const h = document.createElement('div'); h.className = 'hoja lat';
-  h.innerHTML = `<div class="lat-pan"><div class="lat-cab"><b>${esc(CLI ? (CLI.t || CLI.n) : 'Cliente consentido')}</b><small>${MID && ACC ? esc(ACC.n) + ' · ' + esc(String(ACC.rol).toLowerCase()) : CLI ? esc(CLI.n) : 'Merkalimentos'}</small></div>
+  h.innerHTML = `<div class="lat-pan"><div class="lat-cab"><b>${esc(CLI ? (CLI.t || CLI.n) : 'Cliente consentido')}<i class="lat-v">v${CAT_V}</i></b><small>${MID && ACC ? esc(ACC.n) + ' · ' + esc(String(ACC.rol).toLowerCase()) : CLI ? esc(CLI.n) : 'Merkalimentos'}</small></div>
     ${it('cat', '🛒', 'Catálogo')}${it('mis', '📋', 'Mis pedidos', n ? `<i>${n}</i>` : '')}${tok ? it('vales', '🎟️', 'Mis vales', va ? `<i class="v">${fmt(va.m)}</i>` : pa ? `<i class="a">${pa}</i>` : '') : ''}
     ${tok ? it('dev', '↩️', 'Agregar devolución', nDev() ? `<i>${nDev()}</i>` : '') : ''}${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${tok && ['apagados','permitidos'].includes(estadoAvisos()) ? it('av', '🔔', 'Activar avisos', '<i class="a">!</i>') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
     ${it('wa', '💬', 'Escribir a Merkalimentos')}<div class="lat-sep"></div>${it('cfg', '⚙️', 'Configuración')}${it('salir', '✕', 'Salir')}</div>`;
   h.onclick = e=>{ if(e.target===h) h.remove(); };
   document.body.appendChild(h); requestAnimationFrame(()=> h.classList.add('on'));
   h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar, av:activarAvisos,
-    wa:()=>{ location.href = `https://wa.me/${wa}?text=${encodeURIComponent('Hola, les escribo desde mi catálogo' + (CLI ? ' (' + (CLI.t || CLI.n) + ')' : ''))}`; }, cfg:verConfig, salir:preguntarSalir})[b.dataset.l](); });
+    wa:()=> escribirMerka(wa), cfg:verConfig, salir:preguntarSalir})[b.dataset.l](); });
 }
 function verConfig(){
   const h = hoja(`<h3>Configuración</h3>
@@ -1159,8 +1161,7 @@ function verConfig(){
       <div id="cfCamAyuda"></div><button class="btn sec" id="cfCamBtn" style="width:100%;margin-top:8px">📷 Activar cámara</button></div>
     <div class="cfg-c"><h4>Aplicación</h4><div><span>Versión</span><b>${CAT_V}</b></div><div><span>Instalada</span><b>${instalada() ? 'Sí ✓' : 'No'}</b></div><div id="cfVer"><span>Actualización</span><b>Buscando…</b></div>
       <details class="mp-det"><summary>Novedades</summary>${CAT_NOV.map(([v, t])=> `<div><span><b>${v}</b> · ${esc(t)}</span></div>`).join('')}</details></div>
-    <div class="acts">${esDueno() && CLI ? '<button class="btn sec" id="cfAcc">👥 Personas con acceso</button>' : ''}${puedeInstalar() ? '<button class="btn sec" id="cfInst">📲 Instalar app</button>' : ''}
-      <button class="btn sec" id="cfBorrar">Borrar historial de este celular</button></div>`);
+    <div class="acts">${esDueno() && CLI ? '<button class="btn sec" id="cfAcc">👥 Personas con acceso</button>' : ''}${puedeInstalar() ? '<button class="btn sec" id="cfInst">📲 Instalar app</button>' : ''}</div>`);
   const a = h.querySelector('#cfAcc'); if(a) a.onclick = ()=>{ h.remove(); verAccesos(); };
   const i = h.querySelector('#cfInst'); if(i) i.onclick = ()=>{ h.remove(); instalar(); };
   const camTxt = {granted:'Permitida ✓', denied:'Bloqueada', prompt:'Sin preguntar', desconocido:'—'};
@@ -1180,7 +1181,6 @@ function verConfig(){
       else { el.innerHTML = `<span>Hay versión nueva <b>${esc(j.v)}</b></span><button class="btn" id="cfAct" style="flex:0 0 auto;padding:8px 14px">Actualizar</button>`;
         el.querySelector('#cfAct').onclick = async ()=>{ try{ const g = await navigator.serviceWorker?.getRegistration(); await g?.update(); }catch(_){} location.reload(); }; }
     }catch(_){ el.innerHTML = '<span>Actualización</span><b>Sin conexión</b>'; } })();
-  h.querySelector('#cfBorrar').onclick = ()=>{ if(!confirmarSimple('¿Borrar el historial de pedidos y el pedido en curso de este celular? Tus pedidos enviados no se borran.')) return; ls.set(K + '_pedidos', []); ls.set(K + '_ultimo', null); carrito = {}; guardarCarrito(); h.remove(); pintar(); toast('Historial borrado'); };
 }
 /* App instalada: se registra una vez para dar prioridad en los vales a quien aún no la tiene */
 async function marcarInstalada(){
@@ -1212,6 +1212,45 @@ async function activarAvisos(silencioso){
   if(Notification.permission !== 'granted'){ if(silencioso) return false; const r = await Notification.requestPermission(); if(r !== 'granted'){ toast('Avisos no permitidos'); return false; } }
   try{ const t = await conLimite(tokenAvisos(), 15000); if(!t) throw 0; if(t !== ls.get('mkcat_push_' + tok)) await guardarTokenAvisos(t); if(!silencioso) toast('Avisos activados ✓'); return true; }
   catch(_){ if(!silencioso) toast('No se pudieron activar los avisos, intenta de nuevo'); return false; }
+}
+/* ===== Escribir a Merkalimentos: WhatsApp o mensaje por la app (respuesta llega como aviso) ===== */
+function escribirMerka(wa){
+  const mis = ls.get(K + '_msgs', []);
+  const h = hoja(`<h3>Escribir a Merkalimentos</h3>
+    <button class="btn" id="emWa" style="width:100%;margin-top:6px">💬 Por WhatsApp</button>
+    ${tok ? `<div class="cfg-c" style="margin-top:12px"><h4>✉️ Mensaje por la app</h4>
+      <textarea id="emTxt" maxlength="400" rows="3" placeholder="Escribe tu mensaje…" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line,#ddd);border-radius:12px;font:inherit;resize:vertical"></textarea>
+      <button class="btn" id="emEnv" style="width:100%;margin-top:8px">Enviar mensaje</button>
+      <small class="sub" style="display:block;margin-top:6px">Te respondemos aquí mismo y te llega un aviso al celular${estadoAvisos() === 'activos' ? '' : ' (activa los avisos en el menú)'}.</small></div>
+    <div id="emHist">${histMsgsHTML(mis)}</div>` : ''}`);
+  h.querySelector('#emWa').onclick = ()=>{ location.href = `https://wa.me/${wa}?text=${encodeURIComponent('Hola, les escribo desde mi catálogo' + (CLI ? ' (' + (CLI.t || CLI.n) + ')' : ''))}`; };
+  const env = h.querySelector('#emEnv'); if(!env) return;
+  env.onclick = async ()=>{
+    const t = h.querySelector('#emTxt').value.trim(); if(!t){ h.querySelector('#emTxt').focus(); return; }
+    env.disabled = true; env.textContent = 'Enviando…';
+    const id = 'MS' + Date.now().toString(36).toUpperCase() + rid(4), quien = yo();
+    try{ const {m, db} = await conLimite(nube(), 8000);
+      await conLimite(m.setDoc(m.doc(db, 'mensajes', id), {id, c:tok, cli:{n:CLI?.n || '', t:CLI?.t || '', ...(quien ? {por:quien} : {})}, t, f:new Date().toISOString(), estado:'Nuevo', creado:m.serverTimestamp()}), 10000);
+    }catch(e){ env.disabled = false; env.textContent = 'Enviar mensaje'; return toast(/permission/i.test(String(e && (e.code || e.message))) ? 'Esta función aún no está activa. Escríbenos por WhatsApp.' : 'Sin conexión: inténtalo de nuevo'); }
+    const ms = ls.get(K + '_msgs', []); ms.unshift({id, t, f:new Date().toISOString()}); ls.set(K + '_msgs', ms.slice(0, 20));
+    h.querySelector('#emTxt').value = ''; env.disabled = false; env.textContent = 'Enviar mensaje'; toast('Mensaje enviado ✓');
+    h.querySelector('#emHist').innerHTML = histMsgsHTML(ls.get(K + '_msgs', []));
+  };
+  refrescarMsgs().then(c=>{ if(c && document.body.contains(h)) h.querySelector('#emHist').innerHTML = histMsgsHTML(ls.get(K + '_msgs', [])); });
+}
+function histMsgsHTML(ms){
+  if(!ms.length) return '';
+  return `<div class="cfg-c" style="margin-top:12px"><h4>Tus mensajes</h4>${ms.slice(0, 8).map(x=> `<div style="display:block;padding:8px 0;border-top:1px solid var(--line,#eee)">
+    <small class="sub">${new Date(x.f).toLocaleDateString('es-MX', {day:'numeric', month:'short'})} · ${new Date(x.f).toLocaleTimeString('es-MX', {hour:'numeric', minute:'2-digit'})}</small><div>${esc(x.t)}</div>
+    ${x.r ? `<div style="margin-top:6px;padding:8px 10px;background:#e8f4ec;border-radius:10px"><b>Merkalimentos:</b> ${esc(x.r)}</div>` : '<small class="sub">Esperando respuesta…</small>'}</div>`).join('')}</div>`;
+}
+async function refrescarMsgs(){
+  const ms = ls.get(K + '_msgs', []), pend = ms.filter(x=> !x.r).slice(0, 8); if(!pend.length) return false;
+  let cambio = false;
+  try{ const {m, db} = await conLimite(nube(), 8000);
+    await conLimite(Promise.all(pend.map(async x=>{ const d = await m.getDoc(m.doc(db, 'mensajes', x.id)); if(d.exists() && d.data().r){ x.r = d.data().r; cambio = true; } })), 10000);
+    if(cambio) ls.set(K + '_msgs', ms); }catch(_){}
+  return cambio;
 }
 /* ===== Aviso del día de visita ===== */
 const DIAS_K = ['dom','lun','mar','mie','jue','vie','sab'], DIAS_N = {lun:'lunes', mar:'martes', mie:'miércoles', jue:'jueves', vie:'viernes', sab:'sábado', dom:'domingo'};
