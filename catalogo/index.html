@@ -728,7 +728,18 @@ function toast(t){ const e = $('toast'); e.textContent = t; e.classList.add('on'
 const precio = p => { const e = CLI && CLI.precios && Number(CLI.precios[p.id]); return e > 0 ? e : p.p; };
 const nombre = p => [p.m, p.n, (p.pr||'').split('·')[0].trim()].filter(Boolean).join(' ');
 const foto = p => !p.f ? '' : (FOTOS[p.f] || (String(p.f).startsWith('data:') ? p.f : ''));
-const prodPorId = id => D.productos.find(p=> p.id===id);
+const prodPorId = id => (D.todos || D.productos).find(p=> p.id===id);
+/* Surtido: tiendas o Foodservice (clientes FS ven por defecto lo suyo y pueden cambiar a tiendita) */
+let SURT = 'tienda';
+const esFS = ()=> !!(CLI && CLI.fs);
+function aplicarSurtido(){
+  if(!D) return; if(!D.todos) D.todos = D.productos;
+  const hayFS = D.todos.some(p=> p.cn === 'f' || p.cn === 'a');
+  SURT = esFS() && hayFS && ls.get(K + '_surt', 'fs') !== 'tienda' ? 'fs' : 'tienda';
+  D.productos = D.todos.filter(p=> SURT === 'fs' ? (p.cn === 'f' || p.cn === 'a') : p.cn !== 'f');
+  const sb = $('sub'); if(sb && D.publicado) sb.textContent = 'Merkalimentos · ' + (SURT === 'fs' ? 'catálogo Foodservice · ' : '') + 'actualizado ' + new Date(D.publicado).toLocaleDateString('es-MX',{day:'numeric', month:'long', year:'numeric'});
+}
+function cambiarSurtido(){ ls.set(K + '_surt', SURT === 'fs' ? 'tienda' : 'fs'); aplicarSurtido(); modo = modo === 'dev' ? 'ver' : modo; pintar(); window.scrollTo({top:0, behavior:'smooth'}); toast(SURT === 'fs' ? 'Catálogo Foodservice' : 'Catálogo de tiendita'); }
 const guardarCarrito = ()=> ls.set(K + '_carrito', carrito);
 
 async function resolverAcceso(){
@@ -763,6 +774,7 @@ async function cargar(){
   $('sub').textContent = 'Merkalimentos · actualizado ' + new Date(D.publicado).toLocaleDateString('es-MX',{day:'numeric', month:'long', year:'numeric'});
   $('hola').innerHTML = (CLI ? (MID && ACC ? `<span class="hola">Hola, ${esc(ACC.n)} · pedidos para ${esc(CLI.t || CLI.n)}</span>` : `<span class="hola">Hola, ${esc(CLI.n)}, aquí podrás encontrar nuestros productos con tus precios</span>`) : '') + avisoVisita();
   asegurarUrlInstalable();
+  aplicarSurtido();
   pintar();
 }
 function pintar(){
@@ -953,8 +965,8 @@ function pdfPedido(p, total){
 
 
 /* ===== Versión del catálogo ===== */
-const CAT_V = '3.4';
-const CAT_NOV = [['3.4', 'Promociones y vales en ámbar, tu día de visita en verde'], ['3.3', 'Más contraste: fondo azul grisáceo, categorías en azul claro y productos en tarjetas blancas'], ['3.2', 'El ícono de la app se actualiza solo'], ['3.1', 'Ícono de la app con el diseño nuevo'], ['3.0', 'Nuevo diseño: colores de Merkalimentos (azul, blanco y gris) y logo nuevo'], ['2.4', 'Ícono en alta calidad'], ['2.3', 'Nuevo ícono de la app: el tendero de Merkalimentos'], ['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
+const CAT_V = '3.5';
+const CAT_NOV = [['3.5', 'Catálogo Foodservice para restaurantes y cocinas, con opción de ver el catálogo de tiendita'], ['3.4', 'Promociones y vales en ámbar, tu día de visita en verde'], ['3.3', 'Más contraste: fondo azul grisáceo, categorías en azul claro y productos en tarjetas blancas'], ['3.2', 'El ícono de la app se actualiza solo'], ['3.1', 'Ícono de la app con el diseño nuevo'], ['3.0', 'Nuevo diseño: colores de Merkalimentos (azul, blanco y gris) y logo nuevo'], ['2.4', 'Ícono en alta calidad'], ['2.3', 'Nuevo ícono de la app: el tendero de Merkalimentos'], ['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
   ['1.7', 'Menú lateral, vales de descuento y escanear QR'], ['1.6', 'App instalable, compartir con encargado o familiar, aviso de visita y precio sugerido'], ['1.5', 'Mis pedidos con seguimiento de entrega']];
 /* ===== Devoluciones ===== */
 let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
@@ -975,12 +987,12 @@ function politicaDevHTML(corta){
 </div>`;
 }
 function pintarDev(){
-  const secs = D.secciones.filter(s=> D.productos.some(p=> p.s===s));
+  const secs = D.secciones.filter(s=> (D.todos || D.productos).some(p=> p.s===s));
   $('secnav').innerHTML = secs.map((s,i)=> `<button data-i="${i}" title="${esc(s)}">${esc(s.length <= 12 ? s : s.split(/[ ,]/)[0])}</button>`).join('');
   $('secnav').querySelectorAll('button').forEach(b=> b.onclick = ()=> document.getElementById('sec' + b.dataset.i).scrollIntoView({behavior:'smooth', block:'start'}));
   $('main').className = 'wrap modo-dev'; document.body.classList.add('modo-pedido-on');
   $('main').innerHTML = `<section class="pagina dev-int"><h2>Agregar devolución</h2>${politicaDevHTML()}${devHistHTML()}</section>`
-    + secs.map((s,i)=> `<section class="pagina" id="sec${i}"><h2>${esc(s)}</h2><div class="grid">${D.productos.filter(p=> p.s===s).map(tarjetaDev).join('')}</div></section>`).join('');
+    + secs.map((s,i)=> `<section class="pagina" id="sec${i}"><h2>${esc(s)}</h2><div class="grid">${(D.todos || D.productos).filter(p=> p.s===s).map(tarjetaDev).join('')}</div></section>`).join('');
   $('main').querySelectorAll('.prod').forEach(b=> b.onclick = ()=>{ const p = prodPorId(b.dataset.id); if(!p.ad) return toast('Este producto no tiene devolución'); pedirDev(p); });
   barraDev(); refrescarDevs();
 }
@@ -1182,12 +1194,12 @@ function abrirMenu(){
   const it = (id, ico, t, extra = '') => `<button class="lat-i" data-l="${id}"><span>${ico}</span><b>${t}</b>${extra}</button>`;
   const h = document.createElement('div'); h.className = 'hoja lat';
   h.innerHTML = `<div class="lat-pan"><div class="lat-cab"><b>${esc(CLI ? (CLI.t || CLI.n) : 'Cliente consentido')}<i class="lat-v">v${CAT_V}</i></b><small>${MID && ACC ? esc(ACC.n) + ' · ' + esc(String(ACC.rol).toLowerCase()) : CLI ? esc(CLI.n) : 'Merkalimentos'}</small></div>
-    ${it('cat', '🛒', 'Catálogo')}${it('mis', '📋', 'Mis pedidos', n ? `<i>${n}</i>` : '')}${tok ? it('vales', '🎟️', 'Mis vales', va ? `<i class="v">${fmt(va.m)}</i>` : pa ? `<i class="a">${pa}</i>` : '') : ''}
+    ${it('cat', '🛒', 'Catálogo')}${esFS() && D && (D.todos || D.productos).some(p=> p.cn === 'f' || p.cn === 'a') ? it('surt', SURT === 'fs' ? '🏪' : '🍳', SURT === 'fs' ? 'Ver catálogo de tiendita' : 'Ver mi catálogo Foodservice') : ''}${it('mis', '📋', 'Mis pedidos', n ? `<i>${n}</i>` : '')}${tok ? it('vales', '🎟️', 'Mis vales', va ? `<i class="v">${fmt(va.m)}</i>` : pa ? `<i class="a">${pa}</i>` : '') : ''}
     ${tok ? it('dev', '↩️', 'Agregar devolución', nDev() ? `<i>${nDev()}</i>` : '') : ''}${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${tok && ['apagados','permitidos'].includes(estadoAvisos()) ? it('av', '🔔', 'Activar avisos', '<i class="a">!</i>') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
     ${it('wa', '💬', 'Escribir a Merkalimentos')}<div class="lat-sep"></div>${it('cfg', '⚙️', 'Configuración')}${it('salir', '✕', 'Salir')}</div>`;
   h.onclick = e=>{ if(e.target===h) h.remove(); };
   document.body.appendChild(h); requestAnimationFrame(()=> h.classList.add('on'));
-  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar, av:activarAvisos,
+  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, surt:cambiarSurtido, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar, av:activarAvisos,
     wa:()=> escribirMerka(wa), cfg:verConfig, salir:preguntarSalir})[b.dataset.l](); });
 }
 function verConfig(){
