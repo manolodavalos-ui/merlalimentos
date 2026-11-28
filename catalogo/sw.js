@@ -1,5 +1,5 @@
 /* Cliente consentido: siempre busca la versión más nueva; sin señal usa la última guardada */
-const CACHE = 'cliente-consentido-v29';
+const CACHE = 'cliente-consentido-v30';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', e => {
