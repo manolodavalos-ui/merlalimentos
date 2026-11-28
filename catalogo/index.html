@@ -914,8 +914,8 @@ function pdfPedido(p, total){
 
 
 /* ===== Versión del catálogo ===== */
-const CAT_V = '2.1';
-const CAT_NOV = [['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
+const CAT_V = '2.2';
+const CAT_NOV = [['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
   ['1.7', 'Menú lateral, vales de descuento y escanear QR'], ['1.6', 'App instalable, compartir con encargado o familiar, aviso de visita y precio sugerido'], ['1.5', 'Mis pedidos con seguimiento de entrega']];
 /* ===== Devoluciones ===== */
 let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
@@ -1369,10 +1369,9 @@ window.addEventListener('popstate', ()=>{
 function preguntarSalir(){
   if(document.querySelector('.hoja.salir-q')) return;
   const n = nCarrito();
-  const h = hoja(`<h3>¿Deseas salir?</h3><p class="sub">${n ? `Tu pedido en curso (${n} ${n===1?'producto':'productos'}) se queda guardado para cuando regreses.` : 'Puedes volver cuando quieras desde el mismo link.'}</p>
-    <div class="acts"><button class="btn" id="sNo">Seguir en el catálogo</button><button class="btn sec" id="sSi">Salir</button></div>`, true);
+  const h = hoja(`<h3>¿Deseas salir?</h3><p class="sub">${n ? `Tu pedido en curso (${n} ${n===1?'producto':'productos'}) se queda guardado para cuando regreses.` : (instalada() ? 'Puedes volver cuando quieras desde el ícono de la app.' : 'Puedes volver cuando quieras desde el mismo link.')}</p>
+    <div class="acts"><button class="btn" id="sSi">Salir</button></div>`, true);
   h.classList.add('salir-q');
-  h.querySelector('#sNo').onclick = ()=> h.remove();
   h.querySelector('#sSi').onclick = ()=>{ h.remove(); salir(); };
 }
 /* Salir: el navegador no deja cerrar una pestaña abierta desde un link, así que regresamos a WhatsApp y dejamos una despedida */
@@ -1386,14 +1385,20 @@ function salir(){
 }
 /* App instalada: se cierra sin cerrar sesión (la identidad queda guardada en el celular) */
 function cerrarApp(){
-  try{ window.close(); }catch(_){}
-  setTimeout(()=>{ if(document.visibilityState === 'hidden') return;
-    try{ const n = history.length; if(n > 1) history.go(-(n - 1)); }catch(_){}
-    setTimeout(()=>{ if(document.visibilityState === 'hidden') return; saliendo = false;
-      const a = document.createElement('div'); a.className = 'adios';
-      a.innerHTML = `<div class="in"><div class="ok">👋</div><h3>¡Hasta pronto!</h3><p class="sub">Ya puedes cerrar la app. Tu sesión queda guardada.</p><button class="btn" id="adVolver">Volver al catálogo</button></div>`;
-      document.body.appendChild(a); a.querySelector('#adVolver').onclick = ()=>{ a.remove(); armarAtras(); }; }, 400);
-  }, 250);
+  if(document.querySelector('.adios')) return;
+  const a = document.createElement('div'); a.className = 'adios';
+  a.innerHTML = `<div class="in"><div class="ok">👋</div><h3>¡Hasta pronto!</h3><p class="sub" id="adTxt">Tu sesión queda guardada.</p></div>`;
+  document.body.appendChild(a);
+  /* al volver a abrir la app desde el ícono, regresa al catálogo */
+  const alVolver = ()=>{ if(document.visibilityState !== 'visible') return; document.removeEventListener('visibilitychange', alVolver); a.remove(); saliendo = false; armarAtras(); };
+  setTimeout(()=>{
+    try{ window.close(); }catch(_){}
+    setTimeout(()=>{ if(document.visibilityState === 'hidden'){ document.addEventListener('visibilitychange', alVolver); return; }
+      try{ const n = history.length; if(n > 1) history.go(-(n - 1)); }catch(_){}
+      setTimeout(()=>{ document.addEventListener('visibilitychange', alVolver); if(document.visibilityState === 'hidden') return;
+        const t = a.querySelector('#adTxt'); if(t) t.innerHTML = 'Tu sesión queda guardada.<br>Presiona <b>Atrás</b> para cerrar la app.'; }, 500);
+    }, 300);
+  }, 1500);
 }
 function despedida(){
   if(document.querySelector('.adios')) return;
