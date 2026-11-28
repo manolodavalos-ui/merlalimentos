@@ -1,5 +1,5 @@
 /* Cliente consentido: siempre busca la versión más nueva; sin señal usa la última guardada */
-const CACHE = 'cliente-consentido-v27';
+const CACHE = 'cliente-consentido-v28';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', e => {
@@ -15,7 +15,7 @@ self.addEventListener('push', e => {
   let j = {}; try { j = e.data ? e.data.json() : {}; } catch (_) { j = {cuerpo: e.data && e.data.text()}; }
   const d = j.data || j;
   e.waitUntil(self.registration.showNotification(d.titulo || 'Merkalimentos', {
-    body: d.cuerpo || '', tag: d.tag || undefined, renotify: !!d.tag, icon: 'cc-icon-192.png', badge: 'cc-icon-192.png', data: {link: d.link || './'}
+    body: d.cuerpo || '', tag: d.tag || undefined, renotify: !!d.tag, icon: 'cc-icon-192-v2.png', badge: 'cc-icon-192-v2.png', data: {link: d.link || './'}
   }));
 });
 self.addEventListener('notificationclick', e => {

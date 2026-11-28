@@ -20,8 +20,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="Cliente consentido">
-<link rel="icon" href="cc-icon-192.png">
-<link rel="apple-touch-icon" href="cc-apple-touch-icon.png">
+<link rel="icon" href="cc-icon-192-v2.png">
+<link rel="apple-touch-icon" href="cc-apple-touch-icon-v2.png">
 <style>
 :root{--bg:#F5F7FA;--card:#fff;--text:#041637;--muted:#64748B;--line:#E2E8F0;--brand:#3D5A80;--brand-2:#4A6A93;--soft:#E8EEF6;--danger:#c0392b;--gold:#f2c94c}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -933,8 +933,8 @@ function pdfPedido(p, total){
 
 
 /* ===== Versión del catálogo ===== */
-const CAT_V = '3.1';
-const CAT_NOV = [['3.1', 'Ícono de la app con el diseño nuevo'], ['3.0', 'Nuevo diseño: colores de Merkalimentos (azul, blanco y gris) y logo nuevo'], ['2.4', 'Ícono en alta calidad'], ['2.3', 'Nuevo ícono de la app: el tendero de Merkalimentos'], ['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
+const CAT_V = '3.2';
+const CAT_NOV = [['3.2', 'El ícono de la app se actualiza solo'], ['3.1', 'Ícono de la app con el diseño nuevo'], ['3.0', 'Nuevo diseño: colores de Merkalimentos (azul, blanco y gris) y logo nuevo'], ['2.4', 'Ícono en alta calidad'], ['2.3', 'Nuevo ícono de la app: el tendero de Merkalimentos'], ['2.2', 'Salir con un solo botón; la app se despide y se cierra sola, sin cerrar tu sesión'], ['2.1', 'Escribir a Merkalimentos por WhatsApp o por mensaje en la app, versión junto al nombre en el menú y categorías siempre visibles'], ['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
   ['1.7', 'Menú lateral, vales de descuento y escanear QR'], ['1.6', 'App instalable, compartir con encargado o familiar, aviso de visita y precio sugerido'], ['1.5', 'Mis pedidos con seguimiento de entrega']];
 /* ===== Devoluciones ===== */
 let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
@@ -1366,7 +1366,7 @@ function asegurarUrlInstalable(){
   try{ if(location.search !== '?' + id) history.replaceState(history.state, '', location.pathname + '?' + id); }catch(_){}
   if(!esIOS) return;
   try{ const man = {name:'Cliente consentido Merkalimentos', short_name:'Cliente consentido', start_url: location.origin + location.pathname + '?' + id, scope: location.origin + location.pathname,
-      display:'standalone', background_color:'#FFFFFF', theme_color:'#FFFFFF', icons:[{src: new URL('../icon-192.png', location.href).href, sizes:'192x192', type:'image/png'}, {src: new URL('../icon-512.png', location.href).href, sizes:'512x512', type:'image/png'}]};
+      display:'standalone', background_color:'#FFFFFF', theme_color:'#FFFFFF', icons:[{src: new URL('cc-icon-192-v2.png', location.href).href, sizes:'192x192', type:'image/png'}, {src: new URL('cc-icon-512-v2.png', location.href).href, sizes:'512x512', type:'image/png'}]};
     document.querySelector('link[rel="manifest"]').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man)); }catch(_){}
 }
 const VALE_URL = new URLSearchParams(location.search).get('vale');
