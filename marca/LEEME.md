@@ -19,3 +19,7 @@ Colores: azul marino `#1B2A49` · verde palomita `#69B450` · verde app `#1F6B45
 - `png/cc-icon-*.png`, `png/cc-apple-touch-icon.png`, `png/cliente-logo*-1200.png`
 
 Los SVG se pueden agrandar a cualquier tamaño (lonas, rotulación) sin perder calidad.
+
+## Versión final (28/nov) · tema D
+- `vector/manuel/` — logos finales de Manuel (horizontal con palomita, vertical con palomita, vertical con tendero)
+- `png/tema-d/` — íconos de las dos apps en estilo D: fondo blanco con arco azul claro (#E3EBF5)
