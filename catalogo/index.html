@@ -912,8 +912,8 @@ function pdfPedido(p, total){
 
 
 /* ===== Versión del catálogo ===== */
-const CAT_V = '1.9';
-const CAT_NOV = [['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
+const CAT_V = '2.0';
+const CAT_NOV = [['2.0', 'Avisos en el celular: recordatorio un día antes de tu visita y estado de tu pedido'], ['1.9', 'Permisos de cámara, escanear vale con foto, códigos más fáciles y versión en Configuración'], ['1.8', 'Agregar devolución con política de devoluciones'],
   ['1.7', 'Menú lateral, vales de descuento y escanear QR'], ['1.6', 'App instalable, compartir con encargado o familiar, aviso de visita y precio sugerido'], ['1.5', 'Mis pedidos con seguimiento de entrega']];
 /* ===== Devoluciones ===== */
 let devC = ls.get(K + '_dev', {});   /* {id: {q, mot, cad}} */
@@ -1142,11 +1142,11 @@ function abrirMenu(){
   const h = document.createElement('div'); h.className = 'hoja lat';
   h.innerHTML = `<div class="lat-pan"><div class="lat-cab"><b>${esc(CLI ? (CLI.t || CLI.n) : 'Cliente consentido')}</b><small>${MID && ACC ? esc(ACC.n) + ' · ' + esc(String(ACC.rol).toLowerCase()) : CLI ? esc(CLI.n) : 'Merkalimentos'}</small></div>
     ${it('cat', '🛒', 'Catálogo')}${it('mis', '📋', 'Mis pedidos', n ? `<i>${n}</i>` : '')}${tok ? it('vales', '🎟️', 'Mis vales', va ? `<i class="v">${fmt(va.m)}</i>` : pa ? `<i class="a">${pa}</i>` : '') : ''}
-    ${tok ? it('dev', '↩️', 'Agregar devolución', nDev() ? `<i>${nDev()}</i>` : '') : ''}${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
+    ${tok ? it('dev', '↩️', 'Agregar devolución', nDev() ? `<i>${nDev()}</i>` : '') : ''}${tok ? it('qr', '📷', 'Escanear QR') : ''}${esDueno() && CLI ? it('acc', '👥', 'Compartir mi catálogo') : ''}${tok && ['apagados','permitidos'].includes(estadoAvisos()) ? it('av', '🔔', 'Activar avisos', '<i class="a">!</i>') : ''}${puedeInstalar() ? it('inst', '📲', 'Instalar app', '<i class="a">!</i>') : ''}
     ${it('wa', '💬', 'Escribir a Merkalimentos')}<div class="lat-sep"></div>${it('cfg', '⚙️', 'Configuración')}${it('salir', '✕', 'Salir')}</div>`;
   h.onclick = e=>{ if(e.target===h) h.remove(); };
   document.body.appendChild(h); requestAnimationFrame(()=> h.classList.add('on'));
-  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar,
+  h.querySelectorAll('[data-l]').forEach(b=> b.onclick = ()=>{ h.remove(); ({cat:()=>{ modo = 'ver'; pintar(); window.scrollTo({top:0, behavior:'smooth'}); }, mis:verMisPedidos, vales:verVales, dev:abrirDevolucion, qr:escanearQR, acc:verAccesos, inst:instalar, av:activarAvisos,
     wa:()=>{ location.href = `https://wa.me/${wa}?text=${encodeURIComponent('Hola, les escribo desde mi catálogo' + (CLI ? ' (' + (CLI.t || CLI.n) + ')' : ''))}`; }, cfg:verConfig, salir:preguntarSalir})[b.dataset.l](); });
 }
 function verConfig(){
@@ -1155,7 +1155,7 @@ function verConfig(){
       ${(CLI.dv||[]).length ? `<div><span>Días de visita</span><b>${CLI.dv.map(k=> DIAS_N[k]).join(', ')}</b></div>` : ''}<p class="sub" style="margin:8px 0 0">¿Algo está mal? Escríbenos por WhatsApp y lo corregimos.</p></div>` : ''}
     ${MID && ACC ? `<div class="cfg-c"><h4>Mi acceso</h4><div><span>Entras como</span><b>${esc(ACC.n)} (${esc(String(ACC.rol).toLowerCase())})</b></div><p class="sub" style="margin:8px 0 0">Tus pedidos llegan con tu nombre a nombre de ${esc(CLI?.t || CLI?.n || 'la tienda')}.</p></div>` : ''}
     <div class="cfg-c"><h4>Devoluciones</h4>${politicaDevHTML(true)}</div>
-    <div class="cfg-c"><h4>Permisos</h4><div><span>Cámara (escanear vales)</span><b id="cfCam">…</b></div><div><span>Avisos en el celular</span><b>Próximamente</b></div>
+    <div class="cfg-c"><h4>Permisos</h4><div><span>Cámara (escanear vales)</span><b id="cfCam">…</b></div><div><span>Avisos en el celular</span><b id="cfAv">…</b></div><small class="sub" style="display:block;margin-top:4px">Te avisamos un día antes de tu visita y cuando tu pedido cambie de estado.</small><div id="cfAvAyuda"></div><button class="btn sec" id="cfAvBtn" style="width:100%;margin-top:8px">🔔 Activar avisos</button>
       <div id="cfCamAyuda"></div><button class="btn sec" id="cfCamBtn" style="width:100%;margin-top:8px">📷 Activar cámara</button></div>
     <div class="cfg-c"><h4>Aplicación</h4><div><span>Versión</span><b>${CAT_V}</b></div><div><span>Instalada</span><b>${instalada() ? 'Sí ✓' : 'No'}</b></div><div id="cfVer"><span>Actualización</span><b>Buscando…</b></div>
       <details class="mp-det"><summary>Novedades</summary>${CAT_NOV.map(([v, t])=> `<div><span><b>${v}</b> · ${esc(t)}</span></div>`).join('')}</details></div>
@@ -1168,6 +1168,12 @@ function verConfig(){
     h.querySelector('#cfCamAyuda').innerHTML = st === 'denied' ? '<small class="sub">Está bloqueada. Para permitirla:</small>' + pasosPermisoCamara() : '';
     h.querySelector('#cfCamBtn').style.display = st === 'granted' ? 'none' : 'block'; };
   pintaCam();
+  const avTxt = {activos:'Activos ✓', permitidos:'Permitidos', bloqueados:'Bloqueados', apagados:'Apagados', instalar:'Instala la app primero', nosoporta:'No disponible en este celular'};
+  const pintaAv = ()=>{ const st = estadoAvisos(), el = h.querySelector('#cfAv'); if(!el) return; el.textContent = avTxt[st] || st;
+    h.querySelector('#cfAvBtn').style.display = (st === 'activos' || st === 'nosoporta' || !tok) ? 'none' : 'block';
+    h.querySelector('#cfAvAyuda').innerHTML = st === 'bloqueados' ? '<small class="sub">Están bloqueados. Para permitirlos:</small>' + pasosPermisoCamara().replace(/Cámara/g, 'Notificaciones') : st === 'instalar' ? '<small class="sub">En iPhone los avisos solo funcionan con la app instalada.</small>' : ''; };
+  pintaAv();
+  h.querySelector('#cfAvBtn').onclick = async ()=>{ if(estadoAvisos() === 'instalar'){ h.remove(); instalar(); return; } await activarAvisos(); pintaAv(); };
   h.querySelector('#cfCamBtn').onclick = async ()=>{ try{ const s2 = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); s2.getTracks().forEach(t=> t.stop()); toast('Cámara permitida ✓'); }catch(_){ toast('La cámara sigue bloqueada: sigue los pasos'); } pintaCam(); };
   (async ()=>{ const el = h.querySelector('#cfVer'); try{ const r = await fetch('version.json?t=' + Date.now(), {cache:'no-store'}); const j = await r.json();
       if(String(j.v) === CAT_V) el.innerHTML = '<span>Actualización</span><b>Al día ✓</b>';
@@ -1181,6 +1187,31 @@ async function marcarInstalada(){
   if(!instalada() || !tok) return; const k = 'mkcat_inst_' + tok; if(ls.get(k)) return;
   try{ const {m, db} = await conLimite(nube(), 8000); const q = yo();
     await conLimite(m.setDoc(m.doc(db, 'clientesCat', tok), {app:{inst:new Date().toISOString(), plat: esIOS ? 'ios' : 'android', por: q ? q.n : ''}}, {merge:true}), 10000); ls.set(k, 1); }catch(_){}
+}
+/* ===== Avisos en el celular (notificaciones) ===== */
+const VAPID = 'BHf8p0aStJLgUSiyM1f5WoJZjEk8QQxKhQDD2NtJtE2jStWWvMRpWFvCJv4PgYnCogB12i6WaqTmv6L_WLjo11Q';
+const pushSoportado = ()=> 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+function estadoAvisos(){ if(!pushSoportado()) return esIOS && !instalada() ? 'instalar' : 'nosoporta'; const p = Notification.permission; return p === 'granted' ? (ls.get('mkcat_push_' + (tok || '')) ? 'activos' : 'permitidos') : p === 'denied' ? 'bloqueados' : 'apagados'; }
+function idEquipo(){ let k = ls.get('mkcat_eq'); if(!k){ k = Math.random().toString(36).slice(2, 10); ls.set('mkcat_eq', k); } return k; }
+async function tokenAvisos(){
+  const reg = await navigator.serviceWorker.ready; const mm = await import('../fb/fb-msg.js');
+  if(!(await mm.isSupported())) throw new Error('nosoporta');
+  let app; try{ app = mm.initializeApp(FB_CFG, 'msg'); }catch(_){ app = tokenAvisos.app; } tokenAvisos.app = app;
+  return mm.getToken(mm.getMessaging(app), {vapidKey: VAPID, serviceWorkerRegistration: reg});
+}
+async function guardarTokenAvisos(t){
+  const {m, db} = await conLimite(nube(), 8000); const q = yo(), k = idEquipo();
+  await conLimite(m.setDoc(m.doc(db, 'clientesCat', tok), {push:{[k]:{t, plat: esIOS ? 'ios' : 'android', n: q ? q.n : '', u: location.origin + location.pathname + (MID ? '?m=' + MID : '?c=' + tok), f: new Date().toISOString()}}}, {merge:true}), 10000);
+  ls.set('mkcat_push_' + tok, t);
+}
+async function activarAvisos(silencioso){
+  if(!tok) return false;
+  const st = estadoAvisos();
+  if(st === 'instalar'){ if(!silencioso) toast('En iPhone primero instala la app para recibir avisos'); return false; }
+  if(st === 'nosoporta'){ if(!silencioso) toast('Este celular no permite avisos'); return false; }
+  if(Notification.permission !== 'granted'){ if(silencioso) return false; const r = await Notification.requestPermission(); if(r !== 'granted'){ toast('Avisos no permitidos'); return false; } }
+  try{ const t = await conLimite(tokenAvisos(), 15000); if(!t) throw 0; if(t !== ls.get('mkcat_push_' + tok)) await guardarTokenAvisos(t); if(!silencioso) toast('Avisos activados ✓'); return true; }
+  catch(_){ if(!silencioso) toast('No se pudieron activar los avisos, intenta de nuevo'); return false; }
 }
 /* ===== Aviso del día de visita ===== */
 const DIAS_K = ['dom','lun','mar','mie','jue','vie','sab'], DIAS_N = {lun:'lunes', mar:'martes', mie:'miércoles', jue:'jueves', vie:'viernes', sab:'sábado', dom:'domingo'};
@@ -1281,7 +1312,7 @@ function asegurarUrlInstalable(){
     document.querySelector('link[rel="manifest"]').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man)); }catch(_){}
 }
 const VALE_URL = new URLSearchParams(location.search).get('vale');
-cargar().then(async ()=>{ VALES = ls.get('mkcat_vales_' + (tok || ''), {}); pintarBotonMis(); setTimeout(pintarUltimo, 300); marcarInstalada();
+cargar().then(async ()=>{ VALES = ls.get('mkcat_vales_' + (tok || ''), {}); pintarBotonMis(); setTimeout(pintarUltimo, 300); marcarInstalada(); setTimeout(()=> activarAvisos(true), 4000);
   await refrescarVales(); if(VALE_URL) activarVale(VALE_URL); }).catch(()=>{});
 /* Botón Atrás del teléfono: cierra ventanas abiertas, luego regresa al catálogo y en la pantalla principal pregunta si desea salir */
 let saliendo = false;
